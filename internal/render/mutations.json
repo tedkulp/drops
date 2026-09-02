@@ -1,0 +1,29 @@
+{
+  "note": "Live controls for internal/render. Re-runnable proof that these tests can fail; the closed tickets' close reasons remain the historical record.",
+  "controls": [
+    {
+      "control": "fence-is-a-mode",
+      "clause": "A fence is a mode, not a line: an opening fence suspends every other reflow rule, blank lines included, until its matching close (dw32p.20)",
+      "file": "internal/render/wrap.go",
+      "test": "TestWrapTextLeavesAFencedBlockAlone",
+      "old": "if fence != \"\" {",
+      "new": "if false {"
+    },
+    {
+      "control": "truncation-is-gated-on-terminal-ness",
+      "clause": "A scanning verb truncates a title only when stdout is a terminal, so `drops list | grep` sees every byte (dw32p.20)",
+      "file": "internal/render/rows.go",
+      "test": "TestRowsTruncateOnlyOnATerminal",
+      "old": "measured := layout{width: console.width(), truncate: console.TTY}",
+      "new": "measured := layout{width: console.width(), truncate: true}"
+    },
+    {
+      "control": "a-relation-title-wraps-under-the-id-column",
+      "clause": "A page truncates nothing: a relation title too long for the line wraps under the id column rather than being ellipsised (dw32p.20 corrected this from the reference build)",
+      "file": "internal/render/page.go",
+      "test": "TestPageWrapsALongRefTitleUnderItsID",
+      "old": "indent := strings.Repeat(\" \", refGutter+pad+refGap)",
+      "new": "indent := \"\""
+    }
+  ]
+}

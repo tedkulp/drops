@@ -1,0 +1,109 @@
+{
+  "note": "The harness's controls for itself. It is the instrument the rest of the catalogue is measured with, so its own load-bearing branches — is the named test really there, did the mutation really compile, did the file really come back — are proved the same way everything else is.",
+  "controls": [
+    {
+      "control": "a-verdict-answers-for-the-name-it-was-asked-about",
+      "clause": "A verdict is about one named test: a parent's or a sibling's fail event does not make a passing subtest red",
+      "file": "tools/mutate/verdict.go",
+      "test": "TestParseVerdict/a_passing_subtest_is_not_redeemed_by_its_failing_sibling",
+      "old": "if e.Test != test {",
+      "new": "if false {"
+    },
+    {
+      "control": "a-build-failure-is-not-a-red",
+      "clause": "A mutation that does not compile proves nothing, whatever the package-level fail event says",
+      "file": "tools/mutate/verdict.go",
+      "test": "TestParseVerdict/a_build_failure_is_not_a_red,_despite_the_package_failing",
+      "old": "v.BuildFailed = true",
+      "new": "v.BuildFailed = false"
+    },
+    {
+      "control": "a-skip-is-not-a-pass",
+      "clause": "A skipped test ran but proved nothing — the trap AGENTS.md records, that go test prints ok for a package whose tests all skipped",
+      "file": "tools/mutate/verdict.go",
+      "test": "TestParseVerdict/a_skipped_test_ran_but_is_not_a_pass",
+      "old": "v.Skipped = true",
+      "new": "v.Skipped = false"
+    },
+    {
+      "control": "a-mutation-names-exactly-one-branch",
+      "clause": "A mutation whose old text is absent or repeated is refused before the file is touched: zero proves nothing and two change a branch nobody named",
+      "file": "tools/mutate/patch.go",
+      "test": "TestApplyMutationRefusesAnythingButOneOccurrence",
+      "old": "if n := strings.Count(body, old); n != 1 {",
+      "new": "if n := strings.Count(body, old); n < 0 {"
+    },
+    {
+      "control": "the-restore-is-verified-not-assumed",
+      "clause": "restore re-reads the file and checks it against the recorded checksum; a mismatch is an error and never a silent success",
+      "file": "tools/mutate/patch.go",
+      "test": "TestRestoreVerifiesTheChecksum",
+      "old": "if got := sum(back); got != s.Sum {",
+      "new": "if got := sum(back); got == \"\" {"
+    },
+    {
+      "control": "a-failing-baseline-is-never-mutated",
+      "clause": "A test that already fails goes red under any mutation, so the run stops at the baseline rather than recording it as proof",
+      "file": "tools/mutate/run.go",
+      "test": "TestBaselineRedNeverMutates",
+      "old": "case base.Failed:",
+      "new": "case false:"
+    },
+    {
+      "control": "the-mutation-is-in-the-file-while-the-test-runs",
+      "clause": "The test is run against the mutated file, not against a tree already restored",
+      "file": "tools/mutate/run.go",
+      "test": "TestRunMutatesTheFileWhileTheTestRuns",
+      "old": "v, runErr := r.RunTest(c.pkg(), c.Test)",
+      "new": "_ = snap.restore()\n\tv, runErr := r.RunTest(c.pkg(), c.Test)"
+    },
+    {
+      "control": "an-interrupted-run-is-recoverable",
+      "clause": "A journal written before the mutation names the file, the snapshot and the checksum, so a harness killed mid-run leaves evidence rather than a silently edited tree",
+      "file": "tools/mutate/run.go",
+      "test": "TestRecoverRestoresAnInterruptedMutation",
+      "old": "if err := s.restore(); err != nil {\n\t\treturn s.File, err\n\t}",
+      "new": "if false {\n\t\treturn s.File, nil\n\t}"
+    },
+    {
+      "control": "only-red-is-a-pass",
+      "clause": "Every outcome but RED is a finding: a test that cannot fail for the clause it appears to cover is what the harness exists to surface",
+      "file": "tools/mutate/run.go",
+      "test": "TestEndToEndAgainstTheFixtureModule",
+      "old": "func (o Outcome) ok() bool { return o == Red }",
+      "new": "func (o Outcome) ok() bool { return true }"
+    },
+    {
+      "control": "a-run-pattern-anchors-each-element",
+      "clause": "A test name is anchored element by element, so TestWrap does not also select TestWrapFence",
+      "file": "tools/mutate/run.go",
+      "test": "TestRunPatternAnchorsEachElement",
+      "old": "parts[i] = \"^\" + regexp.QuoteMeta(p) + \"$\"",
+      "new": "parts[i] = regexp.QuoteMeta(p)"
+    },
+    {
+      "control": "a-filter-matching-nothing-is-refused",
+      "clause": "A filter that selects no control is an error, because \"0 controls, all red\" is a green run reporting that nothing was proved",
+      "file": "tools/mutate/catalogue.go",
+      "test": "TestSelectRefusesAFilterThatMatchesNothing",
+      "old": "if !ok {",
+      "new": "if ok {"
+    },
+    {
+      "control": "a-control-states-its-clause",
+      "clause": "Every part of a control is required: AGENTS.md's rule is one control per requirement clause, and a control that cannot state its clause is a cheap mutation wearing a number",
+      "file": "tools/mutate/catalogue.go",
+      "test": "TestLoadCatalogueRequiresEveryPart",
+      "old": "\t\t\tif strings.TrimSpace(f.value) == \"\" {",
+      "new": "\t\t\tif false {"
+    },
+    {
+      "control": "flags-are-accepted-in-any-order",
+      "clause": "A flag after a positional filter is still a flag: Go's flag package stops at the first non-flag argument, which would read --json as a control name",
+      "file": "tools/mutate/main.go",
+      "test": "TestParseArgsAcceptsFlagsInAnyOrder/flags_last",
+      "old": "\t\tpositional = append(positional, fs.Arg(0))\n\t\targs = fs.Args()[1:]",
+      "new": "\t\treturn append(positional, fs.Args()...), nil"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "note": "Live controls for internal/resolve. Re-runnable proof that these tests can fail; the closed tickets' close reasons remain the historical record.",
+  "controls": [
+    {
+      "control": "a-binding-routes-by-prefix-only-inside-its-repository",
+      "clause": "A workspace binding routes a directory by prefix only when the bound directory lies inside that directory's repository, so an unbound nested Git root beats an ancestor binding and a worktree binding does not speak for its repository (dw32p.21)",
+      "file": "internal/resolve/resolve.go",
+      "test": "TestWorkspacePrefixRule",
+      "old": "return !facts.InRepository || covers(facts.Root, bound)",
+      "new": "return true"
+    },
+    {
+      "control": "two-projects-on-one-locator-is-reported",
+      "clause": "Two projects claiming one origin is reported as Ambiguous, never guessed (dw32p.8)",
+      "file": "internal/resolve/resolve.go",
+      "test": "TestAmbiguousLocatorNamesEveryClaimant",
+      "old": "case len(claimants) > 1:",
+      "new": "case false:"
+    }
+  ]
+}

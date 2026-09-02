@@ -20,6 +20,12 @@
 # that binary later opens is not the justfile's business.
 no_default_store := "/dev/null/no-default-store-in-tests/drops.db"
 
+# `mutate` takes arguments whose values contain spaces and braces — a mutation
+# is a fragment of Go source. Interpolating {{ARGS}} into the recipe line hands
+# them back to the shell to re-split, so `--old 'if measured.truncate {'`
+# arrives as three arguments; "$@" under this setting preserves them exactly.
+set positional-arguments
+
 # `git describe` has no tag to work from until dw32p.28 cuts v1.0.0, so today it
 # reports a bare short hash. The `-dirty` suffix is the load-bearing part: after
 # cutover the binary on PATH is built from this working tree, and `drops version`
@@ -44,6 +50,36 @@ lint:
 # The gate: lint, then the full race suite.
 test-all: lint test
     @echo "all suites green"
+
+# Prove the tests can fail. AGENTS.md holds every requirement clause to a
+# control that has been mutated with its test observed red; this is those four
+# steps as one command, over the controls catalogued in each package's
+# mutations.json.
+#
+#   just mutate                  every catalogued control
+#   just mutate render resolve   by package, or by control name
+#   just mutate --list           what is catalogued, without running it
+#   just mutate --restore        finish a run that was interrupted
+#
+# Deliberately NOT part of `test-all`. The gate answers "is the build green",
+# which is a question about this commit; mutation answers "can these tests
+# fail", which is a question about the suite, and pays a compile per control to
+# do it. Run it when a ticket adds or changes a control.
+#
+# DROPS_DB is exported for the same reason `test` exports it: mutate spawns
+# `go test`, which inherits this environment. tools/mutate carries the same
+# fallback so a bare `go run ./tools/mutate` is equally safe.
+#
+# Built, not `go run`. Measured 2026-09-02: `go run` prints "exit status 3" to
+# stderr and exits 1 itself, collapsing every exit code the harness makes to 1.
+# That would lose the one distinction worth having here — a finding (1) against
+# "a restore failed and the tree may still hold a mutation" (3) — which is the
+# same defect class dw32p.1 found in cobra and fixed rather than inherited.
+
+# Prove the tests can fail: mutate each catalogued control, require its test red.
+mutate *ARGS:
+    @go build -o .scratch/bin/mutate ./tools/mutate
+    @DROPS_DB="{{no_default_store}}" .scratch/bin/mutate "$@"
 
 # Refuses to install before cutover, and deletes itself when the guard does.
 #

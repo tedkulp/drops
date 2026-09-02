@@ -1,0 +1,45 @@
+{
+  "note": "Fixture catalogue for the harness's own end-to-end test. Each control is here to reach one outcome.",
+  "controls": [
+    {
+      "control": "less-is-strict",
+      "clause": "Less reports a strictly less than b, so equal inputs are not less",
+      "file": "calc/calc.go",
+      "test": "TestLess",
+      "old": "return a < b",
+      "new": "return a <= b"
+    },
+    {
+      "control": "clamp-lower-bound",
+      "clause": "Clamp raises a value below lo up to lo",
+      "file": "calc/calc.go",
+      "test": "TestClamp",
+      "old": "if n < lo {",
+      "new": "if false {"
+    },
+    {
+      "control": "does-not-compile",
+      "clause": "a mutation that does not compile proves nothing about the test",
+      "file": "calc/calc.go",
+      "test": "TestLess",
+      "old": "return a < b",
+      "new": "return a < undefinedSymbol"
+    },
+    {
+      "control": "drifted-from-the-code",
+      "clause": "a control whose old text is gone has drifted and must refuse",
+      "file": "calc/calc.go",
+      "test": "TestLess",
+      "old": "return a <= b",
+      "new": "return true"
+    },
+    {
+      "control": "no-such-test",
+      "clause": "a test name that matches nothing must not read as covered",
+      "file": "calc/calc.go",
+      "test": "TestNothingNamedThis",
+      "old": "return a < b",
+      "new": "return true"
+    }
+  ]
+}

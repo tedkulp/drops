@@ -1,0 +1,21 @@
+{
+  "note": "Live controls for internal/memory. Re-runnable proof that these tests can fail; the closed tickets' close reasons remain the historical record.",
+  "controls": [
+    {
+      "control": "a-supersession-chain-lives-in-one-project",
+      "clause": "A link never crosses a project boundary: a memory and its successor in different projects is refused (dw32p.18)",
+      "file": "internal/memory/supersede.go",
+      "test": "TestValidateSupersessionReject/cross_project",
+      "old": "if target.Project != l.Project {",
+      "new": "if target.Project == l.Project {"
+    },
+    {
+      "control": "a-period-inside-a-token-does-not-end-a-sentence",
+      "clause": "DeriveTitle's sentence boundary rejects a period that opens or sits inside a token, so \"~/.beads\" and \"time.RFC3339Nano\" do not truncate a title (dw32p.18)",
+      "file": "internal/memory/derive.go",
+      "test": "TestDeriveTitle",
+      "old": "var sentenceBoundary = regexp.MustCompile(`[^\\s.]\\.\\s+[\"'(A-Z]`)",
+      "new": "var sentenceBoundary = regexp.MustCompile(`\\.\\s`)"
+    }
+  ]
+}

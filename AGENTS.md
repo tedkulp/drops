@@ -17,17 +17,21 @@ directory.
 `just test-all`: `go vet` and a gofmt check, then `go test ./... -race`. A green
 `go test` is not a green build.
 
-Recipes export `DROPS_DB` to `.scratch/drops.db`. Until the cutover ticket, the old
+`test` and `mutate` export `DROPS_DB` to `/dev/null/no-default-store-in-tests/drops.db`
+— not a scratch store but a tripwire, so a test that reaches for `store.DefaultPath()`
+fails with ENOTDIR and names the path. Until the cutover ticket, the old
 `drops` on `PATH` has sole ownership of `~/.drops/drops.db` — the store this
 repository's own issues live in. Runtime code refuses the default real-store path
 during development; run a local binary only through a guarded recipe.
 
-Three tools lie about success here:
+Four tools lie about success here:
 
 - `gofmt -l` exits zero while listing files. The file list is the signal, never `$?`.
 - `grep -c` exits one on zero matches and silently skips the rest of an `&&` chain.
 - `go test` prints `ok` for a package whose tests all skipped. Read the skip count
   and the test events before treating that output as proof.
+- `go run` exits 1 whatever its program exited, printing `exit status 3` to stderr.
+  A recipe that needs the program's own exit code must `go build` and run the binary.
 
 ## Test discipline
 
@@ -54,19 +58,55 @@ not need a control; a comparator does.
 
 ### How a mutation is run
 
-Commit first. A restore command cannot distinguish a mutation from uncommitted work.
+`just mutate`. The four steps are the recipe's, not yours:
 
 1. Snapshot the file and record its checksum.
 2. Apply the mutation.
-3. Run the one test that names this requirement. It must fail. A green run means the
-   test does not cover the clause — fix the test, not the record.
+3. Run the one named test, expecting failure. A pass is the finding: the test does
+   not cover the clause — fix the test, not the record.
 4. Restore from the snapshot and verify the checksum matches.
+
+The snapshot is harness-owned, so **you no longer have to commit first**. `git
+checkout` was never the restore here — a restore command cannot distinguish a
+mutation from uncommitted work — and the harness never runs one. A run killed
+between steps 2 and 4 leaves a journal naming exactly what to put back; the next
+run refuses to start, and `just mutate --restore` finishes it.
+
+Controls live beside the code they mutate, in each package's `mutations.json`: a
+name, the requirement clause it proves, the file, the `old` → `new` edit, and the
+test. `just mutate` runs every one; `just mutate core` scopes to a package or a
+single control name; `--list` prints what is catalogued without running it; and
+`--file/--old/--new/--test/--clause` runs one ad hoc, for while you are still
+finding out whether a test can fail at all.
+
+It refuses more than it accepts, and every refusal is a finding, never a pass:
+
+| It says | It means |
+|---|---|
+| `GREEN` | the test passed with the branch broken, so it does not cover the clause |
+| `NOT RUN` | no test of that name ran — `go test -run` matching nothing prints `ok` and exits 0 |
+| `BUILD FAILED` | the mutation does not compile, so it proves nothing about the test |
+| `NO MATCH` | `old` is absent or appears twice; a mutation must name exactly one branch |
+| `BASELINE RED` | the test was already failing, so its red says nothing |
+
+Exit 0 means every control went red, 1 that there is a finding, 2 that it was
+called wrong, and **3 that a restore failed and the tree may still hold a
+mutation**.
+
+`just mutate` is deliberately not part of `test-all`. The gate asks whether this
+commit is green; mutation asks whether the suite can fail, and pays a compile per
+control to answer. Run it when a ticket adds or changes a control.
 
 ### What a ticket records
 
 Enumerate, in `close --reason`: each control (file and behaviour), the test that went
-red, and confirmation of the restore. A bare count is unauditable — it is the form
-that let a ticket record "one control" without anyone reading it as "one".
+red, and confirmation of the restore. `just mutate <package>` prints exactly that, so
+the enumeration is a by-product rather than prose written from memory, and `--json` is
+the same record for a machine. A bare count is unauditable — it is the form that let a
+ticket record "one control" without anyone reading it as "one".
+
+A control that is not in a `mutations.json` was proved once and can never be proved
+again. Catalogue it.
 
 ### Seams
 
