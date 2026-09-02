@@ -238,6 +238,8 @@ func TestNormalizeLocator(t *testing.T) {
 		{name: "absolute path is machine-local", raw: "/home/ted/src/mirrors/drops.git", want: ""},
 		{name: "file scheme is machine-local", raw: "file:///home/ted/src/mirrors/drops.git", want: ""},
 		{name: "relative path is machine-local", raw: "../mirrors/drops.git", want: ""},
+		{name: "absolute path with a colon is still a path", raw: "/home/ted/a:b/mirrors/drops.git", want: ""},
+		{name: "relative path with a colon is still a path", raw: "./a:b/mirrors/drops.git", want: ""},
 	}
 
 	for _, test := range tests {
@@ -530,6 +532,15 @@ func TestWriteRegistration(t *testing.T) {
 			register: Registration{BindingPath: root},
 		},
 		{
+			name:     "a read matched by locator is told to persist nothing",
+			intent:   Read,
+			remote:   "git@github.com:tedkulp/drops.git",
+			locators: []model.RepositoryLocator{locator(dropsKey, "github.com/tedkulp/drops")},
+			want:     Found,
+			project:  dropsKey,
+			rule:     RuleRepositoryLocator,
+		},
+		{
 			name:     "a write matched by an existing binding persists nothing",
 			intent:   Write,
 			remote:   "git@github.com:tedkulp/drops.git",
@@ -593,6 +604,31 @@ func TestOutsideAnyContext(t *testing.T) {
 			}
 			if result.Register != (Registration{}) {
 				t.Errorf("register = %+v, want empty: a directory in no repository is never bound", result.Register)
+			}
+		})
+	}
+}
+
+// TestReservedSlugsAreKnown pins that the reserved names are resolve's own
+// constants, exactly as the inbox fallback key is. A Request whose Projects
+// happen not to carry them must still not propose one, or a repository
+// directory called inbox or global mints a second Project under a slug the two
+// stores are supposed to converge on.
+func TestReservedSlugsAreKnown(t *testing.T) {
+	for _, slug := range []string{model.InboxProjectSlug, model.GlobalProjectSlug} {
+		t.Run(slug, func(t *testing.T) {
+			root := "/home/ted/clones/" + slug
+			result, err := Resolve(Request{
+				Cwd:    root,
+				Intent: Write,
+				Git:    gitFacts(root, ""),
+			})
+			if err != nil {
+				t.Fatalf("Resolve: %v", err)
+			}
+			if result.Outcome != Ambiguous || result.Ambiguity.Kind != AmbiguousSlug {
+				t.Fatalf("got %v/%v, want %v/%v",
+					result.Outcome, result.Ambiguity.Kind, Ambiguous, AmbiguousSlug)
 			}
 		})
 	}
