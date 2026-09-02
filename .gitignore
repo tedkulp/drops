@@ -1,0 +1,13 @@
+# Build output.
+/drops
+
+# Development stores. The real store stays outside this repository.
+/.scratch/
+*.db
+*.db-wal
+*.db-shm
+
+# This repository deliberately has no hidden planning tree. Override the
+# workstation's global ignore so an accidental .internal/ is visible to git.
+!/.internal/
+!/.internal/**
