@@ -6,6 +6,10 @@
 scratch_db := justfile_directory() + "/.scratch/drops.db"
 export DROPS_DB := scratch_db
 
+# Build to a stable path.
+build:
+    go build -o drops .
+
 # Run the full test suite the way CI does.
 test:
     go test ./... -race
