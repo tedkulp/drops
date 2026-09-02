@@ -1,25 +1,85 @@
 # justfile — drops. `just` 1.58.0+.
 #
-# Recipes export a repository-local scratch store. Until the cutover ticket,
-# the old `drops` on PATH remains the only binary allowed to open the real store.
+# Tests must never be able to reach a real store, and this is how that is
+# enforced. `/dev/null` is not a directory, so `store.Open`'s MkdirAll fails with
+# ENOTDIR and names the path: a test that calls `store.DefaultPath()` instead of
+# taking an explicit path goes red, rather than quietly opening a store and
+# passing. A merely-absent directory would NOT do this — Open creates it.
+#
+# It cannot silently disarm the way a repository path could: nothing gitignored
+# or uncreated is involved, and drops is UNIX-only already (flock).
+#
+# Measured 2026-09-02: the suite passes with DROPS_DB unset — 416 tests, 1 skip —
+# so nothing consults DefaultPath today. This is a tripwire for a test written
+# later. It matters most AFTER cutover, when internal/store's guard is gone:
+# `go test -tags dropscutover` with DROPS_DB unset was observed opening
+# ~/.drops/drops.db itself, stopping only at the v6 schema check that the
+# cutover removes.
+#
+# Exported by `test` alone. `build` and `install` produce a binary; what store
+# that binary later opens is not the justfile's business.
+no_default_store := "/dev/null/no-default-store-in-tests/drops.db"
 
-scratch_db := justfile_directory() + "/.scratch/drops.db"
-export DROPS_DB := scratch_db
+# `git describe` has no tag to work from until dw32p.28 cuts v1.0.0, so today it
+# reports a bare short hash. The `-dirty` suffix is the load-bearing part: after
+# cutover the binary on PATH is built from this working tree, and `drops version`
+# is the only thing that can say it was built from a tree with uncommitted work.
 
-# Build to a stable path.
+# Build to ./drops, stamped with the commit it came from.
 build:
-    go build -o drops .
+    go build -ldflags "-X github.com/tedkulp/drops/internal/cli.Version=$(git describe --tags --always --dirty 2>/dev/null || echo devel)" -o drops .
 
 # Run the full test suite the way CI does.
 test:
-    go test ./... -race
+    DROPS_DB="{{no_default_store}}" go test ./... -race
 
 # A green `go test` is not a green build: vet reads the whole tree.
 # `gofmt -l` exits zero while listing files, so test its output instead.
+
+# go vet, plus a gofmt-clean check.
 lint:
     go vet ./...
     @test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
 
-# The gate. Lint first so cheap failures precede the race suite.
+# The gate: lint, then the full race suite.
 test-all: lint test
     @echo "all suites green"
+
+# Refuses to install before cutover, and deletes itself when the guard does.
+#
+# Every ordinary build has `realStoreAllowed = false` and refuses
+# ~/.drops/drops.db, so installing one would replace a working `drops` on PATH
+# with a binary that cannot open the only store it exists to serve. dw32p.28
+# removes internal/store/guard_cutover.go, and this check goes green on its own
+# the moment it does. It runs before `test-all` so the refusal is immediate
+# rather than arriving after the race suite.
+_cutover-guard:
+    @test ! -f internal/store/guard_cutover.go || { \
+      echo "refusing: pre-cutover build. It refuses ~/.drops/drops.db (internal/store/guard.go)," >&2; \
+      echo "so installing it would break drops on PATH. dw32p.28 removes the guard." >&2; \
+      exit 1; }
+
+# A copy, deliberately NOT the symlink the old repo used. That symlink pointed at
+# a FROZEN repository; this one is under active development, so a symlink would
+# make every `just build` — a half-finished one, a branch one — instantly the
+# live `drops` for every agent session on this machine. The stale-binary failure
+# the old repo's comment feared is answered by the version stamp instead: a copy
+# that says `v1.0.0-14-gabc1234` tells you how stale it is, and staleness you can
+# see costs minutes rather than an afternoon.
+#
+# It refuses a SYMLINK, inverting the old check. After cutover the path is a
+# regular file this recipe owns; a symlink there means something else has taken
+# over managing it, and this recipe is not entitled to guess.
+#
+# Gated on `test-all` because this binary is the live issue tracker: installing a
+# red build breaks the tool you would use to record that it is broken.
+
+# Copy this repo's build to ~/.local/bin/drops.
+install: _cutover-guard test-all build
+    @mkdir -p ~/.local/bin
+    @if [ -L ~/.local/bin/drops ]; then \
+      echo "refusing: ~/.local/bin/drops is a symlink -> $(readlink ~/.local/bin/drops)" >&2; \
+      exit 1; \
+    fi
+    @install -m 755 drops ~/.local/bin/drops
+    @echo "installed: $(~/.local/bin/drops version)"
