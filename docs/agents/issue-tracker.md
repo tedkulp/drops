@@ -214,6 +214,113 @@ decides what each may drop, and the rule is not the same in both:
 There is no assignee column, no label column and no `--wide`. Measured 2026-08-28:
 10 of 184 open issues carry an assignee. `show` answers both for a row you picked out.
 
+### What a row looks like
+
+One glyph, the id, the priority, the type padded to eight columns, the project
+under `--all-projects`, then the title. A continuation sits four columns in.
+
+```
+◐ dw32p.20 P2 task     Build the render package
+    unblocks 1
+● br-6vf   P0 decision Does cobra still earn its place?
+```
+
+The glyph vocabulary is `○` open, `◐` in_progress, `●` closed, and `⊘`
+tombstoned, which **outranks** whatever status a tombstoned row carries: a
+removed issue reading as open is worse than one whose lifecycle is hidden.
+Nothing parses these — every scripted consumer reads `--json`. The same
+vocabulary marks a relation on a page, so a listing and a page can never
+disagree about what a state looks like.
+
+### What a page looks like
+
+Identity, then body, then relations, then comments — what the issue *is* before
+what it is attached to.
+
+```
+Build the render package
+dw32p.20 · drops · in_progress · task · P2 · @Ted Kulp · wayfinder:task
+opened 2026-09-01, updated 2026-09-02
+
+## Question
+
+Build `internal/render` from scratch over `internal/model`.
+
+Parent
+  ○ dw32p  Rewrite drops from scratch
+
+Blocked by
+  ● dw32p.14  Build the model package
+
+Comments  1
+
+2026-09-02 · agent · dw32p.20:0a1b2c3d4e5f
+  measured against the reference build.
+```
+
+- The identity strip carries `tombstoned` after the status when the issue is
+  tombstoned, `@assignee` when it has one, and the comma-joined labels last.
+  Every part is omitted when empty, and the strip wraps like anything else.
+- Dates are `opened`, `updated` and, when closed, `closed`, sliced to the date
+  from an opaque timestamp that is never parsed and reformatted. A deferral
+  gets its own `deferred until` line.
+- A close reason prints under `closed: `, wrapped, with continuations hanging
+  eight columns. A blank line inside it is left bare rather than indented.
+- An **empty description contributes nothing, not a blank line**: a thin issue
+  costs three lines. An empty relation block or thread prints no heading.
+- `Children` carries its own count, `Children  N, M open`, where a tombstoned
+  child is not open whatever its status says.
+- A body is reflowed **by paragraph**, never line by line: bodies are authored
+  hard-wrapped at whatever width their author used, and re-wrapping each source
+  line leaves a one-word orphan on alternating lines. Headings, quotes, table
+  rows, fences, thematic breaks and anything indented four or more columns are
+  emitted untouched — a wrapped command is no longer the command. A list item
+  reflows together with its one-to-three-space continuations, hanging two
+  columns. Widths are counted in **runes**, so a paragraph of em dashes wraps
+  where it looks like it should.
+
+### Width and paging
+
+Off a terminal the wrap is a **fixed 80 columns**, so redirecting `show` into a
+file or a diff produces the same bytes on every machine. On a terminal the
+measured width is used, capped at 100, because prose past roughly a hundred
+columns is measurably harder to read.
+
+The renderer does not discover either fact. It never inspects an `*os.File`,
+reads `$COLUMNS` or `$PAGER`, or calls ioctl: the CLI measures the terminal
+once — `$COLUMNS` winning over the measurement, so a caller can pin the width
+without a terminal — and states the answer, which is why every byte above is
+reproducible from a struct literal in a test.
+
+Paging is `less -FRX` unless `$PAGER` says otherwise; an explicitly empty
+`$PAGER` disables it. `-F` exits immediately when the output fits one screen,
+so a thin issue still prints inline. A pager that cannot start is not an error —
+the output goes straight to stdout instead, because failing to show an issue
+because `less` is missing would be the worse bug.
+
+### `--json`
+
+A scanning verb emits a **bare array**, a reading verb a **bare object**, each
+followed by exactly one newline and no envelope. An empty result is `[]`, never
+`null`, and a nil list *inside* a value is `[]` too, which is what makes
+`show --json`'s `.blockers[]` and `.comments[]` safe on every issue rather than
+on most of them. Nothing is escaped beyond what JSON requires, so an issue body
+full of `<`, `>` and `&` stays readable and stays byte-stable against the
+mirror. `--json` never pages.
+
+### Two deliberate differences in the rewrite
+
+`internal/render` in this repository is the rewrite's renderer, and it departs
+from the binary currently on `PATH` in exactly two places. Both are corrections,
+not drift:
+
+- **A relation title wraps under the id column instead of being cut.** The old
+  build ellipsised it, which contradicts its own rule that a page truncates
+  nothing. Wrapping is lossless; truncation is not.
+- **The glyph vocabulary lost `blocked` and `deleted` and gained `⊘`
+  tombstoned.** Status `blocked` was never written in the real store, and
+  deletion became a versioned tombstone rather than a status.
+
 ## Wayfinding operations
 
 Used by `/wayfinder`. The **map** is one issue; its **tickets** are that issue's
