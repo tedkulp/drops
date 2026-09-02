@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tedkulp/drops/internal/model"
+	"github.com/tedkulp/drops/internal/render"
 	"github.com/tedkulp/drops/internal/sync"
 )
 
@@ -303,5 +304,36 @@ func TestLabelListCountsAreProjectScoped(t *testing.T) {
 	every, _, _ := run(t, db, cwd, "label", "list", "--all-projects")
 	if !strings.Contains(every, "here") {
 		t.Errorf("label list --all-projects missed the label: %q", every)
+	}
+}
+
+func TestMemoryGlyphsComeFromTheSharedVocabulary(t *testing.T) {
+	// The clause the doc makes: one glyph vocabulary, so a listing and a page
+	// can never disagree about what a state looks like. The memory listing
+	// used to spell ○ and ⊘ again for itself, which is two things that can
+	// drift; it now goes through render.StatusMark like everything else.
+	db := filepath.Join(t.TempDir(), "drops.db")
+	cwd := t.TempDir()
+
+	out, _, code := run(t, db, cwd, "remember", "--global", "a note worth keeping around")
+	if code != 0 {
+		t.Fatalf("remember exit = %d", code)
+	}
+	id := strings.TrimSpace(out)
+
+	live, _, _ := run(t, db, cwd, "memories")
+	if !strings.HasPrefix(live, render.StatusMark(model.StatusOpen, false)+" "+id) {
+		t.Errorf("live memory row = %q, want it to open with the shared live glyph", live)
+	}
+
+	if _, _, code := run(t, db, cwd, "forget", id); code != 0 {
+		t.Fatalf("forget %s failed", id)
+	}
+	gone, _, _ := run(t, db, cwd, "memories", "--deleted")
+	if !strings.HasPrefix(gone, render.StatusMark(model.StatusOpen, true)+" "+id) {
+		t.Errorf("tombstoned memory row = %q, want it to open with the shared tombstone glyph", gone)
+	}
+	if strings.HasPrefix(gone, render.StatusMark(model.StatusOpen, false)) {
+		t.Errorf("tombstone did not outrank the live glyph: %q", gone)
 	}
 }

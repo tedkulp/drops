@@ -333,10 +333,11 @@ func emitMemories(app *App, ms []model.Memory) error {
 }
 
 func printMemory(app *App, m model.Memory) {
-	mark := "○"
-	if m.Tombstone == model.Tombstoned {
-		mark = "⊘"
-	}
+	// A memory has no status, so it borrows the open glyph and lets the
+	// tombstone outrank it exactly as an issue's does. Going through
+	// StatusMark rather than spelling the glyphs again here is the point:
+	// two copies of the vocabulary are two things that can drift.
+	mark := render.StatusMark(model.StatusOpen, m.Tombstone == model.Tombstoned)
 	line := fmt.Sprintf("%s %s  %s", mark, m.ID, m.Title)
 	if state := memoryState(m); state != "" {
 		line += " · " + state
