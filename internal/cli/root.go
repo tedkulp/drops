@@ -123,6 +123,34 @@ func noArgs() cobra.PositionalArgs {
 	}
 }
 
+// unknownSubcommand rejects any positional reaching a command that only holds
+// subcommands, because the only thing a positional can be there is a mistyped
+// verb.
+//
+// Cobra's default is the worst possible answer: a group with no Run prints its
+// help and exits 0, so `drops comment edit <id> "..."` reports success having
+// written nothing. Root is no better — its legacyArgs rejection is a bare
+// error, which lands on exit 1 (crashed) rather than 2 (called it wrong).
+func unknownSubcommand() cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return nil
+		}
+		return invalidArgs("unknown command %q for %q", args[0], cmd.CommandPath())
+	}
+}
+
+// newGroupCmd builds a command that carries only subcommands: bare, it prints
+// its help; with a positional, it refuses through unknownSubcommand.
+func newGroupCmd(use, short string) *cobra.Command {
+	return &cobra.Command{
+		Use:   use,
+		Short: short,
+		Args:  unknownSubcommand(),
+		RunE:  func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
+	}
+}
+
 // maximumArgs is cobra.MaximumNArgs with the rejection wrapped through
 // invalidArgs.
 func maximumArgs(n int) cobra.PositionalArgs {
@@ -163,6 +191,7 @@ func NewRootCmd(opts Options) (*cobra.Command, func()) {
 		Short:         "Cross-project issue tracker for AI coding agents",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		Args:          unknownSubcommand(),
 		RunE:          func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if cmd == root {

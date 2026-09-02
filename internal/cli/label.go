@@ -6,13 +6,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/tedkulp/drops/internal/core"
 	"github.com/tedkulp/drops/internal/model"
 	"github.com/tedkulp/drops/internal/render"
 )
 
 func registerLabelCmds(root *cobra.Command, app *App) {
-	label := &cobra.Command{Use: "label", Short: "Manage issue labels"}
+	label := newGroupCmd("label", "Manage issue labels")
 	label.AddCommand(
 		newLabelAddCmd(app),
 		newLabelRmCmd(app),
@@ -87,7 +86,7 @@ func newLabelListCmd(app *App) *cobra.Command {
 				}
 				return nil
 			}
-			counts, err := app.storeWideLabelCounts()
+			counts, err := app.labelCounts()
 			if err != nil {
 				return err
 			}
@@ -117,11 +116,22 @@ func liveLabelNames(labels []model.Label) []string {
 	return out
 }
 
-// storeWideLabelCounts counts live labels across every issue, ignoring -P and
-// the ambient project, which is the documented (and rough-edged) behaviour of
-// `label list` with no id.
-func (a *App) storeWideLabelCounts() (map[string]int, error) {
-	issues, err := a.core.Issues(a.ctx, core.IssueFilter{IncludeTombstoned: true})
+// labelCounts counts live labels over the scope every other read uses: the
+// working directory's project, -P, or --all-projects.
+//
+// The old build ignored all three and answered store-wide, so `-P drops`,
+// `-P beacon` and `-P global` printed the same table byte for byte with
+// nothing to tell them apart (i-wnkh7). Reproducing that here would carry a
+// silently-wrong answer into a from-scratch build for no reason but
+// precedent. An unresolved directory counts nothing, matching the empty
+// result the scanning verbs give it.
+func (a *App) labelCounts() (map[string]int, error) {
+	filter, ok, err := scopedIssueFilter(a, 0)
+	if err != nil || !ok {
+		return map[string]int{}, err
+	}
+	filter.IncludeTombstoned = true
+	issues, err := a.core.Issues(a.ctx, filter)
 	if err != nil {
 		return nil, err
 	}

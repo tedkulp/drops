@@ -49,7 +49,7 @@ func newSyncCmd(app *App) *cobra.Command {
 }
 
 func newReplicaCmd(app *App) *cobra.Command {
-	replica := &cobra.Command{Use: "replica", Short: "Manage the replica key"}
+	replica := newGroupCmd("replica", "Manage the replica key")
 	replica.AddCommand(&cobra.Command{
 		Use:   "rekey",
 		Short: "Rotate the active replica key",

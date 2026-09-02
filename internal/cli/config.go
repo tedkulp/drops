@@ -11,7 +11,7 @@ func newConfigCmd(app *App, dbPath *string) *cobra.Command {
 	cfg := &cobra.Command{
 		Use:         "config",
 		Short:       "Inspect drops configuration",
-		Args:        noArgs(),
+		Args:        unknownSubcommand(),
 		RunE:        func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 		Annotations: noStore(),
 	}

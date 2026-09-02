@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -466,5 +467,93 @@ func TestImportRejectsParentCycleAndCommitsNothing(t *testing.T) {
 	}
 	if _, err := targetStore.Project(t.Context(), project.Key); !errors.Is(err, model.ErrNotFound) {
 		t.Fatalf("partially imported Project error = %v, want ErrNotFound", err)
+	}
+}
+
+func TestEditMemoryRefusesToMoveOneLinkOfASupersessionChain(t *testing.T) {
+	// The clause: a supersession chain lives in one Project, and the refusal
+	// says so. The schema already enforces it — memories carries FOREIGN KEY
+	// (superseded_by, project_key) REFERENCES memories(id, project_key) — so
+	// without this check the agent's answer was "not found: constraint
+	// failed: FOREIGN KEY constraint failed (787)" at exit 4, naming neither
+	// the rule nor the other memory, for what is invalid input.
+	rules, _ := openCore(t)
+	here, err := rules.CreateProject(t.Context(), "here")
+	if err != nil {
+		t.Fatalf("create Project here: %v", err)
+	}
+	there, err := rules.CreateProject(t.Context(), "there")
+	if err != nil {
+		t.Fatalf("create Project there: %v", err)
+	}
+
+	old, err := rules.CreateMemory(t.Context(), core.CreateMemory{
+		Project: here.Key, Title: "first", Body: "the first take on the scratch store",
+	})
+	if err != nil {
+		t.Fatalf("create Memory: %v", err)
+	}
+	replacement, err := rules.SupersedeMemory(t.Context(), old.ID, core.CreateMemory{
+		Title: "second", Body: "the corrected take on the scratch store",
+	})
+	if err != nil {
+		t.Fatalf("supersede Memory: %v", err)
+	}
+
+	// Both directions of the chain refuse, and each names the other link.
+	for _, testcase := range []struct {
+		name  string
+		id    model.ID
+		names model.ID
+	}{
+		{"the superseded link", old.ID, replacement.ID},
+		{"the superseding link", replacement.ID, old.ID},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			key := there.Key
+			_, err := rules.EditMemory(t.Context(), testcase.id, core.MemoryEdit{Project: &key})
+			if !errors.Is(err, model.ErrInvalid) {
+				t.Fatalf("move %s: err = %v, want ErrInvalid", testcase.id, err)
+			}
+			if !strings.Contains(err.Error(), string(testcase.names)) {
+				t.Errorf("refusal did not name %s: %v", testcase.names, err)
+			}
+			moved, readErr := rules.Memory(t.Context(), testcase.id)
+			if readErr != nil {
+				t.Fatalf("read back %s: %v", testcase.id, readErr)
+			}
+			if moved.ProjectKey != here.Key {
+				t.Errorf("%s moved anyway: project = %s", testcase.id, moved.ProjectKey)
+			}
+		})
+	}
+
+	// An unchained memory still moves, so the guard is the chain and not the
+	// project change.
+	free, err := rules.CreateMemory(t.Context(), core.CreateMemory{
+		Project: here.Key, Title: "free", Body: "a memory in no chain at all",
+	})
+	if err != nil {
+		t.Fatalf("create free Memory: %v", err)
+	}
+	key := there.Key
+	movedFree, err := rules.EditMemory(t.Context(), free.ID, core.MemoryEdit{Project: &key})
+	if err != nil {
+		t.Fatalf("move unchained Memory: %v", err)
+	}
+	if movedFree.ProjectKey != there.Key {
+		t.Fatalf("unchained Memory = %#v, want project %s", movedFree, there.Key)
+	}
+
+	// An edit that names the memory's own project is not a move, so a chained
+	// memory can still have its text corrected in place.
+	same := here.Key
+	title := "first, corrected"
+	fixed, err := rules.EditMemory(t.Context(), old.ID, core.MemoryEdit{Project: &same, Title: &title})
+	if err != nil {
+		t.Fatalf("edit chained Memory in place: %v", err)
+	}
+	if fixed.Title != title || fixed.ProjectKey != here.Key {
+		t.Fatalf("in-place edit = %#v", fixed)
 	}
 }

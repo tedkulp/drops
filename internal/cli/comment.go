@@ -13,7 +13,7 @@ import (
 )
 
 func registerCommentCmds(root *cobra.Command, app *App) {
-	comment := &cobra.Command{Use: "comment", Short: "Read and write issue comments"}
+	comment := newGroupCmd("comment", "Read and write issue comments")
 	comment.AddCommand(
 		newCommentAddCmd(app),
 		newCommentListCmd(app),

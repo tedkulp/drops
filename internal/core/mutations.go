@@ -148,13 +148,16 @@ func (core *Core) EditMemory(ctx context.Context, id model.ID, edit MemoryEdit) 
 		if err != nil {
 			return err
 		}
-		if edit.Project != nil {
+		if edit.Project != nil && *edit.Project != current.ProjectKey {
 			project, err := tx.Project(ctx, *edit.Project)
 			if err != nil {
 				return err
 			}
 			if project.ArchivedAt != nil {
 				return fmt.Errorf("%w: destination Project is archived", model.ErrInvalid)
+			}
+			if err := refuseChainedMove(ctx, tx, current); err != nil {
+				return err
 			}
 			current.ProjectKey = *edit.Project
 		}
@@ -186,6 +189,35 @@ func (core *Core) EditMemory(ctx context.Context, id model.ID, edit MemoryEdit) 
 		core.emitWarnings(model.RecordMemory, string(id), []textField{{"title", changed.Title}, {"body", changed.Body}})
 	}
 	return changed, err
+}
+
+// refuseChainedMove rejects rescoping a Memory that stands in a supersession
+// chain, in either direction.
+//
+// The schema pins a chain to one Project — memories carries FOREIGN KEY
+// (superseded_by, project_key) REFERENCES memories(id, project_key) — so
+// moving one link is a write SQLite refuses. Left to it, the agent gets
+// "constraint failed: FOREIGN KEY constraint failed (787)" at exit 4, which
+// names neither the rule nor the other memory. This states the rule instead,
+// and states it as invalid input, which is what it is.
+func refuseChainedMove(ctx context.Context, tx *store.Tx, memory model.Memory) error {
+	if memory.SupersededBy != nil {
+		return fmt.Errorf("%w: Memory %s was superseded by %s and a supersession chain lives in one Project; "+
+			"edit %s instead, or forget this one", model.ErrInvalid, memory.ID, *memory.SupersededBy, *memory.SupersededBy)
+	}
+	siblings, err := tx.Memories(ctx, store.MemoryFilter{
+		Project: &memory.ProjectKey, IncludeSuperseded: true, IncludeTombstoned: true,
+	})
+	if err != nil {
+		return err
+	}
+	for _, sibling := range siblings {
+		if sibling.SupersededBy != nil && *sibling.SupersededBy == memory.ID {
+			return fmt.Errorf("%w: Memory %s supersedes %s and a supersession chain lives in one Project; "+
+				"remember a fresh memory in the destination instead", model.ErrInvalid, memory.ID, sibling.ID)
+		}
+	}
+	return nil
 }
 
 func (core *Core) SetMemoryTombstone(ctx context.Context, id model.ID, tombstone model.Tombstone) (model.Memory, error) {

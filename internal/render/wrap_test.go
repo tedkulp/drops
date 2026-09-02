@@ -116,3 +116,84 @@ func TestWrapTextTellsAMarkerFromProse(t *testing.T) {
 		})
 	}
 }
+
+func TestWrapTextLeavesAFencedBlockAlone(t *testing.T) {
+	// The clause: a fence is a mode, not a line. Emitting the markers
+	// untouched while reflowing what lies between them is the failure this
+	// covers — the block still looks like code and no longer holds the
+	// command. The body carries every rule a fence has to suspend: a long
+	// command, a blank line, a heading, a list marker and a thematic break.
+	body := strings.Join([]string{
+		"prose before the fence that is long enough to reflow at this width",
+		"",
+		"```sh",
+		"drops ready -t task --json | jq --arg m \"dw32p.\" '[.[] | select(.id)]'",
+		"",
+		"# not a heading in here",
+		"- not a list item in here",
+		"---",
+		"```",
+		"",
+		"prose after the fence that is long enough to reflow at this width",
+	}, "\n")
+
+	got := render.WrapText(body, 40)
+
+	want := []string{
+		"prose before the fence that is long",
+		"enough to reflow at this width",
+		"",
+		"```sh",
+		"drops ready -t task --json | jq --arg m \"dw32p.\" '[.[] | select(.id)]'",
+		"",
+		"# not a heading in here",
+		"- not a list item in here",
+		"---",
+		"```",
+		"",
+		"prose after the fence that is long",
+		"enough to reflow at this width",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("fenced block\n got %q\nwant %q", got, want)
+	}
+}
+
+func TestWrapTextClosesAFenceOnItsOwnMarker(t *testing.T) {
+	// Load-bearing branch: the closing marker must match the opening one, so
+	// a ``` inside a ~~~ block is content rather than the end of the block.
+	body := strings.Join([]string{
+		"~~~",
+		"```",
+		"a nested marker line that is far too long to survive being reflowed here",
+		"~~~",
+		"prose after the fence that is long enough to reflow at this width",
+	}, "\n")
+
+	got := render.WrapText(body, 40)
+
+	want := []string{
+		"~~~",
+		"```",
+		"a nested marker line that is far too long to survive being reflowed here",
+		"~~~",
+		"prose after the fence that is long",
+		"enough to reflow at this width",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("mismatched fence marker\n got %q\nwant %q", got, want)
+	}
+}
+
+func TestWrapTextRunsAnUnclosedFenceToTheEnd(t *testing.T) {
+	// Load-bearing branch: an unclosed fence keeps the mode rather than
+	// silently reflowing its tail, because the tail is still the command.
+	body := "```\na command line that is far too long to survive being reflowed at this width"
+
+	got := render.WrapText(body, 40)
+
+	want := []string{"```", "a command line that is far too long to survive being reflowed at this width"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("unclosed fence\n got %q\nwant %q", got, want)
+	}
+}

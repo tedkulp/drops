@@ -33,14 +33,22 @@ func ellipsis(text string, max int) string {
 //
 // Only two things are reflowed: a plain paragraph, and a list item together
 // with its indented continuation lines. Everything else — headings, quotes,
-// table rows, fences, and any line indented four or more columns — is emitted
-// untouched, because reflowing it would destroy what its shape means. A
-// wrapped command is no longer the command, and a reflowed table row is not a
-// row.
+// table rows, fenced blocks and their contents, and any line indented four or
+// more columns — is emitted untouched, because reflowing it would destroy what
+// its shape means. A wrapped command is no longer the command, and a reflowed
+// table row is not a row.
+//
+// A fence is a mode, not a line. Emitting the ``` markers untouched while
+// reflowing what lies between them is the worst of both: it looks like a code
+// block and no longer holds the command. So an opening fence suspends every
+// other rule — including the blank-line paragraph break — until its closing
+// fence, and an unclosed fence runs to the end of the body rather than
+// silently reflowing its tail.
 func WrapText(text string, width int) []string {
 	var lines []string
 	var block []string
 	inListItem := false
+	fence := ""
 
 	flush := func() {
 		if len(block) == 0 {
@@ -56,6 +64,13 @@ func WrapText(text string, width int) []string {
 
 	for _, line := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
 		indent := len(line) - len(strings.TrimLeft(line, " "))
+		if fence != "" {
+			lines = append(lines, line)
+			if strings.HasPrefix(line, fence) {
+				fence = ""
+			}
+			continue
+		}
 		switch {
 		case strings.TrimSpace(line) == "":
 			flush()
@@ -74,14 +89,19 @@ func WrapText(text string, width int) []string {
 			flush()
 			block, inListItem = []string{line}, true
 
-		// A heading, quote, table row or fence stands alone, unreflowed, and
-		// does not absorb the lines after it. A fence is three backticks or
-		// three tildes; a single leading backtick is inline code, and
-		// treating it as a fence would split a paragraph that merely opens
-		// with a symbol name.
-		case strings.IndexByte("#>|", line[0]) >= 0,
-			strings.HasPrefix(line, "```"), strings.HasPrefix(line, "~~~"),
-			isThematicBreak(line):
+		// A fence opens a mode. It is three backticks or three tildes; a
+		// single leading backtick is inline code, and treating it as a fence
+		// would swallow the rest of a paragraph that merely opens with a
+		// symbol name. The closing marker must match the opening one, so a
+		// ``` inside a ~~~ block is content.
+		case strings.HasPrefix(line, "```"), strings.HasPrefix(line, "~~~"):
+			flush()
+			lines = append(lines, line)
+			fence = line[:3]
+
+		// A heading, quote, table row or thematic break stands alone,
+		// unreflowed, and does not absorb the lines after it.
+		case strings.IndexByte("#>|", line[0]) >= 0, isThematicBreak(line):
 			flush()
 			lines = append(lines, line)
 

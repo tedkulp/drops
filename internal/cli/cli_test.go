@@ -186,3 +186,122 @@ func TestReadyExcludesClosed(t *testing.T) {
 		t.Fatalf("closed issue %s absent from -a list:\n%s", id, out)
 	}
 }
+
+func TestUnknownCommandExitsTwo(t *testing.T) {
+	// The clause: a mistyped verb is "you called it wrong" (2), never a
+	// crash (1) and never success (0). Cobra's own answers are both wrong —
+	// legacyArgs rejects an unknown root command with a bare error, which
+	// lands on 1, and a group with no Run prints its help and exits 0, so
+	// `drops comment edit <id> "..."` reported success having written
+	// nothing.
+	db := filepath.Join(t.TempDir(), "drops.db")
+	cwd := t.TempDir()
+	for _, testcase := range []struct {
+		name string
+		args []string
+	}{
+		{"unknown root verb", []string{"nosuchverb"}},
+		{"unknown subcommand", []string{"comment", "edit", "zzzzz", "body"}},
+		{"unknown dep subcommand", []string{"dep", "frobnicate", "zzzzz"}},
+		{"unknown memory subcommand", []string{"memory", "forget", "mem-zzzzz"}},
+		{"unknown project subcommand", []string{"project", "delete", "x"}},
+		{"unknown label subcommand", []string{"label", "count"}},
+		{"unknown replica subcommand", []string{"replica", "show"}},
+		{"unknown config subcommand", []string{"config", "set", "x"}},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			_, _, code := run(t, db, cwd, testcase.args...)
+			if code != 2 {
+				t.Fatalf("%v exit = %d, want 2", testcase.args, code)
+			}
+		})
+	}
+}
+
+func TestBareGroupPrintsHelpAndSucceeds(t *testing.T) {
+	// The other side of the same branch: a group with no positional is a
+	// request for its help, not a misuse.
+	db := filepath.Join(t.TempDir(), "drops.db")
+	out, _, code := run(t, db, t.TempDir(), "dep")
+	if code != 0 {
+		t.Fatalf("bare group exit = %d, want 0", code)
+	}
+	if !strings.Contains(out, "Available Commands:") {
+		t.Fatalf("bare group printed no help: %q", out)
+	}
+}
+
+func TestSearchHonoursAllFlag(t *testing.T) {
+	// The clause: -a means the same on search as on every other scanning
+	// verb. Search answered from every live status regardless, so the flag
+	// an agent passes to reach a closed issue was inert and the default was
+	// wider than list's — a closed issue appeared in results that claimed to
+	// be open work.
+	db := filepath.Join(t.TempDir(), "drops.db")
+	cwd := t.TempDir()
+
+	openOut, _, _ := run(t, db, cwd, "q", "--inbox", "cobra stays for now")
+	openID := strings.TrimSpace(openOut)
+	closedOut, _, _ := run(t, db, cwd, "q", "--inbox", "cobra was reconsidered")
+	closedID := strings.TrimSpace(closedOut)
+	if _, _, code := run(t, db, cwd, "close", closedID, "--reason", "settled"); code != 0 {
+		t.Fatalf("close %s failed", closedID)
+	}
+
+	bare, _, code := run(t, db, cwd, "search", "cobra", "--inbox")
+	if code != 0 {
+		t.Fatalf("search exit = %d, want 0", code)
+	}
+	if !strings.Contains(bare, openID) {
+		t.Errorf("search dropped the open issue %s: %q", openID, bare)
+	}
+	if strings.Contains(bare, closedID) {
+		t.Errorf("search without -a returned the closed issue %s: %q", closedID, bare)
+	}
+
+	all, _, _ := run(t, db, cwd, "search", "cobra", "--inbox", "-a")
+	if !strings.Contains(all, closedID) {
+		t.Errorf("search -a missed the closed issue %s: %q", closedID, all)
+	}
+	if !strings.Contains(all, openID) {
+		t.Errorf("search -a dropped the open issue %s: %q", openID, all)
+	}
+}
+
+func TestLabelListCountsAreProjectScoped(t *testing.T) {
+	// The clause: `label list` with no id counts over the scope every other
+	// read uses. The old build ignored -P and the ambient project and
+	// answered store-wide, so two projects printed the same table byte for
+	// byte with nothing to tell them apart (i-wnkh7). The rewrite does not
+	// inherit it.
+	db := filepath.Join(t.TempDir(), "drops.db")
+	cwd := t.TempDir()
+
+	if _, _, code := run(t, db, cwd, "project", "add", "--slug", "alpha"); code != 0 {
+		t.Fatal("project add alpha failed")
+	}
+	if _, _, code := run(t, db, cwd, "project", "add", "--slug", "beta"); code != 0 {
+		t.Fatal("project add beta failed")
+	}
+	if _, _, code := run(t, db, cwd, "create", "in alpha", "-P", "alpha", "-l", "here"); code != 0 {
+		t.Fatal("create in alpha failed")
+	}
+
+	alpha, _, code := run(t, db, cwd, "label", "list", "-P", "alpha")
+	if code != 0 {
+		t.Fatalf("label list -P alpha exit = %d, want 0", code)
+	}
+	if !strings.Contains(alpha, "here") {
+		t.Errorf("label list -P alpha missed its own label: %q", alpha)
+	}
+
+	beta, _, _ := run(t, db, cwd, "label", "list", "-P", "beta")
+	if strings.Contains(beta, "here") {
+		t.Errorf("label list -P beta counted alpha's label: %q", beta)
+	}
+
+	every, _, _ := run(t, db, cwd, "label", "list", "--all-projects")
+	if !strings.Contains(every, "here") {
+		t.Errorf("label list --all-projects missed the label: %q", every)
+	}
+}

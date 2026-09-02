@@ -12,7 +12,7 @@ import (
 )
 
 func registerProjectCmds(root *cobra.Command, app *App) {
-	project := &cobra.Command{Use: "project", Short: "Manage projects, the routing dimension of the store"}
+	project := newGroupCmd("project", "Manage projects, the routing dimension of the store")
 	project.AddCommand(
 		newProjectAddCmd(app),
 		newProjectArchiveCmd(app),

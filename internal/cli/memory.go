@@ -119,11 +119,7 @@ func newMemoriesCmd(app *App) *cobra.Command {
 }
 
 func newMemoryCmd(app *App) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "memory",
-		Short: "Read or edit a memory by exact id",
-		Args:  noArgs(),
-	}
+	cmd := newGroupCmd("memory", "Read or edit a memory by exact id")
 	cmd.AddCommand(
 		newMemoryShowCmd(app),
 		newMemoryEditCmd(app),

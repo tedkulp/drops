@@ -11,7 +11,7 @@ import (
 )
 
 func registerDepCmds(root *cobra.Command, app *App) {
-	dep := &cobra.Command{Use: "dep", Short: "Manage dependencies between issues"}
+	dep := newGroupCmd("dep", "Manage dependencies between issues")
 	dep.AddCommand(
 		newDepAddCmd(app),
 		newDepRmCmd(app),

@@ -401,7 +401,7 @@ func newSearchCmd(app *App) *cobra.Command {
 	var limit int
 	cmd := &cobra.Command{
 		Use:   "search <term>",
-		Short: "Search issue titles, descriptions and notes in the current scope",
+		Short: "Search issue titles, descriptions and comment threads in the current scope",
 		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, ok, err := scopedIssueFilter(app, limit)
@@ -410,6 +410,13 @@ func newSearchCmd(app *App) *cobra.Command {
 					return err
 				}
 				return emitIssues(app, nil)
+			}
+			// -a means the same here as on every other scanning verb.
+			// Without this search answered from every live status, so the
+			// flag an agent passes to reach closed issues was inert and the
+			// default was wider than list's.
+			if err := applyStatuses(&f, nil, app.includeClosed); err != nil {
+				return err
 			}
 			issues, err := app.core.SearchIssues(app.ctx, args[0], f)
 			if err != nil {
