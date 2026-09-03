@@ -1,4 +1,4 @@
-// Package cli issue verbs: create, q, show, update, close, reopen.
+// Package cli issue verbs: create, q, show, update, claim, release, close, reopen.
 package cli
 
 import (
@@ -17,6 +17,8 @@ func registerIssueCmds(root *cobra.Command, app *App) {
 		newQuickCmd(app),
 		newShowCmd(app),
 		newUpdateCmd(app),
+		newClaimCmd(app),
+		newReleaseCmd(app),
 		newCloseCmd(app),
 		newReopenCmd(app),
 	)
@@ -319,10 +321,7 @@ func newUpdateCmd(app *App) *cobra.Command {
 				edit.Priority = &priority
 			}
 			if f.Changed("assignee") {
-				var p *string
-				if assignee != "" {
-					p = &assignee
-				}
+				p := &assignee
 				edit.Assignee = &p
 			}
 			if edit.Title != nil || edit.Description != nil || edit.Type != nil || edit.Priority != nil || edit.Assignee != nil {
@@ -347,6 +346,50 @@ func newUpdateCmd(app *App) *cobra.Command {
 	f.StringVarP(&assignee, "assignee", "A", "", "new assignee")
 	f.IntVarP(&priority, "priority", "p", 2, "new priority 0-4")
 	return cmd
+}
+
+func newClaimCmd(app *App) *cobra.Command {
+	return &cobra.Command{
+		Use:   "claim <id> <who>",
+		Short: "Claim an unassigned issue",
+		Args:  exactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := app.ensureReplica(); err != nil {
+				return err
+			}
+			issue, err := app.core.ClaimIssue(app.ctx, model.ID(args[0]), args[1])
+			if err != nil {
+				return err
+			}
+			if app.json {
+				return render.EmitOne(app.out, issue)
+			}
+			fmt.Fprintln(app.out, "claimed", issue.ID, "by", args[1])
+			return nil
+		},
+	}
+}
+
+func newReleaseCmd(app *App) *cobra.Command {
+	return &cobra.Command{
+		Use:   "release <id>",
+		Short: "Release an issue's claim",
+		Args:  exactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := app.ensureReplica(); err != nil {
+				return err
+			}
+			issue, err := app.core.ReleaseIssue(app.ctx, model.ID(args[0]))
+			if err != nil {
+				return err
+			}
+			if app.json {
+				return render.EmitOne(app.out, issue)
+			}
+			fmt.Fprintln(app.out, "released", issue.ID)
+			return nil
+		},
+	}
 }
 
 func newCloseCmd(app *App) *cobra.Command {

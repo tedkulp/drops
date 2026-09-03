@@ -162,12 +162,12 @@
       "new": "\t\t\tif true {\n\t\t\t\tedit.Priority = &priority\n\t\t\t}"
     },
     {
-      "control": "an-empty-assignee-clears-it",
-      "clause": "-A \"\" clears an assignee rather than storing an empty string (dw32p.31)",
+      "control": "an-empty-assignee-remains-exact",
+      "clause": "update -A writes the exact string it receives, while release alone writes NULL (vud8k)",
       "file": "internal/cli/issue.go",
-      "test": "TestUpdateClearAssignee",
-      "old": "\t\t\t\tvar p *string\n\t\t\t\tif assignee != \"\" {\n\t\t\t\t\tp = &assignee\n\t\t\t\t}",
-      "new": "\t\t\t\tp := &assignee"
+      "test": "TestUpdateKeepsEmptyAssignee",
+      "old": "\t\t\t\tp := &assignee\n\t\t\t\tedit.Assignee = &p",
+      "new": "\t\t\t\tvar p *string\n\t\t\t\tif assignee != \"\" {\n\t\t\t\t\tp = &assignee\n\t\t\t\t}\n\t\t\t\tedit.Assignee = &p"
     },
     {
       "control": "one-id-shows-an-object",

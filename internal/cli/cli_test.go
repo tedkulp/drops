@@ -86,49 +86,19 @@ func TestMalformedInvocationDoesNotMutate(t *testing.T) {
 	}
 }
 
-func TestUpdateClearAssignee(t *testing.T) {
+func TestUpdateKeepsEmptyAssignee(t *testing.T) {
 	db := filepath.Join(t.TempDir(), "drops.db")
 	cwd := t.TempDir()
-	out, _, _ := run(t, db, cwd, "q", "--inbox", "who")
-	id := strings.TrimSpace(out)
-	if id == "" {
-		t.Fatalf("q produced no id (out=%q)", out)
-	}
-	run(t, db, cwd, "update", id, "-A", "alice")
+	id := strings.TrimSpace(mustRun(t, db, cwd, "q", "--inbox", "who"))
+	mustRun(t, db, cwd, "update", id, "-A", "alice")
+	mustRun(t, db, cwd, "update", id, "-A", "")
 
-	out, _, _ = run(t, db, cwd, "show", id, "--json")
-	var set struct {
-		Assignee *string `json:"assignee"`
-	}
-	if err := json.Unmarshal([]byte(out), &set); err != nil {
-		t.Fatalf("show --json: %v", err)
-	}
-	if set.Assignee == nil || *set.Assignee != "alice" {
-		t.Fatalf("assignee after -A alice = %v, want alice", set.Assignee)
-	}
-
-	run(t, db, cwd, "update", id, "-A", "")
-	out, _, _ = run(t, db, cwd, "show", id, "--json")
-	var cleared struct {
-		Assignee *string `json:"assignee"`
-	}
-	if err := json.Unmarshal([]byte(out), &cleared); err != nil {
-		t.Fatalf("show --json: %v", err)
-	}
-	if cleared.Assignee != nil {
-		t.Fatalf("assignee after -A \"\" = %v, want null (cleared)", *cleared.Assignee)
-	}
-	// The JSON cannot tell the two apart: `assignee` is omitempty, so a
-	// pointer to "" and a nil pointer both vanish from the object. The
-	// difference is in the store, and it matters — a row holding '' is not
-	// NULL, so it is not unassigned to anything that asks the column.
-	if got := storedAssignee(t, db, id); got.Valid {
-		t.Fatalf("assignee column after -A \"\" = %q, want NULL", got.String)
+	got := storedAssignee(t, db, id)
+	if !got.Valid || got.String != "" {
+		t.Fatalf("assignee column after -A \"\" = %#v, want an exact empty string", got)
 	}
 }
 
-// storedAssignee reads the column itself, because --json omits an empty
-// assignee and so cannot distinguish NULL from ”.
 func storedAssignee(t *testing.T, dbPath, id string) sql.NullString {
 	t.Helper()
 	opened, err := store.Open(context.Background(), dbPath)

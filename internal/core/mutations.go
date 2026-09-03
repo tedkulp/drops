@@ -69,6 +69,45 @@ func (core *Core) EditIssue(ctx context.Context, id model.ID, edit IssueEdit) (m
 	return changed, err
 }
 
+// ClaimIssue assigns an unclaimed Issue without allowing one session to
+// overwrite another session's claim.
+func (core *Core) ClaimIssue(ctx context.Context, id model.ID, assignee string) (model.Issue, error) {
+	if assignee == "" {
+		return model.Issue{}, fmt.Errorf("%w: empty assignee", model.ErrInvalid)
+	}
+	var changed model.Issue
+	err := core.store.WithTx(ctx, func(ctx context.Context, tx *store.Tx) error {
+		current, err := tx.Issue(ctx, id)
+		if err != nil {
+			return err
+		}
+		if current.Tombstone == model.Tombstoned {
+			return fmt.Errorf("%w: Issue %s is tombstoned", model.ErrConflict, id)
+		}
+		if current.Assignee != nil && *current.Assignee != "" {
+			return fmt.Errorf("%w: Issue %s is already claimed by %s", model.ErrConflict, id, *current.Assignee)
+		}
+		observed := current.Revision
+		next, err := observed.Next(core.replica)
+		if err != nil {
+			return err
+		}
+		current.Assignee, current.UpdatedAt, current.Revision = &assignee, core.timestamp(), next
+		if err := tx.UpdateIssue(ctx, current, observed); err != nil {
+			return err
+		}
+		changed = current
+		return nil
+	})
+	return changed, err
+}
+
+// ReleaseIssue removes an Issue's claim.
+func (core *Core) ReleaseIssue(ctx context.Context, id model.ID) (model.Issue, error) {
+	var unassigned *string
+	return core.EditIssue(ctx, id, IssueEdit{Assignee: &unassigned})
+}
+
 func (core *Core) SetIssueTombstone(ctx context.Context, id model.ID, tombstone model.Tombstone) (model.Issue, error) {
 	var changed model.Issue
 	err := core.store.WithTx(ctx, func(ctx context.Context, tx *store.Tx) error {

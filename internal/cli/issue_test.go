@@ -224,6 +224,71 @@ func TestUpdateChangesOnlyTheFlagsYouPass(t *testing.T) {
 	}
 }
 
+// TestClaimAssignsOnlyAnUnclaimedIssue pins claim as the safe wayfinder
+// acquisition: it assigns a free ticket and refuses to overwrite another
+// session's claim.
+func TestClaimAssignsOnlyAnUnclaimedIssue(t *testing.T) {
+	db, cwd := newStore(t)
+	id := mustRun(t, db, cwd, "q", "--inbox", "available")
+
+	if got := mustRun(t, db, cwd, "claim", id, "alice"); got != "claimed "+id+" by alice" {
+		t.Fatalf("claim output = %q, want the issue and claimant", got)
+	}
+	if _, _, code := run(t, db, cwd, "claim", id, "bob"); code != 5 {
+		t.Fatalf("claiming an assigned issue exit = %d, want 5 (conflict)", code)
+	}
+	if _, _, code := run(t, db, cwd, "claim", id, ""); code != 2 {
+		t.Fatalf("claiming for an empty name exit = %d, want 2 (invalid input)", code)
+	}
+
+	var view struct {
+		Assignee *string `json:"assignee"`
+	}
+	if err := json.Unmarshal([]byte(mustRun(t, db, cwd, "show", id, "--json")), &view); err != nil {
+		t.Fatalf("show --json: %v", err)
+	}
+	if view.Assignee == nil || *view.Assignee != "alice" {
+		t.Fatalf("assignee after refused claims = %v, want alice", view.Assignee)
+	}
+}
+
+func TestClaimTreatsEmptyAssigneeAsUnclaimed(t *testing.T) {
+	db, cwd := newStore(t)
+	id := mustRun(t, db, cwd, "q", "--inbox", "historically empty")
+	mustRun(t, db, cwd, "update", id, "-A", "")
+
+	if got := mustRun(t, db, cwd, "claim", id, "alice"); got != "claimed "+id+" by alice" {
+		t.Fatalf("claim over an empty assignee = %q, want alice to acquire the issue", got)
+	}
+}
+
+// TestReleaseClearsTheClaim pins the other half of the operation: release
+// writes an unassigned value that a later session can claim.
+func TestReleaseClearsTheClaim(t *testing.T) {
+	db, cwd := newStore(t)
+	id := mustRun(t, db, cwd, "q", "--inbox", "claimed")
+	mustRun(t, db, cwd, "claim", id, "alice")
+
+	if got := mustRun(t, db, cwd, "release", id); got != "released "+id {
+		t.Fatalf("release output = %q, want the issue", got)
+	}
+	var view struct {
+		Assignee *string `json:"assignee"`
+	}
+	if err := json.Unmarshal([]byte(mustRun(t, db, cwd, "show", id, "--json")), &view); err != nil {
+		t.Fatalf("show --json: %v", err)
+	}
+	if got := storedAssignee(t, db, id); got.Valid {
+		t.Fatalf("assignee column after release = %#v, want NULL", got)
+	}
+	if view.Assignee != nil {
+		t.Fatalf("assignee after release = %q, want null", *view.Assignee)
+	}
+	if got := mustRun(t, db, cwd, "claim", id, "bob"); got != "claimed "+id+" by bob" {
+		t.Fatalf("claim after release = %q, want bob to acquire the issue", got)
+	}
+}
+
 // TestUpdateStatusMovesTheGlyph: --status is the in_progress path, and the
 // listing glyph is how a reader sees it.
 func TestUpdateStatusMovesTheGlyph(t *testing.T) {

@@ -23,6 +23,8 @@ relation, and the whole comment thread.
 | what is stuck | `drops blocked` |
 | read one | `drops show <id>` for a person, `drops show <id> --json` to parse |
 | change one | `drops update <id> --title/-d/-p/-t/--status/-A` |
+| claim unassigned work | `drops claim <id> <who>` |
+| release a claim | `drops release <id>` |
 | finish one | `drops close <id> --reason "why"` |
 | undo that | `drops reopen <id>` |
 | search | `drops search "term"` (titles, descriptions and comment bodies; add `-a` to reach closed issues) |
@@ -680,21 +682,33 @@ map whose blocking edges you wired in a second pass is worth running it against.
 
 ```sh
 drops ready -t task --json | jq --arg m "<map-id>." \
-  '[.[] | select(.id | startswith($m)) | select(.assignee == null)]'
+  '[.[] | select(.id | startswith($m)) | select((.assignee // "") == "")]'
 ```
 
 `drops ready` already means open and unblocked. `-t task` drops the map's own
 epic, which is otherwise unblocked and shows up in its own frontier. The
-`assignee` filter is done here because `list` and `ready` have no assignee flag,
-and it works on an absent key as well as a null one. First by id order wins.
+`assignee` filter is done here because `list` and `ready` have no assignee flag.
+It treats both an absent assignee and the historical empty string as unclaimed.
+First by id order wins.
 
 **Claim.** Before any work, so concurrent sessions skip the ticket:
 
 ```sh
-drops update <ticket-id> -A "<dev name>"
+drops claim <ticket-id> "<dev name>"
 ```
 
-An open, unassigned child is unclaimed. The assignee *is* the claim.
+An open child with no assignee, or with a historical empty assignee, is
+unclaimed. `claim` refuses to overwrite a non-empty claim, so taking work from
+another session is never implicit.
+
+**Release.** When a session stops without resolving its ticket:
+
+```sh
+drops release <ticket-id>
+```
+
+`release` writes a null assignee, putting the ticket back in the frontier.
+`update -A` remains an exact field edit; it is not the claiming operation.
 
 **Resolve.**
 

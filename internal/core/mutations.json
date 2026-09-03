@@ -410,6 +410,51 @@
       "new": "\t\t\t_ = created"
     },
     {
+      "control": "claim-rejects-an-empty-name",
+      "clause": "claim requires a non-empty claimant, because an empty assignee remains unclaimed (vud8k)",
+      "file": "internal/core/mutations.go",
+      "package": "./internal/cli",
+      "test": "TestClaimAssignsOnlyAnUnclaimedIssue",
+      "old": "\tif assignee == \"\" {\n\t\treturn model.Issue{}, fmt.Errorf(\"%w: empty assignee\", model.ErrInvalid)\n\t}",
+      "new": "\tif false {\n\t\treturn model.Issue{}, fmt.Errorf(\"%w: empty assignee\", model.ErrInvalid)\n\t}"
+    },
+    {
+      "control": "claim-does-not-overwrite",
+      "clause": "claim refuses to overwrite another session's non-empty claim (vud8k)",
+      "file": "internal/core/mutations.go",
+      "package": "./internal/cli",
+      "test": "TestClaimAssignsOnlyAnUnclaimedIssue",
+      "old": "\t\tif current.Assignee != nil && *current.Assignee != \"\" {\n\t\t\treturn fmt.Errorf(\"%w: Issue %s is already claimed by %s\", model.ErrConflict, id, *current.Assignee)\n\t\t}",
+      "new": "\t\tif false {\n\t\t\treturn fmt.Errorf(\"%w: Issue %s is already claimed by %s\", model.ErrConflict, id, *current.Assignee)\n\t\t}"
+    },
+    {
+      "control": "claim-accepts-a-historical-empty",
+      "clause": "claim treats a historical empty assignee as unclaimed (vud8k)",
+      "file": "internal/core/mutations.go",
+      "package": "./internal/cli",
+      "test": "TestClaimTreatsEmptyAssigneeAsUnclaimed",
+      "old": "\t\tif current.Assignee != nil && *current.Assignee != \"\" {",
+      "new": "\t\tif current.Assignee != nil {"
+    },
+    {
+      "control": "claim-writes-the-claimant",
+      "clause": "claim assigns an unclaimed Issue to the named claimant (vud8k)",
+      "file": "internal/core/mutations.go",
+      "package": "./internal/cli",
+      "test": "TestClaimAssignsOnlyAnUnclaimedIssue",
+      "old": "\t\tcurrent.Assignee, current.UpdatedAt, current.Revision = &assignee, core.timestamp(), next",
+      "new": "\t\tcurrent.UpdatedAt, current.Revision = core.timestamp(), next"
+    },
+    {
+      "control": "release-writes-null",
+      "clause": "release writes NULL rather than an empty assignee, returning the Issue to the unclaimed state (vud8k)",
+      "file": "internal/core/mutations.go",
+      "package": "./internal/cli",
+      "test": "TestReleaseClearsTheClaim",
+      "old": "\tvar unassigned *string\n\treturn core.EditIssue(ctx, id, IssueEdit{Assignee: &unassigned})",
+      "new": "\tempty := \"\"\n\tassigned := &empty\n\treturn core.EditIssue(ctx, id, IssueEdit{Assignee: &assigned})"
+    },
+    {
       "control": "a-chained-memory-does-not-move-alone",
       "clause": "A supersession chain lives in one Project, and the refusal names the other link rather than leaking SQLite's FOREIGN KEY text (dw32p.27)",
       "file": "internal/core/mutations.go",
