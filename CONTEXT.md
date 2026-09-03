@@ -67,3 +67,23 @@ The permanent reservation of one opaque ID to either an issue or a memory. Owner
 ## Replica succession
 
 The recorded replacement of one active replica key by another in the same store lineage. Succession affects future authorship only; it never rewrites existing record revisions or creation origins.
+
+## Live issue
+
+An issue that has not been tombstoned, whatever its status. Liveness is independent of whether an issue is open or closed: a closed issue is live, a tombstoned one is not.
+
+## Open issue
+
+A live issue whose status is `open` or `in_progress`. Being open is a claim about whether the work is finished, not about whether it has started, so an issue someone is part-way through is open.
+
+## Ready issue
+
+An open issue with no blocking dependency on another issue that is itself unfinished. Readiness is computed from the dependency graph rather than stored, so it changes when a blocker's status changes and never needs to be maintained.
+
+## Blocked issue
+
+An open issue with at least one blocking dependency on an unfinished issue. Blocked and ready are complementary properties of the same open set; neither is a status an issue can be put into.
+
+## Deferral
+
+The convention of marking an issue as deliberately postponed. Deferral is expressed as an ordinary label and carries no meaning to the model: a deferred issue is an ordinary open issue, and nothing computes readiness or ordering differently because of it.
