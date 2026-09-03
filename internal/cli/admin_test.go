@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"testing"
 )
@@ -18,8 +19,11 @@ func TestVersionWorksBeforeTheStoreExists(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("version exit = %d", code)
 	}
-	if out != "drops "+Version+"\n" {
-		t.Fatalf("version = %q, want %q", out, "drops "+Version+"\n")
+	if out != VersionLine()+"\n" {
+		t.Fatalf("version = %q, want %q", out, VersionLine()+"\n")
+	}
+	if !strings.HasPrefix(out, "drops "+Version) {
+		t.Fatalf("version = %q, want it to name the release %q", out, Version)
 	}
 	if _, err := os.Stat(filepath.Dir(missing)); err == nil {
 		t.Fatal("version created the store directory; it is meant not to touch the store at all")
@@ -297,5 +301,91 @@ func gitRun(t *testing.T, dir string, args ...string) {
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+t.TempDir())
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+// FormatVersion is a pure function over facts the caller looks up, so every
+// line the binary can print is reachable from a struct literal — no build, no
+// repository, no toolchain involved.
+func TestFormatVersionReportsWhatIsKnown(t *testing.T) {
+	for _, row := range []struct {
+		name string
+		info BuildInfo
+		want string
+	}{{
+		name: "a release build",
+		info: BuildInfo{Version: "v0.1.0", Revision: "e4a8f4b43c4a0db933f21bbdcd5237c2432e5d1e", BuildDate: "2026-09-03T10:24:20Z"},
+		want: "drops v0.1.0 (e4a8f4b, built 2026-09-03T10:24:20Z)",
+	}, {
+		name: "built from a modified tree",
+		info: BuildInfo{Version: "v0.1.0", Revision: "e4a8f4b43c4a0db933f21bbdcd5237c2432e5d1e", Modified: true, BuildDate: "2026-09-03T10:24:20Z"},
+		want: "drops v0.1.0 (e4a8f4b modified, built 2026-09-03T10:24:20Z)",
+	}, {
+		// `go build ./...` embeds the revision but stamps no date.
+		name: "no build date",
+		info: BuildInfo{Version: "devel", Revision: "e4a8f4b43c4a0db933f21bbdcd5237c2432e5d1e"},
+		want: "drops devel (e4a8f4b)",
+	}, {
+		// A test binary, or a build from outside a repository.
+		name: "no repository",
+		info: BuildInfo{Version: "devel"},
+		want: "drops devel",
+	}, {
+		name: "a date but no repository",
+		info: BuildInfo{Version: "v0.1.0", BuildDate: "2026-09-03T10:24:20Z"},
+		want: "drops v0.1.0 (built 2026-09-03T10:24:20Z)",
+	}, {
+		// Nothing stamped at all still names the product and a version.
+		name: "nothing known",
+		info: BuildInfo{},
+		want: "drops devel",
+	}, {
+		// A revision shorter than the abbreviation must not be sliced.
+		name: "a short revision",
+		info: BuildInfo{Version: "v0.1.0", Revision: "e4a8f4"},
+		want: "drops v0.1.0 (e4a8f4)",
+	}} {
+		t.Run(row.name, func(t *testing.T) {
+			if got := FormatVersion(row.info); got != row.want {
+				t.Errorf("FormatVersion(%+v) = %q, want %q", row.info, got, row.want)
+			}
+		})
+	}
+}
+
+// The commit is read from what the toolchain embedded, never stamped. This is
+// the interpretation half; the lookup half is one call with nothing to get
+// wrong. A `go test` binary carries no VCS settings, so reading the real ones
+// here could only ever skip.
+func TestBuildInfoFromReadsTheToolchainsSettings(t *testing.T) {
+	settings := []debug.BuildSetting{
+		{Key: "-compiler", Value: "gc"},
+		{Key: "vcs", Value: "git"},
+		{Key: "vcs.revision", Value: "e4a8f4b43c4a0db933f21bbdcd5237c2432e5d1e"},
+		{Key: "vcs.time", Value: "2026-09-03T10:15:43Z"},
+		{Key: "vcs.modified", Value: "true"},
+	}
+	got := buildInfoFrom(settings)
+	if got.Revision != "e4a8f4b43c4a0db933f21bbdcd5237c2432e5d1e" {
+		t.Errorf("Revision = %q", got.Revision)
+	}
+	if !got.Modified {
+		t.Error("vcs.modified=true did not set Modified")
+	}
+	// The stamped fields are not in the settings and must survive.
+	if got.Version != Version || got.BuildDate != BuildDate {
+		t.Errorf("stamped fields lost: %+v", got)
+	}
+
+	// vcs.modified carries the string "false", which is not emptiness: reading
+	// it as "present means modified" would report every clean build as dirty.
+	clean := buildInfoFrom([]debug.BuildSetting{{Key: "vcs.modified", Value: "false"}})
+	if clean.Modified {
+		t.Error("vcs.modified=false was read as modified")
+	}
+
+	// A binary built outside a repository has no settings and claims no commit.
+	if bare := buildInfoFrom(nil); bare.Revision != "" || bare.Modified {
+		t.Errorf("no settings produced %+v", bare)
 	}
 }

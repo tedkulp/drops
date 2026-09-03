@@ -246,8 +246,10 @@ func NewRootCmd(opts Options) (*cobra.Command, func()) {
 	registerDoctorCmd(root, app)
 	registerSyncCmds(root, app)
 
-	root.Version = Version
-	root.SetVersionTemplate("drops {{.Version}}\n")
+	// Cobra's --version and the version subcommand print one string, built
+	// once, so the two answers cannot drift apart.
+	root.Version = VersionLine()
+	root.SetVersionTemplate("{{.Version}}\n")
 	root.CompletionOptions.DisableDefaultCmd = true
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newConfigCmd(app, &dbPath))

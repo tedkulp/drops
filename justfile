@@ -25,14 +25,24 @@ no_default_store := "/dev/null/no-default-store-in-tests/drops.db"
 # arrives as three arguments; "$@" under this setting preserves them exactly.
 set positional-arguments
 
-# dw32p.28 cut v0.1.0 — 1.0 waits on the TUI and a good deal of cleanup. The
-# `-dirty` suffix is the load-bearing part: the binary on PATH is built from this
-# working tree, and `drops version` is the only thing that can say it was built
-# from a tree with uncommitted work.
+# dw32p.28 cut v0.1.0 — 1.0 waits on the TUI and a good deal of cleanup.
+#
+# Only two things are stamped. The commit and whether the tree was modified are
+# NOT: Go embeds vcs.revision and vcs.modified in every binary built from a
+# repository, and a value the toolchain cannot get wrong beats one this recipe
+# has to remember to pass. That is also why `git describe` no longer asks for
+# --dirty — dirtiness now has one source instead of two that could disagree.
+#
+# The build date has no such source: Go records the commit's time, never the
+# build's, and build time is the one that answers "how stale is the binary on my
+# PATH". It is the reason this repo installs a copy rather than a symlink.
 
-# Build to ./drops, stamped with the commit it came from.
+# Build to ./drops, stamped with its version and build date.
 build:
-    go build -ldflags "-X github.com/tedkulp/drops/internal/cli.Version=$(git describe --tags --always --dirty 2>/dev/null || echo devel)" -o drops .
+    go build -ldflags "\
+      -X github.com/tedkulp/drops/internal/cli.Version=$(git describe --tags --always 2>/dev/null || echo devel) \
+      -X github.com/tedkulp/drops/internal/cli.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      -o drops .
 
 # Run the full test suite the way CI does.
 test:

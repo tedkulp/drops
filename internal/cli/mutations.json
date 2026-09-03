@@ -776,6 +776,94 @@
       "test": "TestCensusFindingsCatchesEachWayARegistryRots",
       "old": "\t\tif !declared[name] {",
       "new": "\t\tif false && !declared[name] {"
+    },
+    {
+      "control": "the-revision-is-abbreviated",
+      "clause": "version abbreviates the commit to what a reader identifies it by, the seven characters git log --oneline shows (dw32p.28)",
+      "file": "internal/cli/version.go",
+      "test": "TestFormatVersionReportsWhatIsKnown",
+      "old": "const shortRevision = 7",
+      "new": "const shortRevision = 12"
+    },
+    {
+      "control": "a-short-revision-is-not-sliced",
+      "clause": "A revision shorter than the abbreviation is printed whole rather than sliced out of range (dw32p.28)",
+      "file": "internal/cli/version.go",
+      "test": "TestFormatVersionReportsWhatIsKnown",
+      "old": "if len(revision) > shortRevision {",
+      "new": "if true {"
+    },
+    {
+      "control": "a-modified-tree-is-named",
+      "clause": "A binary built from a tree with uncommitted work says so, which is the whole answer to the stale-binary question dw32p.26 gave the stamp (dw32p.28)",
+      "file": "internal/cli/version.go",
+      "test": "TestFormatVersionReportsWhatIsKnown",
+      "old": "\t\tif info.Modified {\n\t\t\trevision += \" modified\"\n\t\t}",
+      "new": "\t\tif false {\n\t\t\trevision += \" modified\"\n\t\t}"
+    },
+    {
+      "control": "an-unknown-commit-is-omitted",
+      "clause": "A fact the build does not know is left out rather than reported as unknown (dw32p.28)",
+      "file": "internal/cli/version.go",
+      "test": "TestFormatVersionReportsWhatIsKnown",
+      "old": "\tif info.Revision != \"\" {",
+      "new": "\tif true {"
+    },
+    {
+      "control": "an-unknown-build-date-is-omitted",
+      "clause": "An unstamped build reports no build date rather than an empty one (dw32p.28)",
+      "file": "internal/cli/version.go",
+      "test": "TestFormatVersionReportsWhatIsKnown",
+      "old": "\tif info.BuildDate != \"\" {\n\t\tfacts = append(facts, \"built \"+info.BuildDate)\n\t}",
+      "new": "\tif true {\n\t\tfacts = append(facts, \"built \"+info.BuildDate)\n\t}"
+    },
+    {
+      "control": "a-build-knowing-nothing-still-names-a-version",
+      "clause": "With no provenance at all the line is the product and its version, with no empty parentheses (dw32p.28)",
+      "file": "internal/cli/version.go",
+      "test": "TestFormatVersionReportsWhatIsKnown",
+      "old": "\tif len(facts) == 0 {\n\t\treturn \"drops \" + version\n\t}",
+      "new": "\tif len(facts) < 0 {\n\t\treturn \"drops \" + version\n\t}"
+    },
+    {
+      "control": "an-unstamped-version-is-devel",
+      "clause": "A build with no version stamped reports devel rather than an empty name (dw32p.26)",
+      "file": "internal/cli/version.go",
+      "test": "TestFormatVersionReportsWhatIsKnown",
+      "old": "\tif version == \"\" {\n\t\tversion = \"devel\"\n\t}",
+      "new": "\tif version == \"\\x00\" {\n\t\tversion = \"devel\"\n\t}"
+    },
+    {
+      "control": "the-commit-comes-from-the-toolchain",
+      "clause": "The commit is read from what Go embedded, never stamped by the recipe (dw32p.28)",
+      "file": "internal/cli/version.go",
+      "test": "TestBuildInfoFromReadsTheToolchainsSettings",
+      "old": "\t\tcase \"vcs.revision\":\n\t\t\tinfo.Revision = setting.Value",
+      "new": "\t\tcase \"vcs.revision\":\n\t\t\tinfo.Revision = \"\""
+    },
+    {
+      "control": "vcs-modified-is-read-as-a-boolean",
+      "clause": "vcs.modified carries the string false, so presence is not modification: reading it that way reports every clean build as dirty (dw32p.28)",
+      "file": "internal/cli/version.go",
+      "test": "TestBuildInfoFromReadsTheToolchainsSettings",
+      "old": "info.Modified = setting.Value == \"true\"",
+      "new": "info.Modified = setting.Value != \"\""
+    },
+    {
+      "control": "the-stamped-fields-survive-the-toolchains-settings",
+      "clause": "The version and build date are stamped, not embedded, so interpreting the build settings must not discard them (dw32p.28)",
+      "file": "internal/cli/version.go",
+      "test": "TestBuildInfoFromReadsTheToolchainsSettings",
+      "old": "\tinfo := BuildInfo{Version: Version, BuildDate: BuildDate}\n\tfor _, setting := range settings {",
+      "new": "\tinfo := BuildInfo{}\n\tfor _, setting := range settings {"
+    },
+    {
+      "control": "version-and-the-flag-print-one-line",
+      "clause": "`drops version` and `drops --version` are built from the same string so the two answers cannot drift (dw32p.28)",
+      "file": "internal/cli/root.go",
+      "test": "TestVersionWorksBeforeTheStoreExists",
+      "old": "root.Version = VersionLine()",
+      "new": "root.Version = Version"
     }
   ]
 }

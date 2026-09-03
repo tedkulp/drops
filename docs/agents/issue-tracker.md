@@ -39,6 +39,7 @@ relation, and the whole comment thread.
 | where am I | `drops config show` |
 | is the store sound | `drops doctor` |
 | talk to the other machine | `drops sync` |
+| which binary is this | `drops version` |
 
 Issue types: `task`, `bug`, `feature`, `epic`, `chore`, `research`, `decision`.
 Priority is 0 (critical) to 4 (backlog), default 2.
@@ -494,6 +495,45 @@ rewrite history.
   text alone.
 
 It is offline and store-wide: it takes no project scope and talks to no network.
+
+## Which binary am I driving?
+
+`drops version` — and `drops --version`, which prints the same line — answers in
+one line:
+
+```
+drops v0.1.0 (e4a8f4b, built 2026-09-03T10:24:20Z)
+```
+
+The release, the commit it was built from, and when. A binary built from a tree
+with uncommitted changes says so:
+
+```
+drops v0.1.0 (e4a8f4b modified, built 2026-09-03T10:24:20Z)
+```
+
+**`modified` is the one to read.** `drops` on `PATH` is a *copy*, not a symlink to
+a repository, so it does not change when the source does — the version line is
+what tells you how stale it is, and `modified` says it was built from a tree that
+had work not yet committed.
+
+Each fact is **omitted when it is not known**, never reported as unknown, so a
+build made outside the recipe still answers truthfully:
+
+| Line | Built by |
+|---|---|
+| `drops v0.1.0 (e4a8f4b, built …)` | `just build` or `just install` |
+| `drops devel (e4a8f4b)` | `go build` — the commit is embedded by the toolchain, no date is stamped |
+| `drops devel` | a build with no repository behind it |
+
+The commit and `modified` are not stamped: Go embeds `vcs.revision` and
+`vcs.modified` in every binary it builds from a repository, so they cannot drift
+from the source they came from. Only the version and the build date are passed in
+by the recipe, the build date because Go records the *commit's* time and never the
+build's.
+
+`version` never opens the store, so it answers when the database is the thing
+that is broken.
 
 ## Exit codes
 
