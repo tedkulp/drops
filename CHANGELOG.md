@@ -1,0 +1,119 @@
+# Changelog
+
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+`drops` was rewritten from scratch for 0.1.0. The previous build is not an
+ancestor of this one — no code was carried forward — so this file starts here
+rather than continuing that history. What it replaced is described under
+[0.1.0](#010--2026-09-03) as *the old build*, because most of what is worth
+saying about this release is what changed relative to the thing people were
+using.
+
+## 0.1.0 — 2026-09-03
+
+First release, and the one that took over `~/.drops/drops.db` and the `drops`
+name on `PATH`.
+
+Not 1.0: the TUI and a good deal of cleanup come first.
+
+### Added
+
+- **A two-machine Git transport.** `drops sync` exports the store as a
+  deterministic JSONL snapshot, commits it to a mirror repository, and pulls and
+  imports the other machine's. Every replicated record carries a
+  `(generation, replica_key)` revision; a higher generation wins, equal
+  generations from different replicas are concurrent and broken by the replica
+  key, and removable records carry versioned tombstones so absence from a
+  snapshot never means deletion. Every export names its predecessor heads, so a
+  snapshot that does not descend linearly from the head this store last accepted
+  is refused as a fork before anything is committed. There is no server, no
+  CRDT, no merge UI, and no second conflict database: losing revisions stay
+  recoverable from Git history.
+- **`drops replica rekey`**, which rotates this installation's future identity
+  without rewriting the history it already authored.
+- **`drops doctor`** — SQLite `quick_check`, `foreign_key_check`, and all three
+  external-content FTS indexes against their source tables. `--repair` rebuilds
+  a failed FTS index and nothing else; `--scan` reads every stored issue and
+  memory for credentials and names what it finds without ever redacting it.
+- **`drops version`** reports the release, the commit it was built from, whether
+  that tree had uncommitted work, and when the binary was built.
+- **A v7 schema.** STRICT typed tables, inline generation/replica revisions,
+  versioned tombstones, one explicit parent record per child, three
+  external-content FTS indexes, and typed local replica state.
+- **An identifier can name an issue or a memory, never both**, and the schema is
+  what guarantees it: every minted id is reserved in `id_owners`, and both tables
+  carry a foreign key back to that reservation.
+- **`just cutover`**, the one-time v6-to-v7 conversion, run once per machine. It
+  censuses the store independently of the conversion and asserts that census as
+  the conversion commits, so a conversion that disagrees with the measurement
+  rolls back rather than half-succeeds. `--dry-run` rehearses on a throwaway copy.
+
+### Changed
+
+- **Every id shape from the old build survives verbatim.** Nothing parses an id,
+  renumbers one, or repairs a prefix that no longer matches its project.
+- **Memories are project-owned notebook entries.** `remember`, `memories`,
+  `memory show`, `memory edit`, `supersede` and `forget` are what is left; a
+  memory now always has exactly one owning project.
+- **`install` copies the binary instead of symlinking it.** The old symlink
+  pointed at a frozen repository; this one is under development, and a symlink
+  would make every build instantly the live `drops` for every session on the
+  machine. Staleness is answered by the version stamp instead.
+- **Every store method takes a `context.Context`.**
+- **`--json` and the mirror use `encoding/json/v2`.**
+- **A project is identified across machines by an immutable opaque key.** Slugs
+  and repository locators are shared metadata; workspace bindings are local and
+  never sync.
+
+### Removed
+
+- **`planinv`, the `bd` compatibility surface, `migrate`, and the `dolt`
+  spike.** Machinery for cancelled plans, a completed one-time job, and spike
+  residue.
+- **The memory recall path.** `recall`, `prime`, salience ranking, pinning,
+  recall telemetry, memory kinds and custom keys are gone. Measured across the
+  real store: `recall_count` was 0 for all 149 memories, so `drops recall` had
+  never returned a memory in the store's lifetime.
+- **Six columns that were never written**, and dependency type `related`, which
+  had one row. Deferral was being done with a label 21 times while its dedicated
+  column had never been used.
+- **Shell completion.** No completion function was ever registered, no script was
+  installed anywhere, and a generated one cannot complete an issue id — the only
+  thing worth completing.
+
+### Fixed
+
+Defects measured in the old build and corrected here rather than reproduced:
+
+- **Every cobra and pflag rejection exited 1**, so a caller could not tell "you
+  called it wrong" (2) from "it crashed" (1). Every parser and positional misuse
+  now exits 2.
+- **An unknown command inside a group exited 0.** `drops comment edit …`
+  reported success having written nothing.
+- **`show` never printed the comment thread.** The renderer had one and was
+  tested for it; the CLI never filled it in, so the documented headline
+  behaviour of `show` was false.
+- **`search` ignored `-a`**, making its default wider than `list`'s.
+- **`label list` reproduced one issue's labels store-wide.**
+- **`move` named no boundary**: it read both endpoints before the write, so
+  every line printed the same project on both sides.
+- **`memories --deleted` hid a memory that had been superseded and then
+  forgotten**, and `memory edit -P` leaked a raw SQLite foreign-key error.
+- **`config show --json` printed `key=value`** instead of JSON.
+- **A fenced code block was reflowed** by the renderer, which treated the fence
+  as an ordinary line.
+- **`supersede --global` and `-P` were accepted and thrown away.**
+
+### Internal
+
+- **The test suite is held to mutation, not coverage.** Each requirement clause
+  has a control — the production branch that makes it true — and that control has
+  been mutated with its test observed red. `just mutate` runs the catalogue: 300
+  controls, all red. Coverage is explicitly not the standard, because two
+  packages sat at 100% function coverage while mutation found real defects in
+  both.
+- **Discovered facts are constructor parameters; real subsystems stay real.**
+  There is deliberately no `Store` interface: every test runs against real
+  temporary SQLite, real Git, and real `flock`.
+- **`docs/agents/issue-tracker.md` is the CLI contract**, and a verb that changes
+  shape without that file changing is treated as a defect.
