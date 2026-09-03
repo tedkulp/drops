@@ -1,12 +1,15 @@
 package sync_test
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/tedkulp/drops/internal/core"
+	"github.com/tedkulp/drops/internal/lockfile"
 	"github.com/tedkulp/drops/internal/model"
 	"github.com/tedkulp/drops/internal/store"
 	"github.com/tedkulp/drops/internal/sync"
@@ -33,7 +36,36 @@ func newMachine(t *testing.T, remote string) *machine {
 	return newMachineWithIDs(t, remote, nil)
 }
 
+func newMachineWithOptions(t *testing.T, opts sync.Options) *machine {
+	t.Helper()
+	return build(t, opts, nil)
+}
+
 func newMachineWithIDs(t *testing.T, remote string, ids core.IDSource) *machine {
+	t.Helper()
+	return build(t, sync.Options{URL: remote, Remote: "origin", Branch: "main"}, ids)
+}
+
+// busyLocker is another process already syncing this store; unlockableLocker is
+// a filesystem that cannot lock at all. The flock contract keeps them apart, so
+// the transport has to as well.
+type busyLocker struct{}
+
+func (busyLocker) Acquire(string) (*lockfile.Lock, error) { return nil, lockfile.ErrHeld }
+func (busyLocker) AcquireWait(string, time.Duration) (*lockfile.Lock, error) {
+	return nil, lockfile.ErrHeld
+}
+
+type unlockableLocker struct{}
+
+func (unlockableLocker) Acquire(string) (*lockfile.Lock, error) {
+	return nil, errors.New("operation not supported")
+}
+func (unlockableLocker) AcquireWait(string, time.Duration) (*lockfile.Lock, error) {
+	return nil, errors.New("operation not supported")
+}
+
+func build(t *testing.T, opts sync.Options, ids core.IDSource) *machine {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "site")
 	opened, err := store.Open(t.Context(), filepath.Join(dir, "drops.db"))
@@ -55,7 +87,7 @@ func newMachineWithIDs(t *testing.T, remote string, ids core.IDSource) *machine 
 	if err := rules.Bootstrap(t.Context()); err != nil {
 		t.Fatalf("bootstrap: %v", err)
 	}
-	transport := sync.New(rules, opened, sync.Options{URL: remote, Remote: "origin", Branch: "main"})
+	transport := sync.New(rules, opened, opts)
 	return &machine{dir: dir, store: opened, core: rules, transport: transport}
 }
 

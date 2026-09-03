@@ -13,6 +13,15 @@ import (
 
 func openTransport(t *testing.T) (*Transport, *store.Store) {
 	t.Helper()
+	return openTransportWith(t, Options{})
+}
+
+// openTransportWith builds a transport over a scratch store and the given
+// collaborators. There is no fake store, core or Git client: those are real
+// subsystems, and only the facts a process discovers about its environment —
+// here the locker and the remote's name — are passed in.
+func openTransportWith(t *testing.T, opts Options) (*Transport, *store.Store) {
+	t.Helper()
 	dir := t.TempDir()
 	opened, err := store.Open(t.Context(), dir+"/drops.db")
 	if err != nil {
@@ -25,7 +34,7 @@ func openTransport(t *testing.T) (*Transport, *store.Store) {
 	if err := rules.Bootstrap(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	return New(rules, opened, Options{}), opened
+	return New(rules, opened, opts), opened
 }
 
 func issueRecord(t *testing.T, key model.ReplicaKey, generation int64, id string) mirror.Record {

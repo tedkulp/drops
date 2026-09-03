@@ -1,0 +1,685 @@
+{
+  "note": "Live controls for internal/sync, the two-machine Git transport. Core owns the merge rules and catalogues them itself; these are the clauses sync owns \u2014 the lock, staleness, the deterministic export bytes and their predecessors, the commit/push/fetch, the chain-level fork proof, the sidecar lifecycle, and rekey. Seeded by dw32p.32.",
+  "controls": [
+    {
+      "control": "the-remote-defaults-to-origin",
+      "clause": "Options.Remote empty selects the remote name `origin` (dw32p.23)",
+      "file": "internal/sync/transport.go",
+      "test": "TestNewFillsInTheProductionDefaults",
+      "old": "t.remote = \"origin\"",
+      "new": "t.remote = \"upstream\""
+    },
+    {
+      "control": "the-branch-defaults-to-main",
+      "clause": "Options.Branch empty selects the branch `main` (dw32p.23)",
+      "file": "internal/sync/transport.go",
+      "test": "TestNewFillsInTheProductionDefaults",
+      "old": "t.branch = \"main\"",
+      "new": "t.branch = \"trunk\""
+    },
+    {
+      "control": "a-nil-locker-selects-the-real-flock",
+      "clause": "Options.Locker nil selects the flock adapter, so the production path is locked without the caller asking (dw32p.23)",
+      "file": "internal/sync/transport.go",
+      "test": "TestNewFillsInTheProductionDefaults",
+      "old": "if t.locker == nil {",
+      "new": "if false {"
+    },
+    {
+      "control": "the-transport-directory-is-the-databases-parent",
+      "clause": "The transport's files sit beside the store, so the directory is the database path's parent and not the database path (dw32p.10)",
+      "file": "internal/sync/transport.go",
+      "test": "TestNewFillsInTheProductionDefaults",
+      "old": "dir:    filepath.Dir(opened.Path()),",
+      "new": "dir:    opened.Path(),"
+    },
+    {
+      "control": "an-explicit-remote-is-kept",
+      "clause": "A configured remote name is used as given, never overwritten by the default (dw32p.23)",
+      "file": "internal/sync/transport.go",
+      "test": "TestNewKeepsAnExplicitRemoteAndBranch",
+      "old": "if t.remote == \"\" {",
+      "new": "if true {"
+    },
+    {
+      "control": "an-explicit-branch-is-kept",
+      "clause": "A configured branch is used as given, never overwritten by the default (dw32p.23)",
+      "file": "internal/sync/transport.go",
+      "test": "TestNewKeepsAnExplicitRemoteAndBranch",
+      "old": "if t.branch == \"\" {",
+      "new": "if true {"
+    },
+    {
+      "control": "an-injected-locker-is-kept",
+      "clause": "A Locker passed in is the one used, which is what makes the lock outcomes testable without a second process (dw32p.23)",
+      "file": "internal/sync/transport.go",
+      "test": "TestNewKeepsAnExplicitRemoteAndBranch",
+      "old": "if t.locker == nil {",
+      "new": "if true {"
+    },
+    {
+      "control": "a-held-lock-is-reported-not-worked-around",
+      "clause": "A lock held by another process is ErrSyncLocked: another process is already flushing this store (dw32p.10)",
+      "file": "internal/sync/transport.go",
+      "test": "TestWithLockReportsAHeldLockAsErrSyncLocked",
+      "old": "if errors.Is(err, lockfile.ErrHeld) {",
+      "new": "if false {"
+    },
+    {
+      "control": "an-unusable-lock-is-not-a-held-lock",
+      "clause": "A filesystem that cannot lock at all is not a held lock: the sync proceeds and reports that it ran unlocked (dw32p.10)",
+      "file": "internal/sync/transport.go",
+      "test": "TestWithLockProceedsUnlockedWhenTheFilesystemCannotLock",
+      "old": "return func() error { return nil }, false, nil // unusable, not held: proceed and warn",
+      "new": "return nil, false, fmt.Errorf(\"%w: %s is held\", ErrSyncLocked, t.lockPath())"
+    },
+    {
+      "control": "the-lock-wait-is-bounded",
+      "clause": "An explicit sync waits a bounded lockWait for the lock rather than blocking forever on a stuck holder (dw32p.10)",
+      "file": "internal/sync/transport.go",
+      "test": "TestWithLockReportsAHeldLockAsErrSyncLocked",
+      "old": "t.locker.AcquireWait(t.lockPath(), lockWait)",
+      "new": "t.locker.AcquireWait(t.lockPath(), 0)"
+    },
+    {
+      "control": "the-remote-url-is-configured-when-given",
+      "clause": "A configured URL is set on the remote before any fetch or push, so a fresh store reaches the shared mirror (dw32p.10)",
+      "file": "internal/sync/transport.go",
+      "test": "TestFirstSyncMovesAnIssueToTheOtherMachine",
+      "old": "if t.url != \"\" {",
+      "new": "if false {"
+    },
+    {
+      "control": "only-unexported-writes-are-exported",
+      "clause": "A store with writes the mirror has not seen exports them (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestFirstSyncMovesAnIssueToTheOtherMachine",
+      "old": "localDirty := !state0.Exported()",
+      "new": "localDirty := state0.WriteSeq < 0"
+    },
+    {
+      "control": "a-store-in-step-exports-nothing",
+      "clause": "A store whose writes are all exported pushes nothing: an export is driven by local writes, not by running the command (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestASyncWithNothingLocalExportsNothing",
+      "old": "localDirty := !state0.Exported()",
+      "new": "localDirty := state0.WriteSeq >= 0"
+    },
+    {
+      "control": "an-import-needs-a-differing-remote",
+      "clause": "A remote tip equal to this store's own head is not something to import (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestASyncWithNothingLocalExportsNothing",
+      "old": "if remoteHead != \"\" && remoteHead != myHead {",
+      "new": "if remoteHead != \"\" {"
+    },
+    {
+      "control": "an-import-needs-a-remote-at-all",
+      "clause": "An unborn remote carries no snapshot, so there is nothing to import from it (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestFirstSyncMovesAnIssueToTheOtherMachine",
+      "old": "if remoteHead != \"\" && remoteHead != myHead {",
+      "new": "if true {"
+    },
+    {
+      "control": "an-unborn-branch-adopts-the-remote",
+      "clause": "A store with no local branch adopts the remote's before merging, so its history descends from the shared one (dw32p.10)",
+      "file": "internal/sync/sync.go",
+      "test": "TestFirstSyncMovesAnIssueToTheOtherMachine",
+      "old": "if err := t.git.Adopt(ctx, t.dir, t.remote, t.branch); err != nil {",
+      "new": "if err := t.git.Adopt(ctx, t.dir, t.remote, \"no-such-branch\"); err != nil {"
+    },
+    {
+      "control": "an-import-refusal-stops-the-sync",
+      "clause": "An identity collision or fork refused by the merge rules aborts the sync, never falling through to export over it (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestIdentityCollisionRefusesImport",
+      "old": "imp, err := t.importRemote(ctx, remoteHead)\n\t\tif err != nil {\n\t\t\treturn result, err\n\t\t}",
+      "new": "imp, err := t.importRemote(ctx, remoteHead)\n\t\tif err != nil {\n\t\t\timp = ImportResult{}\n\t\t}"
+    },
+    {
+      "control": "a-pure-pull-fast-forwards-the-branch",
+      "clause": "A pull with nothing local to send moves the branch to the remote tip, so the next local write commits on the shared history (dw32p.10)",
+      "file": "internal/sync/sync.go",
+      "test": "TestAPurePullRecordsTheHeadItFastForwardedTo",
+      "old": "t.git.FastForward(ctx, t.dir, t.branch, remoteHead)",
+      "new": "t.git.FastForward(ctx, t.dir, t.branch, myHead)"
+    },
+    {
+      "control": "a-pure-pull-records-the-head-it-took",
+      "clause": "After a pure pull the store and sidecar both name the head taken, keeping the coherent pair a later export is checked against (dw32p.10)",
+      "file": "internal/sync/sync.go",
+      "test": "TestAPurePullRecordsTheHeadItFastForwardedTo",
+      "old": "if err := t.recordExport(ctx, state.WriteSeq, remoteHead); err != nil {",
+      "new": "if err := t.recordExport(ctx, state.WriteSeq, \"\"); err != nil {"
+    },
+    {
+      "control": "a-merged-export-names-the-remote-head",
+      "clause": "An export made after folding in a remote snapshot names that remote head as a predecessor (dw32p.10)",
+      "file": "internal/sync/sync.go",
+      "test": "TestAMergedExportNamesBothParents",
+      "old": "preds = append(preds, remoteHead)",
+      "new": "preds = append(preds, myHead)"
+    },
+    {
+      "control": "an-export-names-the-head-it-builds-on",
+      "clause": "An export names the head it built on as a predecessor, which is what makes the far side's chain check linear (dw32p.10)",
+      "file": "internal/sync/sync.go",
+      "test": "TestAMergedExportNamesBothParents",
+      "old": "preds = append(preds, myHead)",
+      "new": "preds = append(preds, remoteHead)"
+    },
+    {
+      "control": "a-merge-is-committed-as-a-merge",
+      "clause": "An export that folded in a remote snapshot is committed with that head as a second parent, so the push fast-forwards (dw32p.10)",
+      "file": "internal/sync/sync.go",
+      "test": "TestAMergedExportNamesBothParents",
+      "old": "if imported && remoteHead != \"\" && remoteHead != myHead {\n\t\t\tcommit, err := t.git.MergeCommit(",
+      "new": "if false {\n\t\t\tcommit, err := t.git.MergeCommit("
+    },
+    {
+      "control": "the-captured-write-sequence-is-what-gets-marked",
+      "clause": "The export mark uses the write sequence captured with the snapshot, so writes landing during the push are not marked exported (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestASyncWithNothingLocalExportsNothing",
+      "old": "writeSeq = batch.WriteSeq",
+      "new": "writeSeq = 0"
+    },
+    {
+      "control": "a-rejected-push-is-retried",
+      "clause": "A push rejected by a concurrent advance re-pulls, re-merges and pushes again rather than failing (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestRejectedPushRePullsAndRetries",
+      "old": "if !isPushRejected(err) || retry >= maxPushRetries {",
+      "new": "if true {"
+    },
+    {
+      "control": "the-retry-folds-in-what-it-fetched",
+      "clause": "The retry merges the head it just fetched, not the one it already had, or the same push is rejected again (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestRejectedPushRePullsAndRetries",
+      "old": "if _, ierr := t.importRemote(ctx, nextHead); ierr != nil {",
+      "new": "if _, ierr := t.importRemote(ctx, remoteHead); ierr != nil {"
+    },
+    {
+      "control": "the-retry-stops-when-the-remote-has-not-moved",
+      "clause": "A rejection with no remote advance behind it is reported rather than retried, because another pull cannot fix it (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestRejectedPushGivesUpWhenTheRemoteHasNotMoved",
+      "old": "if nextHead == \"\" || nextHead == remoteHead {",
+      "new": "if false {"
+    },
+    {
+      "control": "a-rejection-may-say-non-fast-forward",
+      "clause": "Git's non-fast-forward wording is recognised as a rejection worth retrying (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestIsPushRejectedRecognisesOnlyARejection",
+      "old": "strings.Contains(message, \"non-fast-forward\") ||",
+      "new": "false ||"
+    },
+    {
+      "control": "a-rejection-may-say-rejected",
+      "clause": "Git's `[rejected]` wording is recognised as a rejection worth retrying (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestIsPushRejectedRecognisesOnlyARejection",
+      "old": "strings.Contains(message, \"rejected\") ||",
+      "new": "false ||"
+    },
+    {
+      "control": "a-rejection-may-say-fetch-first",
+      "clause": "Git's `fetch first` hint is recognised as a rejection worth retrying (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestIsPushRejectedRecognisesOnlyARejection",
+      "old": "strings.Contains(message, \"fetch first\")",
+      "new": "false"
+    },
+    {
+      "control": "rejection-wording-is-matched-case-insensitively",
+      "clause": "Push rejection wording is matched without regard to case, since Git's casing is not part of any contract (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestIsPushRejectedRecognisesOnlyARejection",
+      "old": "message := strings.ToLower(commandErr.Stderr)",
+      "new": "message := commandErr.Stderr"
+    },
+    {
+      "control": "only-a-git-failure-can-be-a-rejection",
+      "clause": "An error that is not a Git command failure is never a push rejection, so an internal failure is not retried in a loop (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestIsPushRejectedRecognisesOnlyARejection",
+      "old": "if !errors.As(err, &commandErr) {\n\t\treturn false\n\t}",
+      "new": "if !errors.As(err, &commandErr) {\n\t\treturn true\n\t}"
+    },
+    {
+      "control": "an-unlocked-run-is-reported",
+      "clause": "A sync that could not take the lock reports the fact, so the caller can surface it (dw32p.10)",
+      "file": "internal/sync/sync.go",
+      "test": "TestSyncReportsARunItCouldNotLock",
+      "old": "result := Result{Unlocked: !locked}",
+      "new": "result := Result{Unlocked: locked}"
+    },
+    {
+      "control": "a-sync-reports-the-conflicts-it-resolved",
+      "clause": "Every equal-generation resolution is reported so an automatic sync can warn about it (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestSyncReportsTheConflictsItResolved",
+      "old": "result.Conflicts = imp.Report.Conflicts",
+      "new": "result.Conflicts = nil"
+    },
+    {
+      "control": "a-sync-reports-what-it-applied",
+      "clause": "Higher-generation replacements are routine and reported as counts (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestSyncReportsWhatItMerged",
+      "old": "result.Applied = imp.Report.Applied",
+      "new": "result.Applied = 0"
+    },
+    {
+      "control": "a-sync-reports-what-it-ignored",
+      "clause": "Records the merge declined to apply are counted in the same report (dw32p.5)",
+      "file": "internal/sync/sync.go",
+      "test": "TestSyncReportsWhatItMerged",
+      "old": "result.Ignored = imp.Report.Ignored",
+      "new": "result.Ignored = 0"
+    },
+    {
+      "control": "a-sidecar-is-minted-only-when-absent",
+      "clause": "The sidecar is minted the first time a local write must be exported and reused on every ordinary reopen (dw32p.10)",
+      "file": "internal/sync/export.go",
+      "test": "TestEnsureSidecarMintsOnceThenReuses",
+      "old": "if sidecar != nil {\n\t\treturn sidecar, nil\n\t}",
+      "new": "if sidecar == nil {\n\t\treturn sidecar, nil\n\t}"
+    },
+    {
+      "control": "a-malformed-sidecar-is-never-replaced",
+      "clause": "A present but unreadable sidecar is a hard error, never silently replaced with a fresh identity (dw32p.10)",
+      "file": "internal/sync/export.go",
+      "test": "TestEnsureSidecarRefusesAMalformedSidecar",
+      "old": "sidecar, err := LoadSidecar(t.dir)\n\tif err != nil {\n\t\treturn nil, err\n\t}",
+      "new": "sidecar, err := LoadSidecar(t.dir)\n\tif err != nil {\n\t\treturn MintSidecar(t.dir)\n\t}"
+    },
+    {
+      "control": "coherence-compares-both-recorded-heads",
+      "clause": "The database and the sidecar each retain the last export head, and a mismatched pair refuses local authorship (dw32p.10)",
+      "file": "internal/sync/export.go",
+      "test": "TestCheckCoherenceComparesBothHeads",
+      "old": "if sidecar.LastExportHead != state.LastExportHead {",
+      "new": "if false {"
+    },
+    {
+      "control": "an-export-stamps-the-store",
+      "clause": "An export records its head in the database half of the coherent pair (dw32p.10)",
+      "file": "internal/sync/export.go",
+      "test": "TestRecordExportStampsBothSides",
+      "old": "if err := t.core.MarkExported(ctx, writeSeq, head); err != nil {",
+      "new": "if err := t.core.MarkExported(ctx, writeSeq, \"\"); err != nil {"
+    },
+    {
+      "control": "an-export-stamps-the-sidecar",
+      "clause": "An export records the same head in the sidecar half of the coherent pair (dw32p.10)",
+      "file": "internal/sync/export.go",
+      "test": "TestRecordExportStampsBothSides",
+      "old": "sidecar.LastExportHead = head",
+      "new": "sidecar.LastExportHead = \"\""
+    },
+    {
+      "control": "an-export-carries-its-predecessors",
+      "clause": "Each deterministic export snapshot names its predecessor heads (dw32p.10)",
+      "file": "internal/sync/export.go",
+      "test": "TestPrepareExportNamesItsPredecessors",
+      "old": "batch, err := t.core.PrepareExport(ctx, predecessors)",
+      "new": "batch, err := t.core.PrepareExport(ctx, nil)"
+    },
+    {
+      "control": "an-unborn-remote-is-not-a-failure",
+      "clause": "A completed fetch reporting no such remote ref is the empty-remote state, not an error (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestFetchRemoteReadsAnUnbornRemoteAsEmpty",
+      "old": "containsFold(commandErr.Stderr, \"couldn't find remote ref\")",
+      "new": "false"
+    },
+    {
+      "control": "an-unborn-remote-may-say-no-matching-refs",
+      "clause": "The other Git wording for an unborn branch reads as the empty-remote state too (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestFetchRemoteClassifiesWhatGitSaid/no_matching_refs",
+      "old": "containsFold(commandErr.Stderr, \"no matching refs\")",
+      "new": "false"
+    },
+    {
+      "control": "a-fetch-that-did-not-complete-is-not-an-empty-remote",
+      "clause": "Only a fetch that ran to completion can report an empty remote: a stall or a killed process stays an error, or the next step pushes over what the remote holds (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestFetchRemoteClassifiesWhatGitSaid/timed_out_mid-message",
+      "old": "commandErr.ExitCode >= 0 && !commandErr.TimedOut &&\n\t\t",
+      "new": ""
+    },
+    {
+      "control": "a-fetch-failure-propagates",
+      "clause": "A fetch that failed for any other reason is reported rather than read as nothing to import (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestFetchRemotePropagatesARealFailure",
+      "old": "return \"\", fmt.Errorf(\"fetch %s: %w\", t.remote, err)",
+      "new": "return \"\", nil"
+    },
+    {
+      "control": "git-wording-is-matched-case-insensitively",
+      "clause": "Git wording is matched without regard to case, since its casing is not part of any contract (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestContainsFoldIgnoresCase",
+      "old": "return strings.Contains(strings.ToLower(haystack), strings.ToLower(needle))",
+      "new": "return strings.Contains(haystack, needle)"
+    },
+    {
+      "control": "a-self-authored-snapshot-attributes-no-head",
+      "clause": "A snapshot carrying nothing authored by another replica is a re-export of records this store already owns: merge, but attribute no head (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestImportRemoteMergesASelfAuthoredSnapshotWithoutAttributingAHead",
+      "old": "if source == \"\" {",
+      "new": "if false {"
+    },
+    {
+      "control": "an-attributed-import-records-the-sources-head",
+      "clause": "An import from another replica records that replica's head, which is what the next snapshot's chain is checked against (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestImportRemoteRecordsTheSourcesHead",
+      "old": "report, err := t.core.ImportWithHead(ctx, snapshot, model.ReplicaHead{Replica: source, SnapshotHead: head})",
+      "new": "report, err := t.core.Import(ctx, snapshot)"
+    },
+    {
+      "control": "lineage-is-proved-before-anything-is-written",
+      "clause": "The chain proof runs before the merge, so a forked snapshot leaves the store exactly as it was (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestImportRemoteRefusesAForkBeforeMerging",
+      "old": "if err := t.proveLineage(ctx, snapshot, source); err != nil {",
+      "new": "if err := error(nil); err != nil {"
+    },
+    {
+      "control": "import-never-adopts-the-sources-key",
+      "clause": "sync import never imports or changes the destination's active replica key (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestImportNeverChangesTheActiveKey",
+      "old": "\tmyKey, err := t.activeReplicaKey()\n\tif err != nil {\n\t\treturn ImportResult{}, err\n\t}",
+      "new": "\tmyKey, err := t.activeReplicaKey()\n\tif err != nil {\n\t\treturn ImportResult{}, err\n\t}\n\tif adopted := authorReplica(snapshot, \"\"); adopted != \"\" {\n\t\t_ = (Sidecar{Replica: adopted}).Save(t.dir)\n\t}"
+    },
+    {
+      "control": "a-successor-must-descend-from-the-accepted-head",
+      "clause": "A snapshot from a replica must name that replica's last accepted head among its predecessors; any other successor is a fork (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestProveLineageRejectsAFork",
+      "old": "if predecessor == head.SnapshotHead {",
+      "new": "if predecessor != head.SnapshotHead {"
+    },
+    {
+      "control": "only-the-sources-own-head-constrains-it",
+      "clause": "A snapshot is checked against the head accepted from its own source replica, so a replica never seen before is not a fork (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestProveLineageAcceptsAFirstSnapshotFromAnUnknownReplica",
+      "old": "if head.Replica != source {",
+      "new": "if head.Replica == source {"
+    },
+    {
+      "control": "a-store-without-a-sidecar-has-no-active-key",
+      "clause": "A store that has never authored locally has no active key and is still readable and importable (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestActiveReplicaKeyIsEmptyWithoutASidecar",
+      "old": "if sidecar == nil {\n\t\treturn \"\", nil\n\t}",
+      "new": "if sidecar == nil {\n\t\treturn \"zzzzzzzzzzzzzzzzzzzzzzzzze\", nil\n\t}"
+    },
+    {
+      "control": "my-own-records-are-not-a-foreign-author",
+      "clause": "Records authored by this store are not a foreign source, so a re-export of them attributes no head (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestAuthorReplicaIsEmptyWhenNothingIsForeign",
+      "old": "if replica == \"\" || replica == mine || isReservedKey(replica) {",
+      "new": "if replica == \"\" || isReservedKey(replica) {"
+    },
+    {
+      "control": "reserved-keys-are-not-a-foreign-author",
+      "clause": "The reserved projects' keys are not replica identities and never name a source (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestAuthorReplicaIsEmptyWhenNothingIsForeign",
+      "old": "if replica == \"\" || replica == mine || isReservedKey(replica) {",
+      "new": "if replica == \"\" || replica == mine {"
+    },
+    {
+      "control": "the-author-is-the-newest-generation",
+      "clause": "The source replica is the one carrying the snapshot's newest revision, whatever order the records arrive in (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestAuthorReplicaTakesTheNewestGeneration",
+      "old": "if generation > newest {",
+      "new": "if newest == 0 {"
+    },
+    {
+      "control": "the-global-project-key-is-reserved",
+      "clause": "The global project's key is one of the two reserved keys (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestAuthorReplicaSkipsMineAndReserved",
+      "old": "key == model.ReplicaKey(model.GlobalProjectKey) ||",
+      "new": "false ||"
+    },
+    {
+      "control": "the-inbox-project-key-is-reserved",
+      "clause": "The inbox project's key is the other reserved key (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestAuthorReplicaIsEmptyWhenNothingIsForeign",
+      "old": "key == model.ReplicaKey(model.InboxProjectKey)",
+      "new": "false"
+    },
+    {
+      "control": "authorship-is-read-from-a-project",
+      "clause": "A project record reports its authoring replica and generation; a kind that falls through reports none, and a fork behind it goes unseen (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestRecordReplicaReadsEveryReplicatedKind/project",
+      "old": "case model.Project:\n\t\treturn value.Revision.Replica, value.Revision.Generation",
+      "new": "case model.Project:\n\t\treturn \"\", 0"
+    },
+    {
+      "control": "authorship-is-read-from-a-repository-locator",
+      "clause": "A repository_locator record reports its authoring replica and generation; a kind that falls through reports none, and a fork behind it goes unseen (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestRecordReplicaReadsEveryReplicatedKind/repository_locator",
+      "old": "case model.RepositoryLocator:\n\t\treturn value.Revision.Replica, value.Revision.Generation",
+      "new": "case model.RepositoryLocator:\n\t\treturn \"\", 0"
+    },
+    {
+      "control": "authorship-is-read-from-a-issue",
+      "clause": "A issue record reports its authoring replica and generation; a kind that falls through reports none, and a fork behind it goes unseen (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestRecordReplicaReadsEveryReplicatedKind/issue",
+      "old": "case model.Issue:\n\t\treturn value.Revision.Replica, value.Revision.Generation",
+      "new": "case model.Issue:\n\t\treturn \"\", 0"
+    },
+    {
+      "control": "authorship-is-read-from-a-issue-parent",
+      "clause": "A issue_parent record reports its authoring replica and generation; a kind that falls through reports none, and a fork behind it goes unseen (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestRecordReplicaReadsEveryReplicatedKind/issue_parent",
+      "old": "case model.IssueParent:\n\t\treturn value.Revision.Replica, value.Revision.Generation",
+      "new": "case model.IssueParent:\n\t\treturn \"\", 0"
+    },
+    {
+      "control": "authorship-is-read-from-a-dependency",
+      "clause": "A dependency record reports its authoring replica and generation; a kind that falls through reports none, and a fork behind it goes unseen (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestRecordReplicaReadsEveryReplicatedKind/dependency",
+      "old": "case model.Dependency:\n\t\treturn value.Revision.Replica, value.Revision.Generation",
+      "new": "case model.Dependency:\n\t\treturn \"\", 0"
+    },
+    {
+      "control": "authorship-is-read-from-a-label",
+      "clause": "A label record reports its authoring replica and generation; a kind that falls through reports none, and a fork behind it goes unseen (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestRecordReplicaReadsEveryReplicatedKind/label",
+      "old": "case model.Label:\n\t\treturn value.Revision.Replica, value.Revision.Generation",
+      "new": "case model.Label:\n\t\treturn \"\", 0"
+    },
+    {
+      "control": "authorship-is-read-from-a-comment",
+      "clause": "A comment record reports its authoring replica and generation; a kind that falls through reports none, and a fork behind it goes unseen (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestRecordReplicaReadsEveryReplicatedKind/comment",
+      "old": "case model.Comment:\n\t\trev := value.Revision()\n\t\treturn rev.Replica, rev.Generation",
+      "new": "case model.Comment:\n\t\treturn \"\", 0"
+    },
+    {
+      "control": "authorship-is-read-from-a-memory",
+      "clause": "A memory record reports its authoring replica and generation; a kind that falls through reports none, and a fork behind it goes unseen (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestRecordReplicaReadsEveryReplicatedKind/memory",
+      "old": "case model.Memory:\n\t\treturn value.Revision.Replica, value.Revision.Generation",
+      "new": "case model.Memory:\n\t\treturn \"\", 0"
+    },
+    {
+      "control": "authorship-is-read-from-a-replica-succession",
+      "clause": "A replica_succession record reports its authoring replica and generation; a kind that falls through reports none, and a fork behind it goes unseen (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestRecordReplicaReadsEveryReplicatedKind/replica_succession",
+      "old": "case model.ReplicaSuccession:\n\t\treturn value.NewReplica, 1",
+      "new": "case model.ReplicaSuccession:\n\t\treturn \"\", 0"
+    },
+    {
+      "control": "an-unknown-kind-has-no-author",
+      "clause": "A record kind the transport does not know reports no replica rather than a guessed one (dw32p.10)",
+      "file": "internal/sync/import.go",
+      "test": "TestRecordReplicaReadsEveryReplicatedKind",
+      "old": "default:\n\t\treturn \"\", 0",
+      "new": "default:\n\t\treturn \"zzzzzzzzzzzzzzzzzzzzzzzzze\", 9"
+    },
+    {
+      "control": "an-absent-sidecar-is-not-an-error",
+      "clause": "An absent sidecar is a missing key reported as (nil, nil), not a failure (dw32p.10)",
+      "file": "internal/sync/sidecar.go",
+      "test": "TestLoadSidecarAbsentIsNil",
+      "old": "if os.IsNotExist(err) {\n\t\treturn nil, nil\n\t}",
+      "new": "if false {\n\t\treturn nil, nil\n\t}"
+    },
+    {
+      "control": "a-malformed-sidecar-is-a-hard-error",
+      "clause": "A present sidecar that does not decode is a hard error (dw32p.10)",
+      "file": "internal/sync/sidecar.go",
+      "test": "TestLoadMalformedSidecarIsHardError",
+      "old": "if err := json.Unmarshal(raw, &sidecar, json.RejectUnknownMembers(true)); err != nil {",
+      "new": "if err := json.Unmarshal(raw, &sidecar, json.RejectUnknownMembers(true)); false {"
+    },
+    {
+      "control": "an-unknown-sidecar-member-is-refused",
+      "clause": "A sidecar carrying a member this build does not know is refused rather than read past (dw32p.10)",
+      "file": "internal/sync/sidecar.go",
+      "test": "TestLoadUnknownMemberIsHardError",
+      "old": "json.RejectUnknownMembers(true)",
+      "new": "json.RejectUnknownMembers(false)"
+    },
+    {
+      "control": "a-loaded-sidecars-key-is-validated",
+      "clause": "A sidecar that decodes but names an invalid replica key is a hard error (dw32p.10)",
+      "file": "internal/sync/sidecar.go",
+      "test": "TestLoadInvalidReplicaKeyIsHardError",
+      "old": "if err := sidecar.Validate(); err != nil {\n\t\treturn nil, fmt.Errorf(\"sidecar %s: %w\", path, err)\n\t}",
+      "new": "if err := sidecar.Validate(); false {\n\t\treturn nil, fmt.Errorf(\"sidecar %s: %w\", path, err)\n\t}"
+    },
+    {
+      "control": "a-saved-sidecars-key-is-validated",
+      "clause": "A sidecar is never written with a key that could not be loaded back (dw32p.10)",
+      "file": "internal/sync/sidecar.go",
+      "test": "TestSaveInvalidReplicaKeyIsRejected",
+      "old": "if err := sidecar.Validate(); err != nil {\n\t\treturn err\n\t}",
+      "new": "if err := sidecar.Validate(); false {\n\t\treturn err\n\t}"
+    },
+    {
+      "control": "a-minted-sidecar-carries-no-export-head",
+      "clause": "A freshly minted replica has exported nothing, so its head is empty and matches a store that has exported nothing (dw32p.10)",
+      "file": "internal/sync/sidecar.go",
+      "test": "TestMintThenLoadRoundTrips",
+      "old": "sidecar := &Sidecar{Replica: key}",
+      "new": "sidecar := &Sidecar{Replica: key, LastExportHead: \"0000000000000000000000000000000000000000\"}"
+    },
+    {
+      "control": "a-minted-sidecar-is-persisted",
+      "clause": "Minting writes the sidecar, so the next process reuses the key rather than minting a second one (dw32p.10)",
+      "file": "internal/sync/sidecar.go",
+      "test": "TestMintThenLoadRoundTrips",
+      "old": "if err := sidecar.Save(dir); err != nil {\n\t\treturn nil, err\n\t}",
+      "new": "if err := error(nil); err != nil {\n\t\treturn nil, err\n\t}"
+    },
+    {
+      "control": "the-export-head-survives-the-round-trip",
+      "clause": "The sidecar persists the last export head, which is the half of the coherent pair that lives outside SQLite (dw32p.10)",
+      "file": "internal/sync/sidecar.go",
+      "test": "TestSavePersistsExportHead",
+      "old": "LastExportHead string           `json:\"last_export_head,omitempty\"`",
+      "new": "LastExportHead string           `json:\"-\"`"
+    },
+    {
+      "control": "transport-files-are-owner-only",
+      "clause": "The mirror is a plaintext copy of every issue and memory, so each transport file lands at 0600 rather than at the ambient umask (dw32p.10)",
+      "file": "internal/sync/file.go",
+      "test": "TestWriteFileAtomicForcesTheModeOverAPreExistingTemp",
+      "old": "const fileMode = 0o600",
+      "new": "const fileMode = 0o644"
+    },
+    {
+      "control": "the-mode-is-forced-after-the-rename",
+      "clause": "The mode is set after the rename, because a pre-existing temp keeps its own mode through O_CREATE|O_TRUNC and rides it onto the final path (dw32p.10)",
+      "file": "internal/sync/file.go",
+      "test": "TestWriteFileAtomicForcesTheModeOverAPreExistingTemp",
+      "old": "if err := os.Chmod(final, fileMode); err != nil {",
+      "new": "if err := error(nil); err != nil {"
+    },
+    {
+      "control": "the-replacement-goes-through-a-temp",
+      "clause": "A transport file is written to a temp and renamed, so a crash mid-write never leaves a truncated file under the final name (dw32p.10)",
+      "file": "internal/sync/file.go",
+      "test": "TestWriteFileAtomicLeavesNothingWhenItCannotWrite",
+      "old": "tmp := filepath.Join(dir, tempName(name))",
+      "new": "tmp := filepath.Join(dir, name)"
+    },
+    {
+      "control": "a-directory-sync-failure-is-reported",
+      "clause": "The directory entry is made durable after the rename, and a failure to do so is reported rather than swallowed (dw32p.10)",
+      "file": "internal/sync/file.go",
+      "test": "TestFsyncDirReportsAMissingDirectory",
+      "old": "d, err := os.Open(dir)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"open %s: %w\", dir, err)\n\t}",
+      "new": "d, err := os.Open(dir)\n\tif err != nil {\n\t\treturn nil\n\t}"
+    },
+    {
+      "control": "rekey-takes-the-store-lock",
+      "clause": "Rekey rotates the active key while holding the store lock (dw32p.10)",
+      "file": "internal/sync/rekey.go",
+      "test": "TestRekeyTakesTheStoreLock",
+      "old": "release, _, err := t.withLock(ctx)",
+      "new": "release, _, err := func() error { return nil }, false, error(nil)"
+    },
+    {
+      "control": "a-store-with-no-key-cannot-rekey",
+      "clause": "A store that has never minted a replica key has nothing to rotate, and says so (dw32p.10)",
+      "file": "internal/sync/rekey.go",
+      "test": "TestRekeyWithoutActiveKeyRefuses",
+      "old": "return \"\", ErrNoActiveKey",
+      "new": "return \"\", nil"
+    },
+    {
+      "control": "an-unreadable-sidecar-is-not-a-missing-one",
+      "clause": "A malformed sidecar is a hard error on the rekey path too: reporting it as absent is how a fresh identity gets minted over a real key (dw32p.10)",
+      "file": "internal/sync/rekey.go",
+      "test": "TestRekeyRefusesAMalformedSidecar",
+      "old": "sidecar, err := LoadSidecar(t.dir)\n\tif err != nil {\n\t\treturn \"\", err\n\t}",
+      "new": "sidecar, err := LoadSidecar(t.dir)\n\tif false {\n\t\treturn \"\", err\n\t}"
+    },
+    {
+      "control": "rekey-records-the-succession",
+      "clause": "Rekey records the old-to-new succession for mirror diagnostics, in that direction (dw32p.10)",
+      "file": "internal/sync/rekey.go",
+      "test": "TestRekeyLeavesWrittenHistoryAlone",
+      "old": "t.core.RecordReplicaSuccession(ctx, sidecar.Replica, next)",
+      "new": "t.core.RecordReplicaSuccession(ctx, next, sidecar.Replica)"
+    },
+    {
+      "control": "rekey-replaces-the-active-key",
+      "clause": "Rekey replaces the sidecar's active key, so new local revisions are authored under the new identity (dw32p.10)",
+      "file": "internal/sync/rekey.go",
+      "test": "TestRekeyRotatesTheActiveKey",
+      "old": "sidecar.Replica = next",
+      "new": "sidecar.Replica = sidecar.Replica"
+    }
+  ]
+}

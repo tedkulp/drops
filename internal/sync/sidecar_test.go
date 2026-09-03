@@ -41,8 +41,8 @@ func TestMintThenLoadRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat sidecar: %v", err)
 	}
-	if perm := fi.Mode().Perm(); perm != fileMode {
-		t.Fatalf("sidecar mode = %04o, want %04o", perm, fileMode)
+	if perm := fi.Mode().Perm(); perm != 0o600 {
+		t.Fatalf("sidecar mode = %04o, want 0600", perm)
 	}
 }
 
@@ -61,14 +61,27 @@ func TestSavePersistsExportHead(t *testing.T) {
 	}
 }
 
+// TestLoadMalformedSidecarIsHardError uses a body that is truncated *after* a
+// valid key, deliberately. encoding/json/v2 keeps the fields it decoded before
+// the error, and that partial sidecar validates — so a body whose key is also
+// invalid cannot tell the decode check from the Validate call under it, and an
+// err != nil assertion over one proves nothing about this clause.
 func TestLoadMalformedSidecarIsHardError(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, sidecarFileName)
-	if err := os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
-		t.Fatalf("write malformed sidecar: %v", err)
-	}
-	if _, err := LoadSidecar(dir); err == nil {
-		t.Fatal("LoadSidecar on malformed sidecar = nil error, want hard error")
+	for name, body := range map[string]string{
+		"not json at all":        "{not json",
+		"truncated after a key":  `{"replica_key":"aaaaaaaaaaaaaaaaaaaaaaaaae"`,
+		"trailing after the top": `{"replica_key":"aaaaaaaaaaaaaaaaaaaaaaaaae"} and more`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, sidecarFileName)
+			if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+				t.Fatalf("write malformed sidecar: %v", err)
+			}
+			if sidecar, err := LoadSidecar(dir); err == nil {
+				t.Fatalf("LoadSidecar on a malformed sidecar = (%#v, nil), want a hard error", sidecar)
+			}
+		})
 	}
 }
 
