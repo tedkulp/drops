@@ -129,6 +129,26 @@ func TestMemoryShowPrintsTitleLineThenBody(t *testing.T) {
 	}
 }
 
+// TestMemoryShowUsesTheMeasuredRenderWidth: memory show is a reading verb, so
+// long prose wraps through render rather than relying on the destination's soft
+// wrapping. $COLUMNS is an explicit measurement even off a terminal.
+func TestMemoryShowUsesTheMeasuredRenderWidth(t *testing.T) {
+	t.Setenv("COLUMNS", "30")
+	db, cwd := newStore(t)
+	body := "This memory body has enough words to wrap at thirty columns without losing any text."
+	id := mustRun(t, db, cwd, "remember", "--global", "--title", "one note", body)
+
+	got := mustRun(t, db, cwd, "memory", "show", id)
+	want := id + " · one note\n" +
+		"This memory body has enough\n" +
+		"words to wrap at thirty\n" +
+		"columns without losing any\n" +
+		"text."
+	if got != want {
+		t.Errorf("memory show\n got %q\nwant %q", got, want)
+	}
+}
+
 // TestSupersedeRetiresTheOldMemoryAndInheritsItsProject: one transaction that
 // mints the replacement, links the old one to it and retires it. The
 // replacement ALWAYS inherits the old memory's project, because a supersession

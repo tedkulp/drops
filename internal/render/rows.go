@@ -112,9 +112,9 @@ func (measured layout) writeRow(out io.Writer, row Row) {
 	}
 }
 
-// StatusMark is the one-glyph status vocabulary, shared by the listing and by
-// the page so the two can never disagree about what an issue's state looks
-// like. Nothing parses these: every scripted consumer reads --json.
+// StatusMark is the one-glyph status vocabulary shared by issue rows, issue
+// pages, related issues and memory rows, so those surfaces cannot drift.
+// Nothing parses these: every scripted consumer reads --json.
 func StatusMark(status model.Status, tombstoned bool) string {
 	if tombstoned {
 		return "⊘"

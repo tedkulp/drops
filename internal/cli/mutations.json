@@ -474,22 +474,6 @@
       "new": "\t\t\t\tIncludeSuperseded: all,"
     },
     {
-      "control": "a-memory-tombstone-outranks-a-supersession",
-      "clause": "A memory that is both retired and removed reports the removal (dw32p.31)",
-      "file": "internal/cli/memory.go",
-      "test": "TestATombstoneOutranksASupersession",
-      "old": "\tcase m.Tombstone == model.Tombstoned:\n\t\treturn \"tombstoned\"\n\tcase m.SupersededBy != nil:",
-      "new": "\tcase m.SupersededBy != nil:\n\t\treturn \"superseded by \" + string(*m.SupersededBy)\n\tcase m.Tombstone == model.Tombstoned:"
-    },
-    {
-      "control": "a-memory-glyph-comes-from-the-shared-vocabulary",
-      "clause": "A memory row borrows render's glyphs, so a listing and a page cannot disagree about a state (dw32p.31)",
-      "file": "internal/cli/memory.go",
-      "test": "TestMemoryGlyphsComeFromTheSharedVocabulary",
-      "old": "\tmark := render.StatusMark(model.StatusOpen, m.Tombstone == model.Tombstoned)",
-      "new": "\tmark := render.StatusMark(model.StatusOpen, false)"
-    },
-    {
       "control": "a-replacement-inherits-the-old-memorys-project",
       "clause": "supersede refuses a -P naming anywhere but the project the replacement inherits (dw32p.31)",
       "file": "internal/cli/memory.go",
@@ -864,6 +848,22 @@
       "test": "TestVersionWorksBeforeTheStoreExists",
       "old": "root.Version = VersionLine()",
       "new": "root.Version = Version"
+    },
+    {
+      "control": "memories-routes-through-render",
+      "clause": "The human memories listing fills render's memory rows instead of spelling output in the CLI (Should the memory verbs go through render?)",
+      "file": "internal/cli/memory.go",
+      "test": "TestMemoriesReadSpansEveryProject",
+      "old": "return newConsole(app.out, app.err).MemoryRows(listing)",
+      "new": "return nil"
+    },
+    {
+      "control": "memory-show-uses-the-measured-console",
+      "clause": "The human memory page uses render with the CLI's measured width rather than writing its body raw (Should the memory verbs go through render?)",
+      "file": "internal/cli/memory.go",
+      "test": "TestMemoryShowUsesTheMeasuredRenderWidth",
+      "old": "return newConsole(app.out, app.err).MemoryPage(render.MemoryPage{",
+      "new": "return (render.Console{Out: app.out}).MemoryPage(render.MemoryPage{"
     }
   ]
 }

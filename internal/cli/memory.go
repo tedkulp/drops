@@ -145,8 +145,14 @@ func newMemoryShowCmd(app *App) *cobra.Command {
 			if app.json {
 				return render.EmitOne(app.out, m)
 			}
-			printMemoryFull(app, m)
-			return nil
+			return newConsole(app.out, app.err).MemoryPage(render.MemoryPage{
+				ID:           m.ID,
+				Title:        m.Title,
+				Provenance:   stringValue(m.Provenance),
+				Body:         m.Body,
+				Tombstoned:   m.Tombstone == model.Tombstoned,
+				SupersededBy: m.SupersededBy,
+			})
 		},
 	}
 }
@@ -339,43 +345,14 @@ func emitMemories(app *App, ms []model.Memory) error {
 	if app.json {
 		return render.EmitMany(app.out, ms)
 	}
+	listing := render.MemoryListing{Rows: make([]render.MemoryRow, 0, len(ms))}
 	for _, m := range ms {
-		printMemory(app, m)
+		listing.Rows = append(listing.Rows, render.MemoryRow{
+			ID:           m.ID,
+			Title:        m.Title,
+			Tombstoned:   m.Tombstone == model.Tombstoned,
+			SupersededBy: m.SupersededBy,
+		})
 	}
-	return nil
-}
-
-func printMemory(app *App, m model.Memory) {
-	// A memory has no status, so it borrows the open glyph and lets the
-	// tombstone outrank it exactly as an issue's does. Going through
-	// StatusMark rather than spelling the glyphs again here is the point:
-	// two copies of the vocabulary are two things that can drift.
-	mark := render.StatusMark(model.StatusOpen, m.Tombstone == model.Tombstoned)
-	line := fmt.Sprintf("%s %s  %s", mark, m.ID, m.Title)
-	if state := memoryState(m); state != "" {
-		line += " · " + state
-	}
-	fmt.Fprintln(app.out, line)
-}
-func memoryState(m model.Memory) string {
-	switch {
-	case m.Tombstone == model.Tombstoned:
-		return "tombstoned"
-	case m.SupersededBy != nil:
-		return "superseded by " + string(*m.SupersededBy)
-	default:
-		return ""
-	}
-}
-
-func printMemoryFull(app *App, m model.Memory) {
-	line := fmt.Sprintf("%s · %s", m.ID, m.Title)
-	if m.Provenance != nil && *m.Provenance != "" {
-		line += " · from " + *m.Provenance
-	}
-	if state := memoryState(m); state != "" {
-		line += " · " + state
-	}
-	fmt.Fprintln(app.out, line)
-	fmt.Fprintln(app.out, m.Body)
+	return newConsole(app.out, app.err).MemoryRows(listing)
 }

@@ -24,6 +24,94 @@
       "test": "TestPageWrapsALongRefTitleUnderItsID",
       "old": "indent := strings.Repeat(\" \", refGutter+pad+refGap)",
       "new": "indent := \"\""
+    },
+    {
+      "control": "memory-row-shape",
+      "clause": "A memory scanning result is one glyph, its measured id column, two spaces, then the title and retirement state (Should the memory verbs go through render?)",
+      "file": "internal/render/memory.go",
+      "test": "TestMemoryRowsRenderTheMemoryShapeAndState",
+      "old": "fmt.Fprintf(out, \"%s  %s\\n\", lead, display)",
+      "new": "fmt.Fprintf(out, \"%s %s\\n\", lead, display)"
+    },
+    {
+      "control": "memory-id-column-is-measured",
+      "clause": "A memory listing sizes its id column to the widest permanent opaque id in the result (Should the memory verbs go through render?)",
+      "file": "internal/render/memory.go",
+      "test": "TestMemoryRowsRenderTheMemoryShapeAndState",
+      "old": "measured.idPad = max(measured.idPad, cols(string(row.ID)))",
+      "new": "measured.idPad = cols(string(row.ID))"
+    },
+    {
+      "control": "memory-truncation-is-terminal-only",
+      "clause": "A memory scanning verb truncates display text only on a terminal and never drops bytes from a pipe (Should the memory verbs go through render?)",
+      "file": "internal/render/memory.go",
+      "test": "TestMemoryRowsTruncateOnlyOnATerminal",
+      "old": "measured := memoryLayout{width: console.width(), truncate: console.TTY}",
+      "new": "measured := memoryLayout{width: console.width(), truncate: true}"
+    },
+    {
+      "control": "memory-tombstone-outranks-supersession",
+      "clause": "A tombstoned memory reports removal rather than the supersession underneath it on both human surfaces (Should the memory verbs go through render?)",
+      "file": "internal/render/memory.go",
+      "test": "TestMemoryPageReportsTombstoneBeforeSupersession",
+      "old": "if tombstoned {",
+      "new": "if false {"
+    },
+    {
+      "control": "live-supersession-is-reported",
+      "clause": "A live retired memory names the memory that superseded it (Should the memory verbs go through render?)",
+      "file": "internal/render/memory.go",
+      "test": "TestMemoryRowsRenderTheMemoryShapeAndState",
+      "old": "if supersededBy != nil {",
+      "new": "if false {"
+    },
+    {
+      "control": "memory-page-header-wraps",
+      "clause": "A memory page wraps its compact identity header without truncating it (Should the memory verbs go through render?)",
+      "file": "internal/render/memory.go",
+      "test": "TestMemoryPageWrapsWithoutChangingItsShape",
+      "old": "writeLines(out, Wrap(header.String(), width))",
+      "new": "writeLines(out, []string{header.String()})"
+    },
+    {
+      "control": "memory-page-body-reflows",
+      "clause": "A memory page reflows prose bodies through the renderer's lossless body rules (Should the memory verbs go through render?)",
+      "file": "internal/render/memory.go",
+      "test": "TestMemoryPageWrapsWithoutChangingItsShape",
+      "old": "writeLines(out, WrapText(page.Body, width))",
+      "new": "writeLines(out, []string{page.Body})"
+    },
+    {
+      "control": "memory-page-provenance-is-rendered",
+      "clause": "A memory page includes non-empty provenance in its compact header (Should the memory verbs go through render?)",
+      "file": "internal/render/memory.go",
+      "test": "TestMemoryPageWrapsWithoutChangingItsShape",
+      "old": "if page.Provenance != \"\" {",
+      "new": "if false {"
+    },
+    {
+      "control": "memory-rows-use-the-pager",
+      "clause": "The human memory scanning surface routes through the injected pager (Should the memory verbs go through render?)",
+      "file": "internal/render/memory.go",
+      "test": "TestMemorySurfacesRouteThroughThePager",
+      "old": "return console.paged(writeRows)",
+      "new": "return writeRows(console.Out)"
+    },
+    {
+      "control": "memory-page-uses-the-pager",
+      "clause": "The human memory reading surface routes through the injected pager (Should the memory verbs go through render?)",
+      "file": "internal/render/memory.go",
+      "test": "TestMemorySurfacesRouteThroughThePager",
+      "old": "return console.paged(writePage)",
+      "new": "return writePage(console.Out)"
+    },
+    {
+      "control": "a-memory-glyph-comes-from-the-shared-vocabulary",
+      "clause": "A memory row borrows render's glyphs, so a listing and a page cannot disagree about a state (Bring cli up to the test discipline)",
+      "file": "internal/render/memory.go",
+      "test": "TestMemoryRowsRenderTheMemoryShapeAndState",
+      "old": "StatusMark(model.StatusOpen, row.Tombstoned)",
+      "new": "StatusMark(model.StatusOpen, false)"
     }
   ]
 }

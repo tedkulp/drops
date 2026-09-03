@@ -301,46 +301,52 @@ because `drops recall` had never returned a memory in the store's life.
 
 `drops show <id> --json`. The user normally passes the id directly.
 
-## Scanning verbs and the reading verb
+## Scanning and reading verbs
 
-`list`, `ready`, `blocked` and `search` are **scanning verbs**: one row per issue,
-always exactly one. `show` is the **reading verb**: one issue in full. The split
-decides what each may drop, and the rule is not the same in both:
+`list`, `ready`, `blocked`, `search` and `memories` are **scanning verbs**: one
+row per result, always exactly one. `show` and `memory show` are **reading
+verbs**: one issue or memory in full. The split decides what each may drop, and
+the rule is not the same in both:
 
 - A scanning verb **truncates what it displays** (a title is a label you recognise)
-  and **never what identifies** (an id is a key you paste). `show` truncates nothing.
+  and **never what identifies** (an id is a key you paste). A reading verb
+  truncates nothing.
 - **Truncation happens only when stdout is a terminal.** Piped or redirected, the
   full title prints, so `drops list | grep` sees every byte. This deliberately
-  differs from `show`, which wraps at a fixed 80 off-terminal: wrapping is lossless
-  and truncation is not, so copying the mechanism would have dropped grep matches
-  silently.
+  differs from a reading verb, which wraps at a fixed 80 off-terminal: wrapping
+  is lossless and truncation is not, so copying the mechanism would have dropped
+  grep matches silently.
 - The id column **sizes to the widest id in the result set**, so column positions
   vary between invocations. Do not write a parser against a byte offset; use `--json`.
-- A **project column appears only under `--all-projects`.** It has to exist, because
-  `move` keeps an id byte-identical across a project change, so the prefix does not
-  answer which project a row is in.
-- Continuation lines (`ready`'s `unblocks N`, `blocked`'s `blocked by a, b`) are
-  indented a fixed four columns, and the blocker list is comma-joined.
-- All four page through `$PAGER` like `show`. `--json` never pages.
-
-**The memory verbs are outside this.** `memories` and `memory show` do not go
-through the renderer at all: they never truncate, never wrap, never page, and
-have no width, so a long memory relies on the terminal's own soft wrap. Only the
-glyph is shared. That was never decided, only built — see
-[Should the memory verbs go through render?](drops://dw32p.33).
+- An issue row's **project column appears only under `--all-projects`.** It has
+  to exist because `move` keeps an id byte-identical across a project change, so
+  the prefix does not answer which project a row is in. Memory rows have no
+  project column.
+- Issue continuation lines (`ready`'s `unblocks N`, `blocked`'s `blocked by a,
+  b`) are indented a fixed four columns, and the blocker list is comma-joined.
+- Every scanning and reading verb pages through `$PAGER`. `--json` never pages.
 
 There is no assignee column, no label column and no `--wide`. Measured 2026-09-02:
 6 of 174 open issues carry an assignee. `show` answers both for a row you picked out.
 
 ### What a row looks like
 
-One glyph, the id, the priority, the type padded to eight columns, the project
-under `--all-projects`, then the title. A continuation sits four columns in.
+An issue row is one glyph, the id, the priority, the type padded to eight
+columns, the project under `--all-projects`, then the title. A continuation sits
+four columns in.
 
 ```
 ◐ dw32p.20 P2 task     Build the render package
     unblocks 1
 ● br-6vf   P0 decision Does cobra still earn its place?
+```
+
+A memory row uses the same glyph and measured id column, then its title and any
+retirement state. It has no priority, type or project columns:
+
+```
+○ mem-k3f9x   Current notebook entry
+⊘ gitops-r1w  Removed notebook entry · tombstoned
 ```
 
 The glyph vocabulary is `○` open, `◐` in_progress, `●` closed, and `⊘`
@@ -352,8 +358,8 @@ and a page can never disagree about what a state looks like.
 
 ### What a page looks like
 
-Identity, then body, then relations, then comments — what the issue *is* before
-what it is attached to.
+An issue page is identity, then body, then relations, then comments — what the
+issue *is* before what it is attached to.
 
 ```
 Build the render package
@@ -376,6 +382,15 @@ Comments  1
   measured against the reference build.
 ```
 
+`memory show` has its own compact page: an id, title, optional provenance and
+retirement state on the header, then the body. It follows the same lossless
+wrapping and paging rules:
+
+```
+mem-k3f9x · Current notebook entry · from wayfinder
+The memory body.
+```
+
 - The identity strip carries `tombstoned` after the status when the issue is
   tombstoned, `@assignee` when it has one, and the comma-joined labels last.
   Every part is omitted when empty, and the strip wraps like anything else.
@@ -390,22 +405,22 @@ Comments  1
   child is not open whatever its status says.
 - A relation title too long for the line **wraps under the id column**. A page
   truncates nothing, relation titles included.
-- A body is reflowed **by paragraph**, never line by line: bodies are authored
-  hard-wrapped at whatever width their author used, and re-wrapping each source
-  line leaves a one-word orphan on alternating lines. Headings, quotes, table
-  rows, thematic breaks and anything indented four or more columns are emitted
-  untouched — a wrapped command is no longer the command. **A fence is a mode,
-  not a line:** ``` or `~~~` suspends every other rule, blank lines included,
-  until its matching close, so the contents of a code block survive intact and
-  an unclosed fence runs to the end of the body. A list item reflows together
-  with its one-to-three-space continuations, hanging two columns. Widths are
-  counted in **runes**, so a paragraph of em dashes wraps where it looks like it
-  should.
+- An issue description or memory body is reflowed **by paragraph**, never line by
+  line: bodies are authored hard-wrapped at whatever width their author used,
+  and re-wrapping each source line leaves a one-word orphan on alternating
+  lines. Headings, quotes, table rows, thematic breaks and anything indented
+  four or more columns are emitted untouched — a wrapped command is no longer
+  the command. **A fence is a mode, not a line:** ``` or `~~~` suspends every
+  other rule, blank lines included, until its matching close, so the contents of
+  a code block survive intact and an unclosed fence runs to the end of the body.
+  A list item reflows together with its one-to-three-space continuations,
+  hanging two columns. Widths are counted in **runes**, so a paragraph of em
+  dashes wraps where it looks like it should.
 
 ### Width and paging
 
-Off a terminal the wrap is a **fixed 80 columns**, so redirecting `show` into a
-file or a diff produces the same bytes on every machine. On a terminal the
+Off a terminal the wrap is a **fixed 80 columns**, so redirecting a reading verb
+into a file or a diff produces the same bytes on every machine. On a terminal the
 measured width is used, capped at 100, because prose past roughly a hundred
 columns is measurably harder to read. `$COLUMNS` wins over the measurement, so a
 caller can pin the width with or without a terminal — but **truncation** in a
