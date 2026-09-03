@@ -187,11 +187,12 @@ func (core *Core) DependencyCycles(ctx context.Context) ([][]model.ID, error) {
 			if state[next] == 0 {
 				visit(next)
 			} else if state[next] == 1 {
-				cycle := append([]model.ID(nil), stack[position[next]:]...)
-				cycle = canonicalCycle(cycle)
-				if !containsCycle(cycles, cycle) {
-					cycles = append(cycles, cycle)
-				}
+				// One cycle per back edge, and no two back edges can yield
+				// the same one: distinct back edges end at distinct stack
+				// positions, and the (from_id, to_id, dep_type) primary key
+				// forbids a repeated edge. So no de-duplication is needed
+				// here, and a guard for it would be a branch no input reaches.
+				cycles = append(cycles, canonicalCycle(append([]model.ID(nil), stack[position[next]:]...)))
 			}
 		}
 		stack = stack[:len(stack)-1]
@@ -225,13 +226,4 @@ func canonicalCycle(cycle []model.ID) []model.ID {
 		}
 	}
 	return append(append([]model.ID(nil), cycle[min:]...), cycle[:min]...)
-}
-
-func containsCycle(cycles [][]model.ID, want []model.ID) bool {
-	for _, cycle := range cycles {
-		if slices.Equal(cycle, want) {
-			return true
-		}
-	}
-	return false
 }

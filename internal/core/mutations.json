@@ -1,0 +1,509 @@
+{
+  "note": "Live controls for internal/core, the rules and transaction owner. Re-runnable proof that these tests can fail; the closed tickets' close reasons remain the historical record. Seeded by dw32p.30.",
+  "controls": [
+    {
+      "control": "longest-chain-is-deepest",
+      "clause": "LongestBlockerChain returns the deepest simple path of open blockers, not the first branch it walks (dw32p.30)",
+      "file": "internal/core/graph.go",
+      "test": "TestLongestBlockerChainTakesTheDeepestPathNotTheFirst",
+      "old": "if candidate := walk(blocker); len(candidate) > len(best) {",
+      "new": "if candidate := walk(blocker); len(best) == 0 {"
+    },
+    {
+      "control": "longest-chain-is-simple",
+      "clause": "A blocker chain is a simple path: a cycle terminates at the first repeated node (dw32p.30)",
+      "file": "internal/core/graph.go",
+      "test": "TestLongestBlockerChainStopsAtTheFirstRepeatedNode",
+      "old": "if onPath[node] {\n\t\t\treturn nil\n\t\t}",
+      "new": "if onPath[node] {\n\t\t\treturn []model.ID{node}\n\t\t}"
+    },
+    {
+      "control": "longest-chain-refuses-an-unknown-issue",
+      "clause": "A blocker chain is asked for by id, so an id naming no Issue is a read error rather than a one-element chain (dw32p.30)",
+      "file": "internal/core/graph.go",
+      "test": "TestLongestBlockerChainRefusesAnUnknownIssue",
+      "old": "if _, err := core.store.Issue(ctx, id); err != nil {",
+      "new": "if _, err := core.store.Issue(ctx, id); false {"
+    },
+    {
+      "control": "cycles-rotate-to-the-lowest-id",
+      "clause": "A dependency cycle is reported in canonical rotation, lowest id first, so the same cycle reads identically from any entry point (dw32p.30)",
+      "file": "internal/core/graph.go",
+      "test": "TestDependencyCyclesRotateToTheLowestID",
+      "old": "if cycle[i] < cycle[min] {",
+      "new": "if cycle[i] > cycle[min] {"
+    },
+    {
+      "control": "cycles-ignore-tombstoned-edges",
+      "clause": "Only LIVE edges form the cycle graph: a tombstoned blocks edge is not a cycle (dw32p.30)",
+      "file": "internal/core/graph.go",
+      "test": "TestDependencyCyclesIgnoreTombstonedAndNonBlockingEdges",
+      "old": "if dependency.Type == model.DepBlocks && dependency.Tombstone == model.Live {",
+      "new": "if dependency.Type == model.DepBlocks {"
+    },
+    {
+      "control": "cycles-ignore-non-blocking-edges",
+      "clause": "Only BLOCKS edges form the cycle graph: a related or discovered-from edge is not a cycle (dw32p.30)",
+      "file": "internal/core/graph.go",
+      "test": "TestDependencyCyclesIgnoreTombstonedAndNonBlockingEdges",
+      "old": "if dependency.Type == model.DepBlocks && dependency.Tombstone == model.Live {",
+      "new": "if dependency.Tombstone == model.Live {"
+    },
+    {
+      "control": "unblock-impacts-count-sole-blockers",
+      "clause": "UnblockImpacts counts, per named blocker, only the Issues that blocker ALONE holds back (dw32p.30)",
+      "file": "internal/core/graph.go",
+      "test": "TestUnblockImpactsCountOnlySoleBlockers",
+      "old": "if len(open) != 1 {",
+      "new": "if len(open) < 1 {"
+    },
+    {
+      "control": "deferral-boundary-is-strict",
+      "clause": "A deferral at exactly now has passed, so the Issue is ready rather than still deferred (dw32p.30)",
+      "file": "internal/core/graph.go",
+      "test": "TestDeferredIssuesLeaveBothReadyAndBlocked",
+      "old": "return err == nil && until.After(now)",
+      "new": "return err == nil && !until.Before(now)"
+    },
+    {
+      "control": "move-is-all-or-nothing",
+      "clause": "A cross-project move commits every named Issue or none, so an unmovable entry leaves no subtree half-refiled (dw32p.27 documents the crossing report)",
+      "file": "internal/core/mutations.go",
+      "test": "TestMoveIssuesCommitsAllOrNothing",
+      "old": "\t\t\tissue, err := tx.Issue(ctx, id)\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}",
+      "new": "\t\t\tissue, err := tx.Issue(ctx, id)\n\t\t\tif err != nil {\n\t\t\t\tcontinue\n\t\t\t}"
+    },
+    {
+      "control": "move-skips-an-issue-already-there",
+      "clause": "An Issue already in the destination is skipped rather than re-revisioned, so a no-op move does not export as a concurrent edit (dw32p.30)",
+      "file": "internal/core/mutations.go",
+      "test": "TestMoveIssuesSkipsAnIssueAlreadyInTheDestination",
+      "old": "if issue.ProjectKey == destination {",
+      "new": "if false {"
+    },
+    {
+      "control": "move-refuses-an-archived-destination",
+      "clause": "An archived Project accepts no new work, so a move into one is invalid input (dw32p.30)",
+      "file": "internal/core/mutations.go",
+      "test": "TestMoveIssuesRefusesAnArchivedDestination",
+      "old": "\t\tif project.ArchivedAt != nil {\n\t\t\treturn fmt.Errorf(\"%w: destination Project is archived\", model.ErrInvalid)\n\t\t}\n\t\tfor _, id := range ids {",
+      "new": "\t\tif false && project.ArchivedAt != nil {\n\t\t\treturn fmt.Errorf(\"%w: destination Project is archived\", model.ErrInvalid)\n\t\t}\n\t\tfor _, id := range ids {"
+    },
+    {
+      "control": "a-comment-does-not-stamp-its-issue",
+      "clause": "A Comment does NOT stamp its Issue's updated_at: it is its own replicated record, and docs/agents/issue-tracker.md states this for parsers that poll updated_at (dw32p.27)",
+      "file": "internal/core/mutations.go",
+      "test": "TestAddCommentLeavesTheIssueUpdatedAtAlone",
+      "old": "return tx.PutComment(ctx, comment)",
+      "new": "if err := tx.PutComment(ctx, comment); err != nil { return err }; issue, err := tx.Issue(ctx, issueID); if err != nil { return err }; observed := issue.Revision; next, err := observed.Next(core.replica); if err != nil { return err }; issue.UpdatedAt, issue.Revision = core.timestamp(), next; return tx.UpdateIssue(ctx, issue, observed)"
+    },
+    {
+      "control": "a-comment-body-is-nonempty",
+      "clause": "An empty Comment body is invalid input, refused before any write (dw32p.30)",
+      "file": "internal/core/mutations.go",
+      "test": "TestAddCommentRefusesAnEmptyBody",
+      "old": "if body == \"\" {",
+      "new": "if false {"
+    },
+    {
+      "control": "a-comment-names-its-missing-issue",
+      "clause": "A Comment on an unknown Issue is refused by NAME: store maps constraint 787 to ErrNotFound too, so without the explicit read the agent gets SQLite's FOREIGN KEY text (dw32p.27's defect class)",
+      "file": "internal/core/mutations.go",
+      "test": "TestAddCommentRefusesAnUnknownIssueByName",
+      "old": "if _, err := tx.Issue(ctx, issueID); err != nil {",
+      "new": "if _, err := tx.Issue(ctx, issueID); err != nil && false {"
+    },
+    {
+      "control": "a-comment-body-is-scanned",
+      "clause": "A Comment body is scanned for credentials like any other authored prose, and the warning names the Comment rather than its Issue (dw32p.13)",
+      "file": "internal/core/mutations.go",
+      "test": "TestAddCommentWarnsOnACredentialWithoutRefusingIt",
+      "old": "core.emitWarnings(model.RecordComment, string(comment.ID), []textField{{\"body\", body}})",
+      "new": "core.emitWarnings(model.RecordComment, string(comment.ID), []textField{{\"body\", \"\"}})"
+    },
+    {
+      "control": "delete-comment-removes-the-row",
+      "clause": "A Comment carries no revision of its own, so deleting one removes it outright rather than tombstoning it (dw32p.7)",
+      "file": "internal/core/mutations.go",
+      "test": "TestDeleteCommentRemovesItFromTheThread",
+      "old": "return core.store.WithTx(ctx, func(ctx context.Context, tx *store.Tx) error { return tx.DeleteComment(ctx, id) })",
+      "new": "_ = id; return nil"
+    },
+    {
+      "control": "forget-is-idempotent",
+      "clause": "Forgetting an already-forgotten Memory is a no-op, so a repeated forget does not export as an edit (dw32p.9)",
+      "file": "internal/core/mutations.go",
+      "test": "TestSetMemoryTombstoneIsIdempotent",
+      "old": "\t\tcurrent, err := tx.Memory(ctx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif current.Tombstone == tombstone {",
+      "new": "\t\tcurrent, err := tx.Memory(ctx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif false && current.Tombstone == tombstone {"
+    },
+    {
+      "control": "forget-sets-the-tombstone",
+      "clause": "Forgetting a Memory sets its tombstone and bumps the revision, and restoring bumps it again (dw32p.9)",
+      "file": "internal/core/mutations.go",
+      "test": "TestSetMemoryTombstoneIsIdempotent",
+      "old": "\t\tcurrent.Tombstone, current.UpdatedAt, current.Revision = tombstone, core.timestamp(), next\n\t\tif err := tx.UpdateMemory(ctx, current, observed); err != nil {",
+      "new": "\t\tcurrent.UpdatedAt, current.Revision = core.timestamp(), next\n\t\tif err := tx.UpdateMemory(ctx, current, observed); err != nil {"
+    },
+    {
+      "control": "project-origin-collision-refuses-the-import",
+      "clause": "A Project key that exists here but claims a different creation origin is an identity collision, and a collision refuses the WHOLE import (dw32p.5)",
+      "file": "internal/core/import.go",
+      "test": "TestImportRefusesAProjectWhoseOriginDiffers",
+      "old": "if found && current.Value.(model.Project).CreationReplica != value.CreationReplica {",
+      "new": "if false && current.Value.(model.Project).CreationReplica != value.CreationReplica {"
+    },
+    {
+      "control": "comment-origin-collision-refuses-the-import",
+      "clause": "A Comment id claiming a different creation origin is an identity collision: a Comment id is derived from its Issue, so two machines can mint the same one (dw32p.5)",
+      "file": "internal/core/import.go",
+      "test": "TestImportRefusesACommentWhoseOriginDiffers",
+      "old": "if found && current.Value.(model.Comment).CreationReplica != value.CreationReplica {",
+      "new": "if false && current.Value.(model.Comment).CreationReplica != value.CreationReplica {"
+    },
+    {
+      "control": "an-id-belongs-to-one-kind",
+      "clause": "An ID is permanently owned by one kind, so a Memory carrying an id reserved for an Issue collides even when both share an origin (dw32p.7)",
+      "file": "internal/core/import.go",
+      "test": "TestImportRefusesAnIDReservedForAnotherKind",
+      "old": "if owner.Kind == kind && owner.CreationReplica == origin {",
+      "new": "if owner.CreationReplica == origin {"
+    },
+    {
+      "control": "an-unreserved-id-is-not-a-collision",
+      "clause": "An incoming id this store never reserved is not a collision, which is what makes first sync possible (dw32p.5)",
+      "file": "internal/core/import.go",
+      "test": "TestImportAcceptsAnUnreservedID",
+      "old": "\towner, err := tx.IDOwner(ctx, id)\n\tif errors.Is(err, model.ErrNotFound) {\n\t\treturn nil\n\t}",
+      "new": "\towner, err := tx.IDOwner(ctx, id)\n\tif errors.Is(err, model.ErrNotFound) {\n\t\treturn model.IdentityCollision{Record: ref, CurrentOrigin: origin, IncomingOrigin: origin, CurrentSummary: \"x\", IncomingSummary: \"y\"}\n\t}"
+    },
+    {
+      "control": "an-import-and-its-head-commit-together",
+      "clause": "An import and the source head it came from commit as one unit, so a crash cannot record having seen records it never merged (dw32p.10)",
+      "file": "internal/core/import.go",
+      "test": "TestImportWithHeadCommitsRecordsAndHeadAsOneUnit",
+      "old": "\t\tif head != nil {\n\t\t\treturn tx.PutReplicaHead(ctx, *head)\n\t\t}",
+      "new": "\t\tif false {\n\t\t\treturn tx.PutReplicaHead(ctx, *head)\n\t\t}"
+    },
+    {
+      "control": "a-duplicate-record-is-refused",
+      "clause": "A snapshot carrying one record twice is refused: two rows for one key would let merge order pick the winner (dw32p.5)",
+      "file": "internal/core/import.go",
+      "test": "TestImportRefusesADuplicateRecord",
+      "old": "if _, duplicate := seen[ref]; duplicate {",
+      "new": "if false {"
+    },
+    {
+      "control": "a-reserved-project-keeps-its-shape-on-import",
+      "clause": "An incoming reserved Project must keep the reserved slug and stay live, and an ordinary Project may not claim a reserved slug (dw32p.7)",
+      "file": "internal/core/import.go",
+      "test": "TestImportRefusesAMalformedReservedProject",
+      "old": "\t\t\tif err := validateReservedProject(project); err != nil {\n\t\t\t\treturn ImportReport{}, err\n\t\t\t}",
+      "new": "\t\t\tif err := validateReservedProject(project); err != nil && false {\n\t\t\t\treturn ImportReport{}, err\n\t\t\t}"
+    },
+    {
+      "control": "registration-writes-its-local-binding",
+      "clause": "Registering a Project writes the Project, its shared locator and its LOCAL workspace binding as one unit (dw32p.8)",
+      "file": "internal/core/registration.go",
+      "test": "TestRegisterProjectWritesProjectLocatorAndBindingTogether",
+      "old": "\t\tif input.BindingPath != \"\" {\n\t\t\tif err := tx.PutWorkspaceBinding(ctx, model.WorkspaceBinding{Path: input.BindingPath, ProjectKey: key}); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t}",
+      "new": ""
+    },
+    {
+      "control": "no-evidence-conflicts-on-a-taken-slug",
+      "clause": "A registration with no evidence to attach is a plain create, so a taken slug conflicts rather than handing back a Project the caller never named (dw32p.8)",
+      "file": "internal/core/registration.go",
+      "test": "TestRegisterProjectWithNoEvidenceConflictsOnATakenSlug",
+      "old": "if input.Locator == \"\" && input.BindingPath == \"\" {",
+      "new": "if false {"
+    },
+    {
+      "control": "reserved-slugs-are-not-registrable",
+      "clause": "No discovered directory can mint a second `global` or `inbox` (dw32p.7)",
+      "file": "internal/core/registration.go",
+      "test": "TestRegisterProjectRefusesReservedAndEmptySlugs",
+      "old": "if input.Slug == \"\" || isReservedSlug(input.Slug) {",
+      "new": "if input.Slug == \"\" {"
+    },
+    {
+      "control": "a-lost-same-slug-race-converges",
+      "clause": "A registration that loses a same-slug race returns the winner and attaches its own evidence there, because two sessions entering one repository at once is ordinary (dw32p.8)",
+      "file": "internal/core/registration.go",
+      "test": "TestRegisterProjectConvergesOnTheWinnerOfASameSlugRace",
+      "old": "if !errors.Is(err, model.ErrConflict) {",
+      "new": "if err != nil {"
+    },
+    {
+      "control": "convergence-does-not-duplicate-a-locator",
+      "clause": "The convergence path does not re-add a locator the winner already carries, so a busy repository does not accumulate one per race (dw32p.8)",
+      "file": "internal/core/registration.go",
+      "test": "TestRegisterProjectDoesNotReAddALocatorTheWinnerHas",
+      "old": "if !alreadyPresent {",
+      "new": "if true {"
+    },
+    {
+      "control": "removing-a-locator-tombstones-it",
+      "clause": "A repository locator is SHARED evidence, so removing one tombstones it for the other machine to merge rather than deleting the row (dw32p.8)",
+      "file": "internal/core/registration.go",
+      "test": "TestSetRepositoryLocatorTombstonesRatherThanDeletes",
+      "old": "\t\tdesired := model.Tombstoned\n\t\tif present {\n\t\t\tdesired = model.Live\n\t\t}",
+      "new": "\t\tdesired := model.Live\n\t\tif present {\n\t\t\tdesired = model.Live\n\t\t}"
+    },
+    {
+      "control": "setting-a-locator-is-idempotent",
+      "clause": "Setting a locator to the state it already holds is a no-op, so a repeated discovery does not export as an edit (dw32p.8)",
+      "file": "internal/core/registration.go",
+      "test": "TestSetRepositoryLocatorIsIdempotent",
+      "old": "\t\tif current.Tombstone == desired {\n\t\t\tchanged = current\n\t\t\treturn nil\n\t\t}",
+      "new": "\t\tif false && current.Tombstone == desired {\n\t\t\tchanged = current\n\t\t\treturn nil\n\t\t}"
+    },
+    {
+      "control": "an-empty-locator-says-it-is-empty",
+      "clause": "An empty locator is refused as EMPTY: model validation also refuses it a transaction later, as `repository locator locator \"\"`, which does not say what is wrong (dw32p.30)",
+      "file": "internal/core/registration.go",
+      "test": "TestSetRepositoryLocatorRefusesEmptyAndAbsentLocators",
+      "old": "if locator == \"\" {",
+      "new": "if false {"
+    },
+    {
+      "control": "removing-an-absent-locator-is-not-found",
+      "clause": "Removing a locator that was never there is not-found, and writes nothing (dw32p.8)",
+      "file": "internal/core/registration.go",
+      "test": "TestSetRepositoryLocatorRefusesEmptyAndAbsentLocators",
+      "old": "\t\t\tif !present {\n\t\t\t\treturn err\n\t\t\t}",
+      "new": "\t\t\tif false {\n\t\t\t\treturn err\n\t\t\t}"
+    },
+    {
+      "control": "a-locator-names-its-missing-project",
+      "clause": "A locator naming no Project is refused by the explicit read, not by the foreign key, whose ErrNotFound leaks SQLite's constraint text (dw32p.27's defect class)",
+      "file": "internal/core/registration.go",
+      "test": "TestSetRepositoryLocatorRefusesAnUnknownProject",
+      "old": "\t\tif _, err := tx.Project(ctx, project); err != nil {\n\t\t\treturn err\n\t\t}",
+      "new": "\t\tif _, err := tx.Project(ctx, project); err != nil && false {\n\t\t\treturn err\n\t\t}"
+    },
+    {
+      "control": "a-binding-names-its-missing-project",
+      "clause": "A workspace binding naming no Project is refused by the explicit read rather than the foreign key (dw32p.27's defect class)",
+      "file": "internal/core/registration.go",
+      "test": "TestBindWorkspaceRefusesAnUnknownProject",
+      "old": "\t\tif _, err := tx.Project(ctx, binding.ProjectKey); err != nil {\n\t\t\treturn err\n\t\t}",
+      "new": "\t\tif _, err := tx.Project(ctx, binding.ProjectKey); err != nil && false {\n\t\t\treturn err\n\t\t}"
+    },
+    {
+      "control": "unbinding-deletes-the-local-row",
+      "clause": "A workspace binding is LOCAL, so unbinding deletes it outright: it never crosses the mirror seam and has no other machine to tell (dw32p.8)",
+      "file": "internal/core/registration.go",
+      "test": "TestUnbindWorkspaceDeletesRatherThanTombstones",
+      "old": "\treturn core.store.WithTx(ctx, func(ctx context.Context, tx *store.Tx) error {\n\t\treturn tx.DeleteWorkspaceBinding(ctx, path)\n\t})",
+      "new": "\t_ = path\n\treturn nil"
+    },
+    {
+      "control": "reserved-projects-have-fixed-timestamps",
+      "clause": "The reserved Projects carry a fixed timestamp, so two machines that bootstrap independently produce byte-identical rows with nothing to merge (dw32p.7)",
+      "file": "internal/core/bootstrap.go",
+      "test": "TestBootstrapCreatesConvergentReservedProjects",
+      "old": "CreatedAt: reservedProjectTimestamp, UpdatedAt: reservedProjectTimestamp,",
+      "new": "CreatedAt: core.timestamp(), UpdatedAt: core.timestamp(),"
+    },
+    {
+      "control": "a-reserved-project-origin-is-its-key",
+      "clause": "A reserved Project's creation origin is derived from its fixed key, not from the replica that happened to bootstrap first (dw32p.7)",
+      "file": "internal/core/bootstrap.go",
+      "test": "TestBootstrapCreatesConvergentReservedProjects",
+      "old": "origin := model.ReplicaKey(reserved.key)",
+      "new": "origin := core.replica"
+    },
+    {
+      "control": "a-malformed-reserved-project-conflicts",
+      "clause": "A reserved Project that has been tampered with is a conflict, not something bootstrap silently repairs (dw32p.7)",
+      "file": "internal/core/bootstrap.go",
+      "test": "TestBootstrapRefusesAMalformedReservedProject",
+      "old": "if existing.Slug != reserved.slug || existing.ArchivedAt != nil {",
+      "new": "if existing.Slug != \"\" && false {"
+    },
+    {
+      "control": "a-tombstoned-parent-is-not-a-parent",
+      "clause": "A tombstoned parent relation survives for the mirror but is not shown on the page (dw32p.7)",
+      "file": "internal/core/views.go",
+      "test": "TestViewIssueOmitsATombstonedParent",
+      "old": "if err == nil && parent.Tombstone == model.Live {",
+      "new": "if err == nil {"
+    },
+    {
+      "control": "mark-exported-uses-the-captured-sequence",
+      "clause": "MarkExported records the write sequence the snapshot captured, not the one current at commit, which a concurrent write may already have passed (dw32p.10)",
+      "file": "internal/core/export.go",
+      "test": "TestMarkExportedRecordsTheCapturedWriteSequence",
+      "old": "return tx.MarkExported(ctx, writeSeq, head)",
+      "new": "_ = writeSeq; return tx.MarkExported(ctx, 0, head)"
+    },
+    {
+      "control": "a-succession-chain-stays-acyclic",
+      "clause": "A Replica succession chain is one-to-one and acyclic; a succession closing a loop is refused with nothing committed (dw32p.10)",
+      "file": "internal/core/replicas.go",
+      "test": "TestRecordReplicaSuccessionRefusesACycle",
+      "old": "\t\treturn validateImportedGraphs(ctx, tx)",
+      "new": "\t\treturn nil"
+    },
+    {
+      "control": "a-rename-preserves-identity",
+      "clause": "Renaming a Project changes the human-facing slug and bumps the generation without changing the opaque key that identity is (dw32p.8)",
+      "file": "internal/core/projects.go",
+      "test": "TestProjectLifecyclePreservesIdentityAndReservedRules",
+      "old": "\t\tchanged.Slug = slug\n\t\tchanged.UpdatedAt = core.timestamp()",
+      "new": "\t\tchanged.UpdatedAt = core.timestamp()"
+    },
+    {
+      "control": "reserved-projects-cannot-be-renamed",
+      "clause": "The reserved Projects keep their slugs, because those slugs are how every machine names them without syncing (dw32p.7)",
+      "file": "internal/core/projects.go",
+      "test": "TestProjectLifecyclePreservesIdentityAndReservedRules",
+      "old": "\tif isReservedProject(key) {\n\t\treturn model.Project{}, fmt.Errorf(\"%w: reserved Projects cannot be renamed\", model.ErrInvalid)\n\t}",
+      "new": ""
+    },
+    {
+      "control": "archiving-stamps-the-project",
+      "clause": "Archiving retires a Project by stamping ArchivedAt and bumping the generation, preserving its identity and records (dw32p.8)",
+      "file": "internal/core/projects.go",
+      "test": "TestProjectLifecyclePreservesIdentityAndReservedRules",
+      "old": "\t\tchanged.ArchivedAt = &stamp\n\t\tchanged.UpdatedAt = stamp",
+      "new": "\t\tchanged.UpdatedAt = stamp"
+    },
+    {
+      "control": "issue-creation-rolls-back-its-reservation",
+      "clause": "Reserving an Issue ID and writing the Issue are one transaction, so a rejected Issue leaves no ID permanently burned (dw32p.7)",
+      "file": "internal/core/issues.go",
+      "test": "TestCreateIssueReservesIDAndRelationsInOneTransaction",
+      "old": "\t\tif err := tx.PutIssue(ctx, issue); err != nil {\n\t\t\treturn err\n\t\t}",
+      "new": "\t\tif err := tx.PutIssue(ctx, issue); err != nil {\n\t\t\treturn nil\n\t\t}"
+    },
+    {
+      "control": "issue-fields-are-validated",
+      "clause": "An Issue with no title, an unknown type or an out-of-range priority is invalid input, refused before any ID is reserved (dw32p.7)",
+      "file": "internal/core/issues.go",
+      "test": "TestCreateIssueRefusesInvalidFields",
+      "old": "\t\treturn model.Issue{}, fmt.Errorf(\"%w: invalid Issue fields\", model.ErrInvalid)",
+      "new": "\t\t_ = model.ErrInvalid"
+    },
+    {
+      "control": "supersession-is-one-transaction",
+      "clause": "The replacement Memory and the link on the old one commit together, so a chain can never point at a Memory that was never written (dw32p.9)",
+      "file": "internal/core/memories.go",
+      "test": "TestSupersedeMemoryIsAtomicAndWarnsWithoutLeakingSecret",
+      "old": "\t\t\told.SupersededBy = &replacement.ID\n\t\t\told.UpdatedAt = core.timestamp()",
+      "new": "\t\t\told.UpdatedAt = core.timestamp()"
+    },
+    {
+      "control": "a-retired-memory-cannot-be-superseded",
+      "clause": "A Memory that is already forgotten or already superseded cannot be superseded again, which is what keeps the chain one-to-one (dw32p.9)",
+      "file": "internal/core/memories.go",
+      "test": "TestSupersedeMemoryRefusesARetiredMemory",
+      "old": "\t\t\tif old.Tombstone == model.Tombstoned || old.SupersededBy != nil {\n\t\t\t\treturn fmt.Errorf(\"%w: Memory %s is retired\", model.ErrConflict, oldID)\n\t\t\t}",
+      "new": ""
+    },
+    {
+      "control": "a-secret-warns-without-refusing",
+      "clause": "A credential in authored prose warns after the commit and names its family and field; it never changes whether the write lands (dw32p.13)",
+      "file": "internal/core/memories.go",
+      "test": "TestSupersedeMemoryIsAtomicAndWarnsWithoutLeakingSecret",
+      "old": "\t\t\tcore.emitWarnings(model.RecordMemory, string(created.ID), []textField{{\"title\", created.Title}, {\"body\", created.Body}})",
+      "new": "\t\t\t_ = created"
+    },
+    {
+      "control": "a-chained-memory-does-not-move-alone",
+      "clause": "A supersession chain lives in one Project, and the refusal names the other link rather than leaking SQLite's FOREIGN KEY text (dw32p.27)",
+      "file": "internal/core/mutations.go",
+      "test": "TestEditMemoryRefusesToMoveOneLinkOfASupersessionChain",
+      "old": "\t\t\tif err := refuseChainedMove(ctx, tx, current); err != nil {\n\t\t\t\treturn err\n\t\t\t}",
+      "new": ""
+    },
+    {
+      "control": "a-superseding-memory-does-not-move-either",
+      "clause": "The chain refusal covers BOTH directions: the Memory that supersedes another is as pinned as the one superseded (dw32p.27)",
+      "file": "internal/core/mutations.go",
+      "test": "TestEditMemoryRefusesToMoveOneLinkOfASupersessionChain/the_superseding_link",
+      "old": "\t\tif sibling.SupersededBy != nil && *sibling.SupersededBy == memory.ID {",
+      "new": "\t\tif false {"
+    },
+    {
+      "control": "closing-stamps-closed-at",
+      "clause": "Closing an Issue stamps ClosedAt and keeps the reason, and reopening clears both (dw32p.7)",
+      "file": "internal/core/relations.go",
+      "test": "TestIssueLifecycleAndRelationsAdvanceRevisionedState",
+      "old": "\t\t\tcurrent.ClosedAt = &stamp\n\t\t\tif reason == \"\" {",
+      "new": "\t\t\tif reason == \"\" {"
+    },
+    {
+      "control": "starting-stamps-started-at-once",
+      "clause": "Moving an Issue to in-progress stamps StartedAt the first time only, so re-starting does not rewrite when work began (dw32p.7)",
+      "file": "internal/core/relations.go",
+      "test": "TestIssueLifecycleAndRelationsAdvanceRevisionedState",
+      "old": "\t\t\tif current.StartedAt == nil {\n\t\t\t\tcurrent.StartedAt = &stamp\n\t\t\t}",
+      "new": ""
+    },
+    {
+      "control": "ready-and-blocked-are-complements",
+      "clause": "Blocked is the exact complement of Ready over the same candidates: an Issue with an open blocker is in one and not the other (dw32p.7)",
+      "file": "internal/core/graph.go",
+      "test": "TestIssueLifecycleAndRelationsAdvanceRevisionedState",
+      "old": "if deferred(issue, now) || len(blockers[issue.ID]) == 0 {",
+      "new": "if deferred(issue, now) {"
+    },
+    {
+      "control": "a-closed-blocker-stops-blocking",
+      "clause": "A blocker that is closed or tombstoned no longer blocks, which is what makes closing an Issue unblock its dependents (dw32p.7)",
+      "file": "internal/core/graph.go",
+      "test": "TestIssueLifecycleAndRelationsAdvanceRevisionedState",
+      "old": "\t\tisTerminal, known := terminal[dependency.ToID]\n\t\tif !known || !isTerminal {",
+      "new": "\t\tisTerminal, known := terminal[dependency.ToID]\n\t\tif _ = isTerminal; !known || true {"
+    },
+    {
+      "control": "doctor-repairs-only-failed-indexes",
+      "clause": "Doctor repairs an FTS index only when that index actually reported a finding, so a healthy store is never rebuilt (dw32p.13)",
+      "file": "internal/core/doctor.go",
+      "test": "TestDoctorRepairsOnlyFailedFTSAndScansRetainedProse",
+      "old": "if check.State != CheckFinding || !slices.Contains(store.FTSIndexes(), check.Name) {",
+      "new": "if !slices.Contains(store.FTSIndexes(), check.Name) {"
+    },
+    {
+      "control": "doctor-rechecks-after-repairing",
+      "clause": "Doctor re-runs its checks after a repair, so the report says whether the repair worked rather than what was wrong before it (dw32p.13)",
+      "file": "internal/core/doctor.go",
+      "test": "TestDoctorRepairsOnlyFailedFTSAndScansRetainedProse",
+      "old": "\t\tif len(report.AttemptedRepairs) != 0 {\n\t\t\treport.Checks = core.integrityChecks(ctx)\n\t\t}",
+      "new": ""
+    },
+    {
+      "control": "delete-wins-an-equal-generation-tie",
+      "clause": "When two machines edit and delete at the same generation, the delete wins and the conflict is reported (dw32p.5)",
+      "file": "internal/core/import.go",
+      "test": "TestImportUsesDeleteWinsForConcurrentRevisions",
+      "old": "\tdeleteWins := currentVersion.Tombstone != incomingVersion.Tombstone",
+      "new": "\tdeleteWins := false"
+    },
+    {
+      "control": "import-refuses-a-parent-cycle",
+      "clause": "An imported parent graph that closes a cycle is refused with nothing committed; only LIVE parent edges form the graph that is checked (dw32p.12)",
+      "file": "internal/core/import.go",
+      "test": "TestImportRejectsParentCycleAndCommitsNothing",
+      "old": "\t\tif parent.Tombstone == model.Live {",
+      "new": "\t\tif false {"
+    },
+    {
+      "control": "an-issue-origin-collision-refuses-the-import",
+      "clause": "An Issue id reserved here from a different origin is an identity collision, and it refuses the whole import (dw32p.5)",
+      "file": "internal/core/import.go",
+      "test": "TestImportRejectsIdentityCollisionWithoutPartialCommit",
+      "old": "\tif owner.Kind == kind && owner.CreationReplica == origin {\n\t\treturn nil\n\t}",
+      "new": "\tif owner.Kind == kind {\n\t\treturn nil\n\t}"
+    },
+    {
+      "control": "registration-is-one-transaction",
+      "clause": "A registration whose binding fails commits neither the Project nor the locator (dw32p.8)",
+      "file": "internal/core/registration.go",
+      "test": "TestRegistrationRollsBackProjectAndLocatorWhenBindingFails",
+      "old": "\t\tif input.BindingPath != \"\" {\n\t\t\tif err := tx.PutWorkspaceBinding(ctx, model.WorkspaceBinding{Path: input.BindingPath, ProjectKey: key}); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t}",
+      "new": "\t\tif input.BindingPath != \"\" {\n\t\t\tif err := tx.PutWorkspaceBinding(ctx, model.WorkspaceBinding{Path: input.BindingPath, ProjectKey: key}); err != nil {\n\t\t\t\treturn nil\n\t\t\t}\n\t\t}"
+    }
+  ]
+}

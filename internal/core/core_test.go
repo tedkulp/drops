@@ -344,6 +344,21 @@ func TestDoctorRepairsOnlyFailedFTSAndScansRetainedProse(t *testing.T) {
 	if len(report.Repaired) != 1 || report.Repaired[0] != "issues_fts" {
 		t.Fatalf("doctor report = %#v", report)
 	}
+	// The checks are re-run after a repair, so the report says whether the
+	// repair WORKED rather than restating what was wrong before it.
+	repaired := false
+	for _, check := range report.Checks {
+		if check.Name != "issues_fts" {
+			continue
+		}
+		repaired = check.State == core.CheckOK
+		if !repaired {
+			t.Errorf("issues_fts after a successful repair = %#v, want ok", check)
+		}
+	}
+	if !repaired {
+		t.Errorf("no post-repair issues_fts check in %#v", report.Checks)
+	}
 	if report.Healthy() {
 		t.Fatal("credential finding reported healthy")
 	}
