@@ -9,6 +9,14 @@ rather than continuing that history. What it replaced is described under
 saying about this release is what changed relative to the thing people were
 using.
 
+## [Unreleased]
+
+### Added
+
+- **`drops claim` and `drops release`** make wayfinder ownership explicit:
+  claiming refuses to overwrite another session, while releasing writes a null
+  assignee that returns the issue to the frontier.
+
 ## 0.1.0 — 2026-09-03
 
 First release, and the one that took over `~/.drops/drops.db` and the `drops`
@@ -37,9 +45,6 @@ Not 1.0: the TUI and a good deal of cleanup come first.
   memory for credentials and names what it finds without ever redacting it.
 - **`drops version`** reports the release, the commit it was built from, whether
   that tree had uncommitted work, and when the binary was built.
-- **`drops claim` and `drops release`** make wayfinder ownership explicit:
-  claiming refuses to overwrite another session, while releasing writes a null
-  assignee that returns the issue to the frontier.
 - **A v7 schema.** STRICT typed tables, inline generation/replica revisions,
   versioned tombstones, one explicit parent record per child, three
   external-content FTS indexes, and typed local replica state.

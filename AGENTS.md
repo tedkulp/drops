@@ -142,6 +142,13 @@ effect for a mutating verb. A census test walks the command tree and fails on an
 command absent from the tested-verb registry, so skipping one is an edit to a visible
 list rather than an omission.
 
+## Changelog
+
+`CHANGELOG.md` follows Keep a Changelog. Every change made after the latest
+release goes under `## [Unreleased]` (create it when absent), grouped under the
+appropriate change category. Only release work moves those entries into a dated
+version section.
+
 ## Lessons retained from the reference build
 
 - Re-check the premise before the next round of rigour, not after it.
