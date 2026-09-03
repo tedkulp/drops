@@ -199,29 +199,29 @@ func (a *App) assembleView(view core.IssueView) (render.Page, showIssueJSON, err
 	out := showIssueJSON{Issue: view.Issue, Comments: view.Comments}
 
 	for _, label := range view.Labels {
-		if label.Tombstone != model.Tombstoned {
-			out.Labels = append(out.Labels, label.Name)
-		}
+		out.Labels = append(out.Labels, label.Name)
 	}
 
 	var parentIDs, blockerIDs, blockingIDs, childIDs []model.ID
 	if view.Parent != nil {
 		parentIDs = append(parentIDs, view.Parent.ParentID)
 	}
+	// The relations arrive live: store filters `tombstoned = 0` in SQL for
+	// labels, dependencies and children alike, and core drops a tombstoned
+	// parent record. Re-filtering here would be a rule in the presentation
+	// layer that no input can ever reach, so it is not written.
 	for _, dep := range view.Dependencies {
-		if dep.Type == model.DepBlocks && dep.Tombstone != model.Tombstoned {
+		if dep.Type == model.DepBlocks {
 			blockerIDs = append(blockerIDs, dep.ToID)
 		}
 	}
 	for _, dep := range view.Dependents {
-		if dep.Type == model.DepBlocks && dep.Tombstone != model.Tombstoned {
+		if dep.Type == model.DepBlocks {
 			blockingIDs = append(blockingIDs, dep.FromID)
 		}
 	}
 	for _, child := range view.Children {
-		if child.Tombstone != model.Tombstoned {
-			childIDs = append(childIDs, child.ChildID)
-		}
+		childIDs = append(childIDs, child.ChildID)
 	}
 
 	resolve := func(ids []model.ID) ([]refData, error) { return resolveRefs(a.ctx, a.core, ids) }

@@ -133,7 +133,7 @@ func (a *App) descendants(id model.ID) ([]model.ID, error) {
 			return err
 		}
 		for _, child := range children {
-			if child.Tombstone == model.Tombstoned || seen[child.ChildID] {
+			if seen[child.ChildID] {
 				continue
 			}
 			seen[child.ChildID] = true
@@ -152,18 +152,39 @@ func (a *App) descendants(id model.ID) ([]model.ID, error) {
 
 // moveCrossings reports blocks and parentage edges that a move splits across
 // projects: one endpoint is in the moving set, the other is not.
+//
+// It runs BEFORE the write, so an endpoint's stored project is still where it
+// came from. An endpoint in the moving set therefore reports the DESTINATION,
+// which is the only way the report can show a crossing at all: reading both
+// ends out of the store here printed the same project on both sides of every
+// edge, so a list whose whole purpose is to name a boundary named none.
+// --dry-run prints what a real move would print, which is the same answer.
 func (a *App) moveCrossings(movedIDs []model.ID, moving map[model.ID]bool, dest model.ProjectKey) ([]moveEdge, []moveEdge, error) {
 	slugs, err := a.slugMap()
 	if err != nil {
 		return nil, nil, err
 	}
+	projectOf := func(id model.ID) string {
+		if moving[id] {
+			return slugs[dest]
+		}
+		return slugs[issueProject(a, id)]
+	}
 	var blocks, parentage []moveEdge
+	// One endpoint moving is not enough to make an edge cross: the other end
+	// may already be in the destination, or be moving with it, in which case
+	// the move JOINED them rather than splitting them. Comparing the two
+	// answers is what makes "crossing" mean crossing — and it subsumes the
+	// "is the other end in the moving set" test, since both ends of such an
+	// edge answer with the destination.
 	addEdge := func(from, to model.ID, list *[]moveEdge) {
-		fromProj := slugs[issueProject(a, from)]
-		toProj := slugs[issueProject(a, to)]
+		fromProject, toProject := projectOf(from), projectOf(to)
+		if fromProject == toProject {
+			return
+		}
 		*list = append(*list, moveEdge{
-			FromID: string(from), FromProject: fromProj,
-			ToID: string(to), ToProject: toProj,
+			FromID: string(from), FromProject: fromProject,
+			ToID: string(to), ToProject: toProject,
 		})
 	}
 	for _, id := range movedIDs {
@@ -172,37 +193,30 @@ func (a *App) moveCrossings(movedIDs []model.ID, moving map[model.ID]bool, dest 
 			return nil, nil, err
 		}
 		for _, dep := range from {
-			if dep.Type != model.DepBlocks || dep.Tombstone == model.Tombstoned {
+			if dep.Type != model.DepBlocks {
 				continue
 			}
-			if !moving[dep.ToID] {
-				addEdge(id, dep.ToID, &blocks)
-			}
+			addEdge(id, dep.ToID, &blocks)
 		}
 		toDeps, err := a.core.DependenciesTo(a.ctx, id)
 		if err != nil {
 			return nil, nil, err
 		}
 		for _, dep := range toDeps {
-			if dep.Type != model.DepBlocks || dep.Tombstone == model.Tombstoned {
+			if dep.Type != model.DepBlocks {
 				continue
 			}
-			if !moving[dep.FromID] {
-				addEdge(dep.FromID, id, &blocks)
-			}
+			addEdge(dep.FromID, id, &blocks)
 		}
 		// Parentage: the moved issue's parent, and its children.
 		view, err := a.core.ViewIssue(a.ctx, id)
 		if err != nil {
 			return nil, nil, err
 		}
-		if view.Parent != nil && !moving[view.Parent.ParentID] {
+		if view.Parent != nil {
 			addEdge(id, view.Parent.ParentID, &parentage)
 		}
 		for _, child := range view.Children {
-			if child.Tombstone == model.Tombstoned || moving[child.ChildID] {
-				continue
-			}
 			addEdge(child.ChildID, id, &parentage)
 		}
 	}

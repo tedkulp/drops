@@ -85,8 +85,13 @@ func newMemoriesCmd(app *App) *cobra.Command {
 				return err
 			}
 			filter := core.MemoryFilter{
-				Project:           project,
-				IncludeSuperseded: all,
+				Project: project,
+				// --deleted widens BOTH: it promises every tombstone,
+				// and a memory that was superseded and later forgotten
+				// is one. Narrowing to live chains first hid it from
+				// the flag whose whole job is to reveal it, leaving it
+				// reachable only under -a.
+				IncludeSuperseded: all || deleted,
 				IncludeTombstoned: all || deleted,
 				Limit:             limit,
 			}
@@ -234,41 +239,32 @@ func newForgetCmd(app *App) *cobra.Command {
 }
 
 func newSupersedeCmd(app *App) *cobra.Command {
-	var (
-		title, source string
-		global        bool
-	)
+	var title, source string
 	cmd := &cobra.Command{
 		Use:   "supersede <id> <text>",
 		Short: "Replace a memory with a new one and link the old to it",
 		Long: "Store a replacement for <id> and point the old memory at it. The old memory\n" +
 			"stays in the store, hidden from the default read paths and reachable under\n" +
-			"--all. The replacement inherits the old memory's project.",
+			"--all.\n\n" +
+			"The replacement ALWAYS inherits the old memory's project: a supersession\n" +
+			"chain lives in one project and the schema enforces it. There is therefore\n" +
+			"no --global here, and a -P naming any other project is refused rather than\n" +
+			"silently ignored.",
 		Args: exactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
-			}
-			if global && app.projectFlag != "" {
-				return invalidArgs("-P %s scopes this memory to a project and --global forces it cross-project; pass one", app.projectFlag)
 			}
 			oldID := model.ID(args[0])
 			old, err := app.core.Memory(app.ctx, oldID)
 			if err != nil {
 				return err
 			}
-			project := old.ProjectKey
-			if global {
-				project = model.GlobalProjectKey
-			} else if app.projectFlag != "" {
-				p, err := app.core.ProjectBySlug(app.ctx, app.projectFlag)
-				if err != nil {
-					return fmt.Errorf("unknown project %q: %w", app.projectFlag, err)
-				}
-				project = p.Key
+			if err := supersedeScopeConflict(app, old.ProjectKey); err != nil {
+				return err
 			}
 			m, err := app.core.SupersedeMemory(app.ctx, oldID, core.CreateMemory{
-				Project:    project,
+				Project:    old.ProjectKey,
 				Title:      title,
 				Body:       args[1],
 				Provenance: source,
@@ -286,8 +282,25 @@ func newSupersedeCmd(app *App) *cobra.Command {
 	f := cmd.Flags()
 	f.StringVar(&title, "title", "", "explicit title")
 	f.StringVar(&source, "source", "", "free-text provenance, e.g. a skill name")
-	f.BoolVar(&global, "global", false, "assign the reserved global project")
 	return cmd
+}
+
+// supersedeScopeConflict refuses a -P that names anywhere but the old memory's
+// own project. core overrides the project on this path unconditionally, so a
+// scope flag that disagreed used to be accepted and then thrown away — a flag
+// that reports success having done nothing, which is the defect class the whole
+// exit-code contract exists to avoid.
+func supersedeScopeConflict(app *App, project model.ProjectKey) error {
+	if app.projectFlag == "" {
+		return nil
+	}
+	if projectSlug(app, project) == app.projectFlag {
+		return nil
+	}
+	return fmt.Errorf(
+		"%w: -P names %q, but a replacement inherits %q from the memory it supersedes; "+
+			"a supersession chain lives in one project",
+		model.ErrInvalid, app.projectFlag, projectSlug(app, project))
 }
 
 // memoryScope resolves where a memory write lands: --global names the reserved

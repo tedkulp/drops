@@ -70,8 +70,15 @@ func newProjectArchiveCmd(app *App) *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{
 		Use:   "archive <slug>",
-		Short: "Archive a project, hiding it from listings and --all-projects",
-		Args:  exactArgs(1),
+		Short: "Archive a project: it leaves `project list` and takes no new work",
+		Long: "Archive a project. It drops out of `project list` (--archived brings it\n" +
+			"back) and refuses new issues and memories.\n\n" +
+			"Its EXISTING issues stay exactly where they are and stay readable: -P\n" +
+			"still scopes to it, and --all-projects still spans it, because\n" +
+			"--all-projects means every project and an archived one is still a\n" +
+			"project. Archiving retires a project from new work; it does not hide\n" +
+			"its history.",
+		Args: exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err

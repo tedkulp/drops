@@ -35,7 +35,7 @@ relation, and the whole comment thread.
 | label | `drops label add <id> <label>...`, `drops label rm`, `drops label list [<id>]` |
 | note something durable | `drops remember "text" [--global] [--source <skill>]` |
 | read the notes | `drops memories [query]`, `drops memory show <id>` |
-| projects | `drops project list`, `project add --slug`, `project rename`, `project archive` |
+| projects | `drops project list`, `project add --slug`, `project rename`, `project archive --force` |
 | where am I | `drops config show` |
 | is the store sound | `drops doctor` |
 | talk to the other machine | `drops sync` |
@@ -111,8 +111,18 @@ name would silently collect every later write from that directory.
 to the reserved inbox. `--db <path>` or `$DROPS_DB` names a different store,
 which is how development runs against a scratch database.
 
+**Archiving retires a project from new work; it does not hide its history.**
+`drops project archive <slug> --force` drops it from `project list` (`--archived`
+brings it back) and makes it refuse new issues and memories. Its existing issues
+stay exactly where they are and stay readable: `-P` still scopes to it, and
+`--all-projects` still spans it, because `--all-projects` means every project and
+an archived one is still a project. The two reserved projects cannot be archived.
+`--force` is required from a non-interactive session.
+
 `drops config show` prints the resolved project and store path, and is the
-quickest way to find out why a command answered the way it did.
+quickest way to find out why a command answered the way it did. It prints
+sorted `key=value` lines, or with `--json` one object of the same pairs;
+`project.slug` is absent, in both forms, when nothing resolves.
 
 ## How a long body gets in
 
@@ -194,6 +204,13 @@ print. `--json` emits **one object**, not an array: `moved`, `noop`, `crossing_b
 The records in `moved` are the pre-move images, so their `project_key` is the project they
 came *from*; `to` is where they went.
 
+**The crossing lists do not follow that rule, deliberately.** A moved endpoint there
+reports the project it is going *to*, so `from_project != to_project` on every entry and
+an edge whose two ends land in one project is not listed at all. Reporting both ends
+pre-move printed the same project on both sides of every entry, which named no boundary
+and made the list useless for the one thing it exists for. A move that *joins* two ends —
+sending a blocker after the issue it blocks — reports nothing, because nothing crossed.
+
 Issues only. A memory's scope moves with `drops memory edit <id> -P <slug>` or `--global`.
 
 ## Comments
@@ -257,9 +274,14 @@ drops forget <id>
 - A title is derived from the body when you do not pass one.
 - `supersede` mints the replacement, links the old one to it, and retires the
   old one, all in one transaction. The replacement always inherits the old
-  memory's project. `memories` shows only the current end of each chain; `-a`
-  reveals the retired links and says what replaced them.
-- `forget` tombstones. `memories --deleted` shows only tombstones, marked `⊘`.
+  memory's project, so `supersede` has **no `--global`**, and a `-P` naming any
+  other project is refused at exit 2 rather than accepted and thrown away.
+  `memories` shows only the current end of each chain; `-a` reveals the retired
+  links and says what replaced them.
+- `forget` tombstones. `memories --deleted` shows only tombstones, marked `⊘`,
+  including one that was superseded before it was forgotten. A memory that is
+  both retired and removed reports the removal: `⊘ … · tombstoned`, never the
+  supersession under it.
 
 **A supersession chain lives in one project**, enforced by the schema. So
 `memory edit -P`/`--global` on any link of a chain is refused at exit 2, naming

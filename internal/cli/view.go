@@ -111,9 +111,6 @@ func isDigit(b byte) bool { return b >= '0' && b <= '9' }
 func pageForView(view core.IssueView) render.Page {
 	labels := make([]string, 0, len(view.Labels))
 	for _, label := range view.Labels {
-		if label.Tombstone == model.Tombstoned {
-			continue
-		}
 		labels = append(labels, label.Name)
 	}
 	page := render.Page{
@@ -138,6 +135,14 @@ func pageForView(view core.IssueView) render.Page {
 	}
 	if view.Issue.DeferredUntil != nil {
 		page.DeferredUntil = *view.Issue.DeferredUntil
+	}
+	for _, comment := range view.Comments {
+		page.Comments = append(page.Comments, render.Comment{
+			ID:        comment.ID,
+			Author:    comment.Author,
+			Body:      comment.Body,
+			CreatedAt: comment.CreatedAt,
+		})
 	}
 	return page
 }

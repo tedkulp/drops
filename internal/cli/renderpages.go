@@ -31,47 +31,15 @@ func renderPages(console render.Console, pages []render.Page) error {
 	return fn(console.Out)
 }
 
-// renderComments renders an issue's whole thread under one pager, in the same
-// shape render's Page uses for its comments section.
+// renderComments renders an issue's whole thread through render's own thread
+// writer — the one `show` uses — so `comment list` and a page can never
+// disagree about what a thread looks like.
 func renderComments(console render.Console, comments []model.Comment) error {
-	fn := func(w io.Writer) error {
-		if len(comments) == 0 {
-			return nil
-		}
-		fmt.Fprintf(w, "Comments  %d\n", len(comments))
-		for _, c := range comments {
-			fmt.Fprintln(w)
-			header := shortDate(c.CreatedAt)
-			if c.Author != "" {
-				header += " · " + c.Author
-			}
-			if c.ID != "" {
-				header += " · " + string(c.ID)
-			}
-			for _, line := range render.Wrap(header, console.Width) {
-				fmt.Fprintln(w, line)
-			}
-			for _, line := range render.WrapText(c.Body, console.Width-2) {
-				if line == "" {
-					fmt.Fprintln(w)
-				} else {
-					fmt.Fprintf(w, "  %s\n", line)
-				}
-			}
-		}
-		return nil
+	thread := make([]render.Comment, 0, len(comments))
+	for _, c := range comments {
+		thread = append(thread, render.Comment{
+			ID: c.ID, Author: c.Author, Body: c.Body, CreatedAt: c.CreatedAt,
+		})
 	}
-	if console.Pager != nil {
-		return console.Pager.Page(console.Out, fn)
-	}
-	return fn(console.Out)
-}
-
-// shortDate trims a timestamp to its date. A timestamp is opaque text that is
-// never parsed and reformatted, so this slices rather than round-tripping.
-func shortDate(stamp model.Timestamp) string {
-	if len(stamp) < 10 {
-		return string(stamp)
-	}
-	return string(stamp[:10])
+	return console.Thread(thread)
 }

@@ -5,6 +5,8 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
+
+	"github.com/tedkulp/drops/internal/render"
 )
 
 func newConfigCmd(app *App, dbPath *string) *cobra.Command {
@@ -29,6 +31,13 @@ func newConfigCmd(app *App, dbPath *string) *cobra.Command {
 				resolvedSlug = scoped.Slug
 			}
 			settings := configSettings(*dbPath, resolvedSlug)
+			if app.json {
+				// config show is the verb an agent reaches for when a
+				// command answered the way it did and nobody knows why,
+				// so it owes --json a real object rather than the
+				// key=value lines a parser would have to split.
+				return render.EmitOne(app.out, settings)
+			}
 			keys := make([]string, 0, len(settings))
 			for k := range settings {
 				keys = append(keys, k)

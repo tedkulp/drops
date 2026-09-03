@@ -75,6 +75,13 @@ func (console Console) Page(page Page) error {
 		page.writeIdentity(out, width)
 		page.writeBody(out, width)
 		page.writeRelations(out, width)
+		if len(page.Comments) > 0 {
+			// The blank line separates the thread from the relations above
+			// it, which is a PAGE concern: a thread rendered on its own has
+			// nothing above it to separate from. Keeping it here is what
+			// lets Page and Thread share one writer byte for byte.
+			fmt.Fprintln(out)
+		}
 		writeComments(out, page.Comments, width)
 		return nil
 	})
@@ -167,6 +174,22 @@ func writeRefs(out io.Writer, heading string, refs []Ref, width int) {
 	}
 }
 
+// Thread writes a comment thread on its own, for a verb that shows the thread
+// without the issue around it. It is the SAME writer Page uses, exported
+// rather than re-spelled at the caller: docs/agents/issue-tracker.md promises
+// `comment list` renders "in the same rendering `show` uses", and a second
+// spelling of it is a promise that holds only until someone edits one of them.
+//
+// It leads with a blank line exactly as it does inside a page, so a thread
+// reads the same in both places.
+func (console Console) Thread(comments []Comment) error {
+	width := console.width()
+	return console.paged(func(out io.Writer) error {
+		writeComments(out, comments, width)
+		return nil
+	})
+}
+
 // writeComments writes a whole thread, oldest first, each body wrapped and
 // indented two columns so a comment is distinguishable from the issue's own
 // prose.
@@ -180,7 +203,7 @@ func writeComments(out io.Writer, comments []Comment, width int) {
 	if len(comments) == 0 {
 		return
 	}
-	fmt.Fprintf(out, "\nComments  %d\n", len(comments))
+	fmt.Fprintf(out, "Comments  %d\n", len(comments))
 	for _, comment := range comments {
 		fmt.Fprintln(out)
 		header := shortDate(comment.CreatedAt)

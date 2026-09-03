@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/tedkulp/drops/internal/model"
 	"github.com/tedkulp/drops/internal/render"
+	"github.com/tedkulp/drops/internal/store"
 	"github.com/tedkulp/drops/internal/sync"
 )
 
@@ -115,6 +118,30 @@ func TestUpdateClearAssignee(t *testing.T) {
 	if cleared.Assignee != nil {
 		t.Fatalf("assignee after -A \"\" = %v, want null (cleared)", *cleared.Assignee)
 	}
+	// The JSON cannot tell the two apart: `assignee` is omitempty, so a
+	// pointer to "" and a nil pointer both vanish from the object. The
+	// difference is in the store, and it matters — a row holding '' is not
+	// NULL, so it is not unassigned to anything that asks the column.
+	if got := storedAssignee(t, db, id); got.Valid {
+		t.Fatalf("assignee column after -A \"\" = %q, want NULL", got.String)
+	}
+}
+
+// storedAssignee reads the column itself, because --json omits an empty
+// assignee and so cannot distinguish NULL from ”.
+func storedAssignee(t *testing.T, dbPath, id string) sql.NullString {
+	t.Helper()
+	opened, err := store.Open(context.Background(), dbPath)
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer opened.Close()
+	var value sql.NullString
+	row := opened.DB().QueryRowContext(context.Background(), "SELECT assignee FROM issues WHERE id = ?", id)
+	if err := row.Scan(&value); err != nil {
+		t.Fatalf("read assignee: %v", err)
+	}
+	return value
 }
 
 func TestReadyRowByteExact(t *testing.T) {
@@ -221,14 +248,19 @@ func TestUnknownCommandExitsTwo(t *testing.T) {
 
 func TestBareGroupPrintsHelpAndSucceeds(t *testing.T) {
 	// The other side of the same branch: a group with no positional is a
-	// request for its help, not a misuse.
+	// request for its help, not a misuse. Every group, because the branch is
+	// shared and a group wired without it would be the one that silently
+	// exits 0 having done nothing.
 	db := filepath.Join(t.TempDir(), "drops.db")
-	out, _, code := run(t, db, t.TempDir(), "dep")
-	if code != 0 {
-		t.Fatalf("bare group exit = %d, want 0", code)
-	}
-	if !strings.Contains(out, "Available Commands:") {
-		t.Fatalf("bare group printed no help: %q", out)
+	cwd := t.TempDir()
+	for _, group := range []string{"comment", "config", "dep", "label", "memory", "project", "replica"} {
+		out, _, code := run(t, db, cwd, group)
+		if code != 0 {
+			t.Errorf("bare %s exit = %d, want 0", group, code)
+		}
+		if !strings.Contains(out, "Available Commands:") {
+			t.Errorf("bare %s printed no help: %q", group, out)
+		}
 	}
 }
 
@@ -336,4 +368,44 @@ func TestMemoryGlyphsComeFromTheSharedVocabulary(t *testing.T) {
 	if strings.HasPrefix(gone, render.StatusMark(model.StatusOpen, false)) {
 		t.Errorf("tombstone did not outrank the live glyph: %q", gone)
 	}
+}
+
+// newStore is one scratch store and one working directory outside any
+// repository, which is why every test that wants a project passes --inbox or
+// -P: an unresolved cwd is the neutral starting point, not an accident.
+func newStore(t *testing.T) (dbPath, cwd string) {
+	t.Helper()
+	return filepath.Join(t.TempDir(), "drops.db"), t.TempDir()
+}
+
+// mustRun runs one invocation and fails the test unless it exits 0. Use it for
+// the setup steps of a test whose subject is a later call; use run directly
+// when the exit code is what is being asserted.
+func mustRun(t *testing.T, dbPath, cwd string, args ...string) string {
+	t.Helper()
+	out, errOut, code := run(t, dbPath, cwd, args...)
+	if code != 0 {
+		t.Fatalf("%v exit = %d, want 0 (stderr: %s)", args, code, errOut)
+	}
+	return strings.TrimSpace(out)
+}
+
+// decodeOne and decodeMany parse the two --json shapes: a reading verb's bare
+// object and a scanning verb's bare array.
+func decodeOne[T any](t *testing.T, out string) T {
+	t.Helper()
+	var value T
+	if err := json.Unmarshal([]byte(out), &value); err != nil {
+		t.Fatalf("not a JSON object: %v (%q)", err, out)
+	}
+	return value
+}
+
+func decodeMany[T any](t *testing.T, out string) []T {
+	t.Helper()
+	var values []T
+	if err := json.Unmarshal([]byte(out), &values); err != nil {
+		t.Fatalf("not a JSON array: %v (%q)", err, out)
+	}
+	return values
 }

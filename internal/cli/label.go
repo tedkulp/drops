@@ -77,7 +77,7 @@ func newLabelListCmd(app *App) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				names := liveLabelNames(labels)
+				names := labelNames(labels)
 				if app.json {
 					return render.EmitMany(app.out, names)
 				}
@@ -106,12 +106,13 @@ func newLabelListCmd(app *App) *cobra.Command {
 	}
 }
 
-func liveLabelNames(labels []model.Label) []string {
+// labelNames is the names in order. It does not filter tombstones: every
+// caller reaches labels through store's IssueLabels, which selects
+// `tombstoned = 0` in SQL, so a filter here would be unreachable.
+func labelNames(labels []model.Label) []string {
 	out := make([]string, 0, len(labels))
 	for _, l := range labels {
-		if l.Tombstone != model.Tombstoned {
-			out = append(out, l.Name)
-		}
+		out = append(out, l.Name)
 	}
 	return out
 }
@@ -141,7 +142,7 @@ func (a *App) labelCounts() (map[string]int, error) {
 		if err != nil {
 			return nil, err
 		}
-		for _, name := range liveLabelNames(labels) {
+		for _, name := range labelNames(labels) {
 			counts[name]++
 		}
 	}

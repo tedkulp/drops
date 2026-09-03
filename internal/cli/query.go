@@ -231,9 +231,7 @@ func (a *App) filterAllLabels(issues []model.Issue, want []string) ([]model.Issu
 		}
 		have := map[string]bool{}
 		for _, l := range labels {
-			if l.Tombstone != model.Tombstoned {
-				have[l.Name] = true
-			}
+			have[l.Name] = true
 		}
 		all := true
 		for _, w := range want {

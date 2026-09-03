@@ -1,0 +1,781 @@
+{
+  "note": "Live controls for internal/cli, the Cobra presentation over resolve, core, sync and render. Re-runnable proof that these tests can fail; the closed tickets' close reasons remain the historical record. Seeded by dw32p.31.",
+  "controls": [
+    {
+      "control": "invalid-input-is-two",
+      "clause": "An invalid input exits 2 so an agent can tell `you called it wrong` from `it crashed` (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestExitCodeForSentinels",
+      "old": "\tcase errors.Is(err, model.ErrInvalid):\n\t\treturn 2",
+      "new": "\tcase errors.Is(err, model.ErrInvalid):\n\t\treturn 1"
+    },
+    {
+      "control": "not-found-is-four",
+      "clause": "A named issue, memory or project that does not exist exits 4 (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestExitCodeForSentinels",
+      "old": "\tcase errors.Is(err, model.ErrNotFound):\n\t\treturn 4",
+      "new": "\tcase errors.Is(err, model.ErrNotFound):\n\t\treturn 1"
+    },
+    {
+      "control": "conflict-is-five",
+      "clause": "A lost compare-and-swap or a supersede against a retired memory exits 5 (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestExitCodeForSentinels",
+      "old": "\tcase errors.Is(err, model.ErrConflict):\n\t\treturn 5",
+      "new": "\tcase errors.Is(err, model.ErrConflict):\n\t\treturn 1"
+    },
+    {
+      "control": "sync-lock-is-ten",
+      "clause": "A sync lock held by another process exits 10 (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestExitCodeForSentinels",
+      "old": "\tcase errors.Is(err, sync.ErrSyncLocked):\n\t\treturn 10",
+      "new": "\tcase errors.Is(err, sync.ErrSyncLocked):\n\t\treturn 1"
+    },
+    {
+      "control": "parser-misuse-is-two",
+      "clause": "A cobra/pflag rejection is wrapped so a bad flag exits 2 rather than collapsing to 1 (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestParserMisuseExitsTwo",
+      "old": "\t\treturn fmt.Errorf(\"%w: %v\", model.ErrInvalid, err)",
+      "new": "\t\treturn err"
+    },
+    {
+      "control": "positional-misuse-is-two",
+      "clause": "A positional-argument rejection is wrapped so it exits 2 rather than the generic 1 (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestInvalidArgsExitsTwo",
+      "old": "func invalidArgs(format string, args ...any) error {\n\treturn fmt.Errorf(\"%w: %s\", model.ErrInvalid, fmt.Sprintf(format, args...))",
+      "new": "func invalidArgs(format string, args ...any) error {\n\treturn fmt.Errorf(\"%s\", fmt.Sprintf(format, args...))"
+    },
+    {
+      "control": "exact-arity-is-checked",
+      "clause": "A verb taking exactly N positionals refuses any other count (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestInvalidArgsExitsTwo",
+      "old": "\t\tif len(args) != n {\n\t\t\treturn invalidArgs(\"accepts %d arg(s), received %d\", n, len(args))",
+      "new": "\t\tif false {\n\t\t\treturn invalidArgs(\"accepts %d arg(s), received %d\", n, len(args))"
+    },
+    {
+      "control": "minimum-arity-is-checked",
+      "clause": "A verb taking at least N positionals refuses fewer (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestLabelAddAndRmNeedALabel",
+      "old": "\t\tif len(args) < n {\n\t\t\treturn invalidArgs(\"requires at least %d arg(s), received %d\", n, len(args))",
+      "new": "\t\tif false {\n\t\t\treturn invalidArgs(\"requires at least %d arg(s), received %d\", n, len(args))"
+    },
+    {
+      "control": "maximum-arity-is-checked",
+      "clause": "A verb taking at most N positionals refuses more (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestLabelAddAndRmNeedALabel",
+      "old": "\t\tif len(args) > n {\n\t\t\treturn invalidArgs(\"accepts at most %d arg(s), received %d\", n, len(args))",
+      "new": "\t\tif false {\n\t\t\treturn invalidArgs(\"accepts at most %d arg(s), received %d\", n, len(args))"
+    },
+    {
+      "control": "a-scanning-verb-takes-no-positional",
+      "clause": "list, ready, blocked and count answer the scope, so a positional there is a misuse (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestScanningVerbsTakeNoPositional",
+      "old": "\t\tif len(args) != 0 {\n\t\t\treturn invalidArgs(\"accepts no args, received %d\", len(args))",
+      "new": "\t\tif false {\n\t\t\treturn invalidArgs(\"accepts no args, received %d\", len(args))"
+    },
+    {
+      "control": "a-mistyped-verb-is-two",
+      "clause": "A positional reaching a group is a mistyped verb and exits 2, never 0 (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestUnknownCommandExitsTwo",
+      "old": "\t\treturn invalidArgs(\"unknown command %q for %q\", args[0], cmd.CommandPath())",
+      "new": "\t\treturn nil"
+    },
+    {
+      "control": "a-bare-group-is-a-request-for-help",
+      "clause": "A group with no positional prints its help at 0; only a positional is a misuse (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestBareGroupPrintsHelpAndSucceeds",
+      "old": "\t\tif len(args) == 0 {\n\t\t\treturn nil\n\t\t}",
+      "new": "\t\tif len(args) == 0 {\n\t\t\treturn invalidArgs(\"no subcommand\")\n\t\t}"
+    },
+    {
+      "control": "a-no-store-verb-skips-the-database",
+      "clause": "version answers before ~/.drops/drops.db exists, so it never opens the store (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestVersionWorksBeforeTheStoreExists",
+      "old": "\t\t\tif cmd.Annotations[annotationNoStore] == \"1\" {\n\t\t\t\treturn nil\n\t\t\t}",
+      "new": "\t\t\tif false {\n\t\t\t\treturn nil\n\t\t\t}"
+    },
+    {
+      "control": "a-read-never-registers",
+      "clause": "A read that resolves to no project advises on stderr and registers nothing (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestScanningVerbAdvisesAndExitsZeroWhenNothingResolves",
+      "old": "\t\tif !forWrite {\n\t\t\tif !a.quiet {",
+      "new": "\t\tif false {\n\t\t\tif !a.quiet {"
+    },
+    {
+      "control": "an-inbox-scope-wins-outright",
+      "clause": "--inbox scopes to the reserved inbox project without consulting the directory (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestListRowByteExact",
+      "old": "\tif a.inbox {\n\t\tp, err := a.core.Project(a.ctx, model.InboxProjectKey)",
+      "new": "\tif false {\n\t\tp, err := a.core.Project(a.ctx, model.InboxProjectKey)"
+    },
+    {
+      "control": "a-contested-origin-is-a-conflict",
+      "clause": "Two projects claiming one origin is reported as a conflict, never guessed (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestAmbiguousOriginIsReportedNeverGuessed",
+      "old": "\t\treturn fmt.Errorf(\"%w: repository %q is claimed by %d projects; bind or pass -P to choose\",\n\t\t\tmodel.ErrConflict, a.Locator, len(a.Projects))",
+      "new": "\t\treturn fmt.Errorf(\"%w: repository %q is claimed by %d projects; bind or pass -P to choose\",\n\t\t\tmodel.ErrInvalid, a.Locator, len(a.Projects))"
+    },
+    {
+      "control": "parent-overrides-a-contradicting-scope",
+      "clause": "A -P or --inbox that disagrees with --parent is an error, because a child goes where its parent is (dw32p.31)",
+      "file": "internal/cli/issue.go",
+      "test": "TestCreateParentConflict",
+      "old": "\tif projectSlug(app, parentProject) == app.projectFlag {\n\t\treturn nil\n\t}",
+      "new": "\treturn nil\n\tif projectSlug(app, parentProject) == app.projectFlag {\n\t\treturn nil\n\t}"
+    },
+    {
+      "control": "an-agreeing-scope-is-not-a-conflict",
+      "clause": "A -P that agrees with --parent is fine; only a contradiction is refused (dw32p.31)",
+      "file": "internal/cli/issue.go",
+      "test": "TestCreateFilesUnderItsParentsProject",
+      "old": "\tif app.projectFlag == \"\" && !app.inbox {\n\t\treturn nil\n\t}",
+      "new": "\tif false {\n\t\treturn nil\n\t}"
+    },
+    {
+      "control": "parent-carries-the-project",
+      "clause": "--parent files the child in its parent's project and the working directory is not consulted (dw32p.31)",
+      "file": "internal/cli/issue.go",
+      "test": "TestCreateFilesUnderItsParentsProject",
+      "old": "\t\t\t\tproject = p.ProjectKey\n\t\t\t\tparsed := model.ID(parent)",
+      "new": "\t\t\t\tproject = model.InboxProjectKey\n\t\t\t\tparsed := model.ID(parent)"
+    },
+    {
+      "control": "update-changes-only-the-flags-you-pass",
+      "clause": "An unpassed update flag is not an instruction to write its zero value (dw32p.31)",
+      "file": "internal/cli/issue.go",
+      "test": "TestUpdateChangesOnlyTheFlagsYouPass",
+      "old": "\t\t\tif f.Changed(\"priority\") {\n\t\t\t\tedit.Priority = &priority\n\t\t\t}",
+      "new": "\t\t\tif true {\n\t\t\t\tedit.Priority = &priority\n\t\t\t}"
+    },
+    {
+      "control": "an-empty-assignee-clears-it",
+      "clause": "-A \"\" clears an assignee rather than storing an empty string (dw32p.31)",
+      "file": "internal/cli/issue.go",
+      "test": "TestUpdateClearAssignee",
+      "old": "\t\t\t\tvar p *string\n\t\t\t\tif assignee != \"\" {\n\t\t\t\t\tp = &assignee\n\t\t\t\t}",
+      "new": "\t\t\t\tp := &assignee"
+    },
+    {
+      "control": "one-id-shows-an-object",
+      "clause": "show emits a bare object for one id and an array for several (dw32p.31)",
+      "file": "internal/cli/issue.go",
+      "test": "TestShowSeveralIDsEmitsAnArrayAndRulesPagesApart",
+      "old": "\t\t\t\tif len(jsons) == 1 {\n\t\t\t\t\treturn render.EmitOne(app.out, jsons[0])\n\t\t\t\t}",
+      "new": "\t\t\t\tif len(jsons) > 0 {\n\t\t\t\t\treturn render.EmitOne(app.out, jsons[0])\n\t\t\t\t}"
+    },
+    {
+      "control": "labels-is-the-key-that-goes-absent",
+      "clause": "show --json omits labels when an issue carries none, which is why .labels[] is not safe (dw32p.31)",
+      "file": "internal/cli/view.go",
+      "test": "TestLabelAddAndRmChangeTheIssuesLabels",
+      "old": "\tLabels   []string        `json:\"labels,omitempty\"`",
+      "new": "\tLabels   []string        `json:\"labels\"`"
+    },
+    {
+      "control": "a-page-carries-its-thread",
+      "clause": "show renders identity, body, every relation AND the whole comment thread (dw32p.31)",
+      "file": "internal/cli/view.go",
+      "test": "TestCommentListRendersTheThreadOldestFirst",
+      "old": "\tfor _, comment := range view.Comments {\n\t\tpage.Comments = append(page.Comments, render.Comment{",
+      "new": "\tfor _, comment := range view.Comments[:0] {\n\t\tpage.Comments = append(page.Comments, render.Comment{"
+    },
+    {
+      "control": "natural-order-compares-digit-runs-numerically",
+      "clause": "A digit run in an id compares numerically, so <p>.2 precedes <p>.10 (dw32p.31)",
+      "file": "internal/cli/view.go",
+      "test": "TestNaturalLessComparesDigitRunsNumerically",
+      "old": "\t\tif xErr == nil && yErr == nil {\n\t\t\tif x != y {\n\t\t\t\treturn x < y\n\t\t\t}\n\t\t\tcontinue\n\t\t}",
+      "new": "\t\tif xErr == nil && yErr == nil && false {\n\t\t\tif x != y {\n\t\t\t\treturn x < y\n\t\t\t}\n\t\t\tcontinue\n\t\t}"
+    },
+    {
+      "control": "natural-order-falls-back-to-bytes",
+      "clause": "A non-digit run compares as text, so an ordinary id still orders (dw32p.31)",
+      "file": "internal/cli/view.go",
+      "test": "TestNaturalLessComparesDigitRunsNumerically",
+      "old": "\t\tif as[i] != bs[i] {\n\t\t\treturn as[i] < bs[i]\n\t\t}",
+      "new": "\t\tif as[i] != bs[i] {\n\t\t\treturn as[i] > bs[i]\n\t\t}"
+    },
+    {
+      "control": "natural-order-breaks-a-prefix-tie-on-length",
+      "clause": "Two ids equal as far as the shorter goes order by length, so a parent precedes its child (dw32p.31)",
+      "file": "internal/cli/view.go",
+      "test": "TestNaturalLessComparesDigitRunsNumerically",
+      "old": "\treturn len(as) < len(bs)",
+      "new": "\treturn false"
+    },
+    {
+      "control": "id-runs-alternate-digits-and-text",
+      "clause": "An id splits into alternating digit and non-digit runs, which is the whole basis of the ordering (dw32p.31)",
+      "file": "internal/cli/view.go",
+      "test": "TestIDRunsAlternateDigitsAndText",
+      "old": "\t\tfor j < len(s) && isDigit(s[j]) == digit {",
+      "new": "\t\tfor j < len(s) && (isDigit(s[j]) == digit || true) {"
+    },
+    {
+      "control": "pages-are-ruled-apart",
+      "clause": "A multi-id show rules its pages apart, once between each pair (dw32p.31)",
+      "file": "internal/cli/renderpages.go",
+      "test": "TestShowSeveralIDsEmitsAnArrayAndRulesPagesApart",
+      "old": "\t\t\tif n > 0 {",
+      "new": "\t\t\tif n >= 0 {"
+    },
+    {
+      "control": "a-thread-is-rendered-once",
+      "clause": "comment list goes through render's own thread writer, so it cannot drift from show's (dw32p.31)",
+      "file": "internal/cli/renderpages.go",
+      "test": "TestCommentListRendersTheThreadOldestFirst",
+      "old": "\t\t\tID: c.ID, Author: c.Author, Body: c.Body, CreatedAt: c.CreatedAt,",
+      "new": "\t\t\tID: c.ID, Author: c.Author, Body: c.Body,"
+    },
+    {
+      "control": "the-default-statuses-are-the-active-ones",
+      "clause": "With no --status and no -a, a listing is open and in_progress (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestReadyExcludesClosed",
+      "old": "\t\tf.Statuses = []model.Status{model.StatusOpen, model.StatusInProgress}",
+      "new": "\t\tf.Statuses = nil"
+    },
+    {
+      "control": "the-all-flag-adds-the-terminal-status",
+      "clause": "-a widens a listing to every live status, tombstones still excluded (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestReadyExcludesClosed",
+      "old": "\tcase includeClosed:\n\t\tf.Statuses = nil // every live status, tombstones still excluded",
+      "new": "\tcase includeClosed:\n\t\tf.Statuses = []model.Status{model.StatusOpen, model.StatusInProgress}"
+    },
+    {
+      "control": "status-all-reaches-tombstones",
+      "clause": "The literal --status all is the only form that reveals tombstoned issues (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestStatusFlagAllReachesTombstones",
+      "old": "\t\tf.IncludeTombstoned = true\n\t\tf.Statuses = nil",
+      "new": "\t\tf.IncludeTombstoned = false\n\t\tf.Statuses = nil"
+    },
+    {
+      "control": "an-unknown-status-is-refused",
+      "clause": "An unknown --status is a misuse, not a filter that matches nothing (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestStatusFlagAllReachesTombstones",
+      "old": "\t\t\tif !model.ValidStatus(st) {\n\t\t\t\treturn invalidArgs(\"unknown status %q\", s)\n\t\t\t}",
+      "new": "\t\t\tif false {\n\t\t\t\treturn invalidArgs(\"unknown status %q\", s)\n\t\t\t}"
+    },
+    {
+      "control": "ready-and-blocked-refuse-the-all-flag",
+      "clause": "-a is meaningless on a queue whose members are open by definition, so it is refused (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestReadyAndBlockedRefuseTheAllFlag",
+      "old": "\tif !app.includeClosed {\n\t\treturn nil\n\t}",
+      "new": "\tif true {\n\t\treturn nil\n\t}"
+    },
+    {
+      "control": "an-unresolved-scope-answers-nothing",
+      "clause": "A directory that resolves to no project returns an empty result rather than every project's issues (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestScanningVerbAdvisesAndExitsZeroWhenNothingResolves",
+      "old": "\tscoped, found, err := app.scopedProject(false)\n\tif err != nil || !found {\n\t\treturn f, false, err\n\t}",
+      "new": "\tscoped, found, err := app.scopedProject(false)\n\tif err != nil {\n\t\treturn f, false, err\n\t}\n\tif !found {\n\t\treturn f, true, nil\n\t}"
+    },
+    {
+      "control": "all-projects-spans-every-project",
+      "clause": "--all-projects skips resolution entirely rather than narrowing to one project (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestAllProjectsAddsTheProjectColumn",
+      "old": "\tif app.allProjects {\n\t\treturn f, true, nil\n\t}",
+      "new": "\tif false {\n\t\treturn f, true, nil\n\t}"
+    },
+    {
+      "control": "the-project-column-appears-only-under-all-projects",
+      "clause": "A project column exists under --all-projects because move keeps an id byte-identical across a project change (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestAllProjectsAddsTheProjectColumn",
+      "old": "\tlisting := render.Listing{Project: app.allProjects}",
+      "new": "\tlisting := render.Listing{Project: false}"
+    },
+    {
+      "control": "a-direct-child-has-no-further-dot",
+      "clause": "list --parent takes direct children only; a further \".\" in the tail is a grandchild (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestListParentTakesDirectChildrenOnly",
+      "old": "\treturn ok && !strings.Contains(tail, \".\")",
+      "new": "\treturn ok && !strings.Contains(tail, \"..\")"
+    },
+    {
+      "control": "a-direct-child-is-matched-on-the-dotted-prefix",
+      "clause": "list --parent matches \"<parent>.\", so an unrelated id sharing a prefix is not a child (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestListParentTakesDirectChildrenOnly",
+      "old": "\ttail, ok := strings.CutPrefix(string(id), string(parentID)+\".\")",
+      "new": "\ttail, ok := strings.CutPrefix(string(id), string(parentID))"
+    },
+    {
+      "control": "an-empty-parent-is-refused",
+      "clause": "list --parent \"\" is refused, because an empty value would silently list every issue (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestListParentTakesDirectChildrenOnly",
+      "old": "\t\t\tif parentGiven && parent == \"\" {",
+      "new": "\t\t\tif false {"
+    },
+    {
+      "control": "the-label-filter-demands-every-label",
+      "clause": "list -l demands every one of the named labels, not at least one (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestListLabelFiltersDemandAllAndAny",
+      "old": "\t\t\tif !have[w] {\n\t\t\t\tall = false\n\t\t\t\tbreak\n\t\t\t}",
+      "new": "\t\t\tif !have[w] {\n\t\t\t\tbreak\n\t\t\t}"
+    },
+    {
+      "control": "a-deferral-is-future-not-merely-non-null",
+      "clause": "list --deferred compares deferred_until against now, so an elapsed deferral is not deferred (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestListDeferredComparesAgainstNow",
+      "old": "\t\tif err == nil && until.After(now) {",
+      "new": "\t\tif err == nil && now.After(until) {"
+    },
+    {
+      "control": "a-deferral-filter-skips-an-undeferred-issue",
+      "clause": "list --deferred drops an issue carrying no deferral at all (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestListDeferredComparesAgainstNow",
+      "old": "\t\tif iss.DeferredUntil == nil {\n\t\t\tcontinue\n\t\t}",
+      "new": "\t\tif iss.DeferredUntil == nil {\n\t\t\tkept = append(kept, iss)\n\t\t\tcontinue\n\t\t}"
+    },
+    {
+      "control": "limit-caps-the-result",
+      "clause": "--limit caps what a listing returns, and 0 means unlimited (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestLimitCapsTheResult",
+      "old": "\t\t\tif limit > 0 && len(issues) > limit {\n\t\t\t\tissues = issues[:limit]\n\t\t\t}",
+      "new": "\t\t\tif false {\n\t\t\t\tissues = issues[:limit]\n\t\t\t}"
+    },
+    {
+      "control": "search-honours-the-all-flag",
+      "clause": "-a means the same on search as on every other scanning verb (dw32p.31)",
+      "file": "internal/cli/query.go",
+      "test": "TestSearchHonoursAllFlag",
+      "old": "\t\t\tif err := applyStatuses(&f, nil, app.includeClosed); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\tissues, err := app.core.SearchIssues(app.ctx, args[0], f)",
+      "new": "\t\t\tissues, err := app.core.SearchIssues(app.ctx, args[0], f)"
+    },
+    {
+      "control": "label-counts-are-project-scoped",
+      "clause": "`label list` with no id counts over the scope every other read uses, not store-wide (dw32p.31)",
+      "file": "internal/cli/label.go",
+      "test": "TestLabelListCountsAreProjectScoped",
+      "old": "\tfilter, ok, err := scopedIssueFilter(a, 0)\n\tif err != nil || !ok {\n\t\treturn map[string]int{}, err\n\t}",
+      "new": "\tfilter, _, err := scopedIssueFilter(a, 0)\n\tfilter.Project = nil\n\tif err != nil {\n\t\treturn map[string]int{}, err\n\t}"
+    },
+    {
+      "control": "a-dependency-type-is-validated",
+      "clause": "An unknown dependency type is a misuse, not a stored edge nothing will match (dw32p.31)",
+      "file": "internal/cli/dep.go",
+      "test": "TestDepTypeMustBeOneOfThree",
+      "old": "\tif !model.ValidDependencyType(t) {\n\t\treturn \"\", invalidArgs(\"dependency type must be blocks|related|discovered-from\")\n\t}",
+      "new": "\tif false {\n\t\treturn \"\", invalidArgs(\"dependency type must be blocks|related|discovered-from\")\n\t}"
+    },
+    {
+      "control": "dep-add-blocks-the-first-id",
+      "clause": "`dep add <id> <blocker-id>` means <blocker-id> blocks <id>, so <id> leaves ready (dw32p.31)",
+      "file": "internal/cli/dep.go",
+      "test": "TestDepAddMakesTheBlockedIssueUnready",
+      "old": "\t\t\tif _, err := app.core.SetDependency(app.ctx, model.ID(args[0]), model.ID(args[1]), t, true); err != nil {",
+      "new": "\t\t\tif _, err := app.core.SetDependency(app.ctx, model.ID(args[1]), model.ID(args[0]), t, true); err != nil {"
+    },
+    {
+      "control": "dep-rm-withdraws-the-edge",
+      "clause": "`dep rm` withdraws the edge so the issue becomes ready again (dw32p.31)",
+      "file": "internal/cli/dep.go",
+      "test": "TestDepRmRestoresReadiness",
+      "old": "\t\t\tif _, err := app.core.SetDependency(app.ctx, model.ID(args[0]), model.ID(args[1]), t, false); err != nil {",
+      "new": "\t\t\tif _, err := app.core.SetDependency(app.ctx, model.ID(args[0]), model.ID(args[1]), t, true); err != nil {"
+    },
+    {
+      "control": "a-blocker-chain-indents-per-level",
+      "clause": "`dep tree` indents two columns per level, deepest last (dw32p.31)",
+      "file": "internal/cli/dep.go",
+      "test": "TestDepTreePrintsTheChainIndented",
+      "old": "\tfor i := 0; i < n; i++ {\n\t\tout += \"  \"\n\t}",
+      "new": "\tfor i := 0; i < n && i < 1; i++ {\n\t\tout += \"  \"\n\t}"
+    },
+    {
+      "control": "cycles-exit-non-zero",
+      "clause": "`dep cycles` exits non-zero when any exist, which is a report rather than a crash (dw32p.31)",
+      "file": "internal/cli/dep.go",
+      "test": "TestDepCyclesReportsAndExitsOne",
+      "old": "\t\t\tif len(cycles) > 0 {\n\t\t\t\treturn errors.New(\"dependency cycles found\")\n\t\t\t}",
+      "new": "\t\t\tif false {\n\t\t\t\treturn errors.New(\"dependency cycles found\")\n\t\t\t}"
+    },
+    {
+      "control": "the-author-flag-wins",
+      "clause": "--author is used verbatim; the git and OS fallbacks are only for when it is absent (dw32p.31)",
+      "file": "internal/cli/comment.go",
+      "test": "TestCommentAuthorDefaultsToGitThenTheOSUser",
+      "old": "\tif flag != \"\" {\n\t\treturn flag\n\t}",
+      "new": "\tif false {\n\t\treturn flag\n\t}"
+    },
+    {
+      "control": "the-author-falls-back-to-a-real-name",
+      "clause": "With no --author the author is the global git user.name, else the OS username, never empty (dw32p.31)",
+      "file": "internal/cli/comment.go",
+      "test": "TestCommentAuthorDefaultsToGitThenTheOSUser",
+      "old": "\tif out, err := exec.Command(\"git\", \"config\", \"--global\", \"user.name\").Output(); err == nil {",
+      "new": "\tif out, err := exec.Command(\"git\", \"config\", \"--global\", \"user.name\").Output(); err != nil {"
+    },
+    {
+      "control": "a-memory-read-spans-every-project",
+      "clause": "Memory reads span every project by default, the inverse of the issue verbs (dw32p.31)",
+      "file": "internal/cli/memory.go",
+      "test": "TestMemoriesReadSpansEveryProject",
+      "old": "\tif a.projectFlag == \"\" {\n\t\treturn nil, nil\n\t}",
+      "new": "\tif a.projectFlag == \"\" {\n\t\tkey := model.InboxProjectKey\n\t\treturn &key, nil\n\t}"
+    },
+    {
+      "control": "a-memory-write-uses-ordinary-scoping",
+      "clause": "A memory write lands where an issue would; --global assigns the reserved global project (dw32p.31)",
+      "file": "internal/cli/memory.go",
+      "test": "TestRememberFilesUnderTheResolvedProject",
+      "old": "\tcase global:\n\t\treturn model.GlobalProjectKey, nil\n\tcase a.projectFlag != \"\":",
+      "new": "\tcase false:\n\t\treturn model.GlobalProjectKey, nil\n\tcase a.projectFlag != \"\":"
+    },
+    {
+      "control": "global-and-a-named-project-contradict",
+      "clause": "--global together with -P is refused, because a memory has exactly one project (dw32p.31)",
+      "file": "internal/cli/memory.go",
+      "test": "TestRememberFilesUnderTheResolvedProject",
+      "old": "\t\t\tif global && app.projectFlag != \"\" {\n\t\t\t\treturn invalidArgs(\"-P %s scopes this memory to a project and --global forces it cross-project; pass one\", app.projectFlag)\n\t\t\t}\n\t\t\tproject, err := app.memoryScope(global)",
+      "new": "\t\t\tproject, err := app.memoryScope(global)"
+    },
+    {
+      "control": "deleted-shows-only-tombstones",
+      "clause": "`memories --deleted` reveals only tombstoned memories, superseded ones included (dw32p.31)",
+      "file": "internal/cli/memory.go",
+      "test": "TestForgetTombstonesAndHidesTheMemory",
+      "old": "\t\t\t\tfor _, m := range ms {\n\t\t\t\t\tif m.Tombstone == model.Tombstoned {\n\t\t\t\t\t\tkept = append(kept, m)\n\t\t\t\t\t}\n\t\t\t\t}",
+      "new": "\t\t\t\tkept = append(kept, ms...)"
+    },
+    {
+      "control": "deleted-widens-past-a-supersession",
+      "clause": "A memory superseded and then forgotten is still a tombstone --deleted must show (dw32p.31)",
+      "file": "internal/cli/memory.go",
+      "test": "TestATombstoneOutranksASupersession",
+      "old": "\t\t\t\tIncludeSuperseded: all || deleted,",
+      "new": "\t\t\t\tIncludeSuperseded: all,"
+    },
+    {
+      "control": "a-memory-tombstone-outranks-a-supersession",
+      "clause": "A memory that is both retired and removed reports the removal (dw32p.31)",
+      "file": "internal/cli/memory.go",
+      "test": "TestATombstoneOutranksASupersession",
+      "old": "\tcase m.Tombstone == model.Tombstoned:\n\t\treturn \"tombstoned\"\n\tcase m.SupersededBy != nil:",
+      "new": "\tcase m.SupersededBy != nil:\n\t\treturn \"superseded by \" + string(*m.SupersededBy)\n\tcase m.Tombstone == model.Tombstoned:"
+    },
+    {
+      "control": "a-memory-glyph-comes-from-the-shared-vocabulary",
+      "clause": "A memory row borrows render's glyphs, so a listing and a page cannot disagree about a state (dw32p.31)",
+      "file": "internal/cli/memory.go",
+      "test": "TestMemoryGlyphsComeFromTheSharedVocabulary",
+      "old": "\tmark := render.StatusMark(model.StatusOpen, m.Tombstone == model.Tombstoned)",
+      "new": "\tmark := render.StatusMark(model.StatusOpen, false)"
+    },
+    {
+      "control": "a-replacement-inherits-the-old-memorys-project",
+      "clause": "supersede refuses a -P naming anywhere but the project the replacement inherits (dw32p.31)",
+      "file": "internal/cli/memory.go",
+      "test": "TestSupersedeRetiresTheOldMemoryAndInheritsItsProject",
+      "old": "\t\t\tif err := supersedeScopeConflict(app, old.ProjectKey); err != nil {\n\t\t\t\treturn err\n\t\t\t}",
+      "new": "\t\t\tif err := error(nil); err != nil {\n\t\t\t\treturn err\n\t\t\t}"
+    },
+    {
+      "control": "memory-edit-changes-only-the-flags-you-pass",
+      "clause": "An unpassed memory edit flag is not an instruction to write its zero value (dw32p.31)",
+      "file": "internal/cli/memory.go",
+      "test": "TestMemoryEditRefusesToSplitASupersessionChain",
+      "old": "\t\t\tif f.Changed(\"body\") {\n\t\t\t\tedit.Body = &body\n\t\t\t}",
+      "new": "\t\t\tif true {\n\t\t\t\tedit.Body = &body\n\t\t\t}"
+    },
+    {
+      "control": "a-memory-project-move-is-attempted-not-ignored",
+      "clause": "`memory edit -P` really moves an unchained memory, which is what makes the chain refusal a refusal (dw32p.31)",
+      "file": "internal/cli/memory.go",
+      "test": "TestMemoryEditRefusesToSplitASupersessionChain",
+      "old": "\t\t\tcase app.projectFlag != \"\":\n\t\t\t\tp, err := app.core.ProjectBySlug(app.ctx, app.projectFlag)\n\t\t\t\tif err != nil {\n\t\t\t\t\treturn fmt.Errorf(\"unknown project %q: %w\", app.projectFlag, err)\n\t\t\t\t}\n\t\t\t\tedit.Project = &p.Key",
+      "new": "\t\t\tcase app.projectFlag != \"\":"
+    },
+    {
+      "control": "move-requires-an-explicit-destination",
+      "clause": "The destination is --to, never -P, so a move without --to is refused rather than moving nothing (dw32p.31)",
+      "file": "internal/cli/move.go",
+      "test": "TestMoveKeepsTheIDAndChangesTheProject",
+      "old": "\t\t\tif !cmd.Flags().Changed(\"to\") {\n\t\t\t\treturn invalidArgs(\"--to <slug> is required\")\n\t\t\t}",
+      "new": "\t\t\tif false {\n\t\t\t\treturn invalidArgs(\"--to <slug> is required\")\n\t\t\t}"
+    },
+    {
+      "control": "move-reports-an-issue-already-there-as-a-noop",
+      "clause": "An issue already in the destination is a reported no-op, so re-running a half-finished triage is safe (dw32p.31)",
+      "file": "internal/cli/move.go",
+      "test": "TestMoveReportsANoOpRatherThanFailing",
+      "old": "\t\t\t\tif issue.ProjectKey == dest.Key {\n\t\t\t\t\tres.NoOp = append(res.NoOp, issue)",
+      "new": "\t\t\t\tif false {\n\t\t\t\t\tres.NoOp = append(res.NoOp, issue)"
+    },
+    {
+      "control": "move-deduplicates-its-ids",
+      "clause": "An id named twice, or reached twice under --subtree, moves once (dw32p.31)",
+      "file": "internal/cli/move.go",
+      "test": "TestMoveDeduplicatesItsIDs",
+      "old": "\t\t\t\tif !seen[id] {\n\t\t\t\t\tseen[id] = true\n\t\t\t\t\tids = append(ids, id)\n\t\t\t\t}",
+      "new": "\t\t\t\tseen[id] = true\n\t\t\t\tids = append(ids, id)"
+    },
+    {
+      "control": "subtree-is-transitive",
+      "clause": "--subtree takes every descendant, not just the direct children (dw32p.31)",
+      "file": "internal/cli/move.go",
+      "test": "TestMoveSubtreeTakesEveryDescendant",
+      "old": "\t\t\tif err := walk(child.ChildID); err != nil {\n\t\t\t\treturn err\n\t\t\t}",
+      "new": "\t\t\t_ = child"
+    },
+    {
+      "control": "a-crossing-endpoint-reports-its-destination",
+      "clause": "A moved endpoint reports the destination, because the report runs before the write (dw32p.31)",
+      "file": "internal/cli/move.go",
+      "test": "TestMoveReportsTheEdgesItMadeCross",
+      "old": "\t\tif moving[id] {\n\t\t\treturn slugs[dest]\n\t\t}",
+      "new": "\t\tif false {\n\t\t\treturn slugs[dest]\n\t\t}"
+    },
+    {
+      "control": "a-crossing-must-actually-cross",
+      "clause": "An edge whose two ends land in one project is not a crossing (dw32p.31)",
+      "file": "internal/cli/move.go",
+      "test": "TestMoveReportsTheEdgesItMadeCross",
+      "old": "\t\tif fromProject == toProject {\n\t\t\treturn\n\t\t}",
+      "new": "\t\tif false {\n\t\t\treturn\n\t\t}"
+    },
+    {
+      "control": "a-dry-run-writes-nothing",
+      "clause": "--dry-run prints what a real move would print and leaves the store alone (dw32p.31)",
+      "file": "internal/cli/move.go",
+      "test": "TestMoveDryRunWritesNothing",
+      "old": "\t\t\tif !dryRun && len(movedIDs) > 0 {",
+      "new": "\t\t\tif len(movedIDs) > 0 {"
+    },
+    {
+      "control": "a-dry-run-says-so-first",
+      "clause": "--dry-run leads with `dry run: nothing was written` before the report it would have printed (dw32p.31)",
+      "file": "internal/cli/move.go",
+      "test": "TestMoveDryRunWritesNothing",
+      "old": "\tif !res.Committed {\n\t\tfmt.Fprintln(app.out, \"dry run: nothing was written\")\n\t}",
+      "new": "\tif false {\n\t\tfmt.Fprintln(app.out, \"dry run: nothing was written\")\n\t}"
+    },
+    {
+      "control": "doctor-exits-on-a-finding",
+      "clause": "doctor exits non-zero on any finding, and the finding is on stdout for a reader to act on (dw32p.31)",
+      "file": "internal/cli/doctor.go",
+      "test": "TestDoctorExitsOneOnACredentialFinding",
+      "old": "\t\t\tif report.Healthy() {\n\t\t\t\treturn nil\n\t\t\t}",
+      "new": "\t\t\tif true {\n\t\t\t\treturn nil\n\t\t\t}"
+    },
+    {
+      "control": "the-credential-scan-is-opt-in",
+      "clause": "--scan is what reads stored text for credentials; doctor alone does not (dw32p.31)",
+      "file": "internal/cli/doctor.go",
+      "test": "TestDoctorExitsOneOnACredentialFinding",
+      "old": "\t\t\treport := app.core.Doctor(app.ctx, core.DoctorOptions{Repair: repair, Scan: scan})",
+      "new": "\t\t\treport := app.core.Doctor(app.ctx, core.DoctorOptions{Repair: repair, Scan: true})"
+    },
+    {
+      "control": "repair-rebuilds-a-failed-index",
+      "clause": "--repair rebuilds any FTS index that failed its check, and reports what it rebuilt (dw32p.31)",
+      "file": "internal/cli/doctor.go",
+      "test": "TestDoctorRepairsAFailedFTSIndex",
+      "old": "\t\t\treport := app.core.Doctor(app.ctx, core.DoctorOptions{Repair: repair, Scan: scan})",
+      "new": "\t\t\treport := app.core.Doctor(app.ctx, core.DoctorOptions{Repair: false, Scan: scan})"
+    },
+    {
+      "control": "doctor-names-the-checks-that-failed",
+      "clause": "doctor's error names the broken checks rather than saying only that it is unhealthy (dw32p.31)",
+      "file": "internal/cli/doctor.go",
+      "test": "TestDoctorRepairsAFailedFTSIndex",
+      "old": "\t\tif check.State == core.CheckFinding || check.State == core.CheckError {\n\t\t\tfailed = append(failed, check.Name)\n\t\t}",
+      "new": "\t\tif false {\n\t\t\tfailed = append(failed, check.Name)\n\t\t}"
+    },
+    {
+      "control": "columns-wins-over-the-measurement",
+      "clause": "$COLUMNS pins the wrap with or without a terminal (dw32p.31)",
+      "file": "internal/cli/console.go",
+      "test": "TestRenderWidthStaysInsideRendersContract",
+      "old": "\tif c := os.Getenv(\"COLUMNS\"); c != \"\" {",
+      "new": "\tif c := os.Getenv(\"COLUMNS\"); false {"
+    },
+    {
+      "control": "columns-below-the-minimum-is-not-a-width",
+      "clause": "A $COLUMNS at or below render's minimum falls back to the fixed default (dw32p.31)",
+      "file": "internal/cli/console.go",
+      "test": "TestRenderWidthStaysInsideRendersContract",
+      "old": "\t\tif n, err := strconv.Atoi(c); err == nil && n > render.MinWidth {",
+      "new": "\t\tif n, err := strconv.Atoi(c); err == nil {"
+    },
+    {
+      "control": "columns-is-capped-at-the-maximum",
+      "clause": "A width past render's maximum is capped, because prose past ~100 columns is harder to read (dw32p.31)",
+      "file": "internal/cli/console.go",
+      "test": "TestRenderWidthStaysInsideRendersContract",
+      "old": "\t\t\treturn min(n, render.MaxWidth)",
+      "new": "\t\t\treturn n"
+    },
+    {
+      "control": "an-empty-pager-disables-paging",
+      "clause": "An explicitly empty $PAGER disables paging, which is how a caller turns it off without a flag (dw32p.31)",
+      "file": "internal/cli/console.go",
+      "test": "TestPagerCommandHonoursAnExplicitlyEmptyPAGER",
+      "old": "\t\tif strings.TrimSpace(p) == \"\" {\n\t\t\treturn \"\"\n\t\t}",
+      "new": "\t\tif strings.TrimSpace(p) == \"\\x00\" {\n\t\t\treturn \"\"\n\t\t}"
+    },
+    {
+      "control": "an-unset-pager-is-not-an-empty-one",
+      "clause": "An unset $PAGER selects render's default; only an explicitly empty one disables paging (dw32p.31)",
+      "file": "internal/cli/console.go",
+      "test": "TestPagerCommandHonoursAnExplicitlyEmptyPAGER",
+      "old": "\tif p, set := os.LookupEnv(\"PAGER\"); set {",
+      "new": "\tif p := os.Getenv(\"PAGER\"); true {"
+    },
+    {
+      "control": "a-non-terminal-writer-gets-no-pager",
+      "clause": "A pipe or a test buffer gets no TTY and no pager, so truncation is off and every byte prints (dw32p.31)",
+      "file": "internal/cli/console.go",
+      "test": "TestConsoleOffATerminalHasNoTTYAndNoPager",
+      "old": "\tf, ok := out.(*os.File)\n\tif ok && isTerminal(f) {\n\t\tconsole.TTY = true",
+      "new": "\tf, ok := out.(*os.File)\n\tif true || (ok && isTerminal(f)) {\n\t\tconsole.TTY = true"
+    },
+    {
+      "control": "config-show-names-the-resolved-project",
+      "clause": "config show prints the resolved project and the store path, and invents neither (dw32p.31)",
+      "file": "internal/cli/config.go",
+      "test": "TestConfigShowNamesTheStoreAndTheResolvedProject",
+      "old": "\tif resolvedSlug != \"\" {\n\t\tout[\"project.slug\"] = resolvedSlug\n\t}",
+      "new": "\tout[\"project.slug\"] = resolvedSlug"
+    },
+    {
+      "control": "config-show-answers-json-with-an-object",
+      "clause": "config show is a reading verb, so --json owes a bare object rather than key=value lines (dw32p.31)",
+      "file": "internal/cli/config.go",
+      "test": "TestConfigShowNamesTheStoreAndTheResolvedProject",
+      "old": "\t\t\tif app.json {",
+      "new": "\t\t\tif false {"
+    },
+    {
+      "control": "a-project-add-binds-its-repository-path",
+      "clause": "--repo-path is canonicalized and stored, so a checkout resolves to that project without -P (dw32p.31)",
+      "file": "internal/cli/project.go",
+      "test": "TestProjectAddBindsARepositoryPath",
+      "old": "\t\t\t\treg.BindingPath = canon",
+      "new": "\t\t\t\t_ = canon"
+    },
+    {
+      "control": "a-path-is-canonicalized-through-its-symlinks",
+      "clause": "A path is made absolute and symlink-resolved so one directory always canonicalises to one string (dw32p.31)",
+      "file": "internal/cli/path.go",
+      "test": "TestProjectAddBindsARepositoryPath",
+      "old": "\treturn resolveSymlinks(abs)",
+      "new": "\treturn abs, nil"
+    },
+    {
+      "control": "an-archived-project-leaves-the-listing",
+      "clause": "An archived project drops out of `project list` and --archived brings it back (dw32p.31)",
+      "file": "internal/cli/project.go",
+      "test": "TestProjectArchiveHidesItFromListAndRefusesNewIssues",
+      "old": "\t\t\t\tif p.ArchivedAt != nil && !archivedFlag {\n\t\t\t\t\tcontinue\n\t\t\t\t}",
+      "new": "\t\t\t\tif false {\n\t\t\t\t\tcontinue\n\t\t\t\t}"
+    },
+    {
+      "control": "archiving-is-confirmed-or-forced",
+      "clause": "Archiving is destructive, so a non-interactive session must pass --force (dw32p.31)",
+      "file": "internal/cli/project.go",
+      "test": "TestProjectArchiveHidesItFromListAndRefusesNewIssues",
+      "old": "\t\t\t\t\treturn invalidArgs(\"archiving is destructive; pass --force to confirm from a non-interactive session\")",
+      "new": "\t\t\t\t\tforce = true"
+    },
+    {
+      "control": "a-project-slug-is-required",
+      "clause": "`project add` needs --slug; there is no default name for a project (dw32p.31)",
+      "file": "internal/cli/project.go",
+      "test": "TestProjectAddRegistersASlug",
+      "old": "\t\t\tif slug == \"\" {\n\t\t\t\treturn invalidArgs(\"--slug <slug> is required\")\n\t\t\t}",
+      "new": "\t\t\tif false {\n\t\t\t\treturn invalidArgs(\"--slug <slug> is required\")\n\t\t\t}"
+    },
+    {
+      "control": "a-rename-goes-through-the-project-key",
+      "clause": "A rename resolves the old slug to its key and renames that, leaving every stored reference alone (dw32p.31)",
+      "file": "internal/cli/project.go",
+      "test": "TestProjectRenameKeepsTheProjectKey",
+      "old": "\t\t\trenamed, err := app.core.RenameProject(app.ctx, p.Key, args[1])",
+      "new": "\t\t\trenamed, err := app.core.RenameProject(app.ctx, p.Key, args[0])"
+    },
+    {
+      "control": "a-first-local-write-mints-a-replica-key",
+      "clause": "The replica sidecar is minted on the first local write, not on a read (dw32p.31)",
+      "file": "internal/cli/root.go",
+      "test": "TestReplicaRekeyRotatesTheSidecarKey",
+      "old": "\tsidecar, err := sync.MintSidecar(a.dir)\n\tif err != nil {\n\t\treturn err\n\t}\n\ta.replica = sidecar.Replica",
+      "new": "\tsidecar, err := sync.MintSidecar(a.dir)\n\tif err != nil {\n\t\treturn err\n\t}\n\t_ = sidecar"
+    },
+    {
+      "control": "a-sync-failure-is-an-error",
+      "clause": "A fetch drops cannot complete is an error at exit 1, never a quiet no-op (dw32p.31)",
+      "file": "internal/cli/sync.go",
+      "test": "TestSyncWithoutARemoteIsAnError",
+      "old": "\t\t\tres, err := app.transport().Sync(app.ctx)\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}",
+      "new": "\t\t\tres, err := app.transport().Sync(app.ctx)\n\t\t\tif err != nil {\n\t\t\t\treturn nil\n\t\t\t}"
+    },
+    {
+      "control": "a-sync-cycle-says-what-it-did",
+      "clause": "A cycle prints `exported at <sha>` or `imported N, ignored M`, and `nothing to sync` when both agree (dw32p.31)",
+      "file": "internal/cli/sync.go",
+      "test": "TestSyncCarriesAnIssueToTheOtherMachine",
+      "old": "\t\t\tif !res.Imported && !res.Exported {\n\t\t\t\tfmt.Fprintln(app.out, \"nothing to sync\")\n\t\t\t}",
+      "new": "\t\t\tif false {\n\t\t\t\tfmt.Fprintln(app.out, \"nothing to sync\")\n\t\t\t}"
+    },
+    {
+      "control": "rekey-persists-the-new-key",
+      "clause": "`replica rekey` rotates this installation's future identity and the sidecar holds the new key (dw32p.31)",
+      "file": "internal/cli/sync.go",
+      "test": "TestReplicaRekeyRotatesTheSidecarKey",
+      "old": "\t\t\tkey, err := app.transport().Rekey(app.ctx)\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}",
+      "new": "\t\t\tkey := app.replica\n\t\t\tvar err error\n\t\t\tif err != nil {\n\t\t\t\treturn err\n\t\t\t}"
+    },
+    {
+      "control": "the-census-covers-the-whole-tree",
+      "clause": "The census walks every command, so a verb added later cannot be silently left untested (dw32p.31)",
+      "file": "internal/cli/census_test.go",
+      "test": "TestEveryCommandIsInTheTestedVerbRegistry",
+      "old": "\t\tfor _, sub := range cmd.Commands() {\n\t\t\twalk(sub)\n\t\t}",
+      "new": "\t\tif false {\n\t\t\tfor _, sub := range cmd.Commands() {\n\t\t\t\twalk(sub)\n\t\t\t}\n\t\t}"
+    },
+    {
+      "control": "the-census-rejects-a-stale-registry-entry",
+      "clause": "A registry entry naming no command in the tree is a finding, not a pass (dw32p.31)",
+      "file": "internal/cli/census_test.go",
+      "test": "TestCensusFindingsCatchesEachWayARegistryRots",
+      "old": "\t\tif !inTree[path] {",
+      "new": "\t\tif false && !inTree[path] {"
+    },
+    {
+      "control": "the-registry-must-name-real-tests",
+      "clause": "A registry entry pointing at a test that does not exist is a finding, so the index cannot rot (dw32p.31)",
+      "file": "internal/cli/census_test.go",
+      "test": "TestCensusFindingsCatchesEachWayARegistryRots",
+      "old": "\t\tif !declared[name] {",
+      "new": "\t\tif false && !declared[name] {"
+    }
+  ]
+}
