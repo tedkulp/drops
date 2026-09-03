@@ -437,17 +437,6 @@ func TestRewriteRefusesAnythingButTheMeasuredV6Shape(t *testing.T) {
 	}
 }
 
-func TestRewriteRefusesTheRealStore(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	path := filepath.Join(home, ".drops", "drops.db")
-
-	_, err := store.Rewrite(t.Context(), path, store.LegacyPlan{Replica: newReplicaKey(t)})
-	if !errors.Is(err, store.ErrRealStoreRefused) {
-		t.Fatalf("rewrite of the real store: err = %v, want ErrRealStoreRefused", err)
-	}
-}
-
 // TestConvertedStoreIsSearchableAndDirty pins the two things the conversion owes
 // the rest of the build: the FTS indexes are populated by the writes rather than
 // carried over, and the store knows it has never been exported.

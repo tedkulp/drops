@@ -9,12 +9,11 @@
 # It cannot silently disarm the way a repository path could: nothing gitignored
 # or uncreated is involved, and drops is UNIX-only already (flock).
 #
-# Measured 2026-09-02: the suite passes with DROPS_DB unset — 416 tests, 1 skip —
-# so nothing consults DefaultPath today. This is a tripwire for a test written
-# later. It matters most AFTER cutover, when internal/store's guard is gone:
-# `go test -tags dropscutover` with DROPS_DB unset was observed opening
-# ~/.drops/drops.db itself, stopping only at the v6 schema check that the
-# cutover removes.
+# This is now the ONLY thing standing between a test and the real store.
+# internal/store's guard was deleted at cutover (dw32p.28), because the binary
+# this repository builds is the one that owns ~/.drops/drops.db. Before that,
+# `go test -tags dropscutover` with DROPS_DB unset was observed opening the real
+# store itself, stopping only at a v6 schema check that no longer exists.
 #
 # Exported by `test` alone. `build` and `install` produce a binary; what store
 # that binary later opens is not the justfile's business.
@@ -26,10 +25,10 @@ no_default_store := "/dev/null/no-default-store-in-tests/drops.db"
 # arrives as three arguments; "$@" under this setting preserves them exactly.
 set positional-arguments
 
-# `git describe` has no tag to work from until dw32p.28 cuts v1.0.0, so today it
-# reports a bare short hash. The `-dirty` suffix is the load-bearing part: after
-# cutover the binary on PATH is built from this working tree, and `drops version`
-# is the only thing that can say it was built from a tree with uncommitted work.
+# dw32p.28 cut v0.1.0 — 1.0 waits on the TUI and a good deal of cleanup. The
+# `-dirty` suffix is the load-bearing part: the binary on PATH is built from this
+# working tree, and `drops version` is the only thing that can say it was built
+# from a tree with uncommitted work.
 
 # Build to ./drops, stamped with the commit it came from.
 build:
@@ -81,26 +80,12 @@ mutate *ARGS:
     @go build -o .scratch/bin/mutate ./tools/mutate
     @DROPS_DB="{{no_default_store}}" .scratch/bin/mutate "$@"
 
-# Refuses to install before cutover, and deletes itself when the guard does.
-#
-# Every ordinary build has `realStoreAllowed = false` and refuses
-# ~/.drops/drops.db, so installing one would replace a working `drops` on PATH
-# with a binary that cannot open the only store it exists to serve. dw32p.28
-# removes internal/store/guard_cutover.go, and this check goes green on its own
-# the moment it does. It runs before `test-all` so the refusal is immediate
-# rather than arriving after the race suite.
-_cutover-guard:
-    @test ! -f internal/store/guard_cutover.go || { \
-      echo "refusing: pre-cutover build. It refuses ~/.drops/drops.db (internal/store/guard.go)," >&2; \
-      echo "so installing it would break drops on PATH. dw32p.28 removes the guard." >&2; \
-      exit 1; }
-
 # A copy, deliberately NOT the symlink the old repo used. That symlink pointed at
 # a FROZEN repository; this one is under active development, so a symlink would
 # make every `just build` — a half-finished one, a branch one — instantly the
 # live `drops` for every agent session on this machine. The stale-binary failure
 # the old repo's comment feared is answered by the version stamp instead: a copy
-# that says `v1.0.0-14-gabc1234` tells you how stale it is, and staleness you can
+# that says `v0.1.0-14-gabc1234` tells you how stale it is, and staleness you can
 # see costs minutes rather than an afternoon.
 #
 # It refuses a SYMLINK, inverting the old check. After cutover the path is a
@@ -111,7 +96,7 @@ _cutover-guard:
 # red build breaks the tool you would use to record that it is broken.
 
 # Copy this repo's build to ~/.local/bin/drops.
-install: _cutover-guard test-all build
+install: test-all build
     @mkdir -p ~/.local/bin
     @if [ -L ~/.local/bin/drops ]; then \
       echo "refusing: ~/.local/bin/drops is a symlink -> $(readlink ~/.local/bin/drops)" >&2; \
@@ -130,10 +115,10 @@ install: _cutover-guard test-all build
 #   just cutover --dry-run     rehearse on a throwaway copy, writing nothing
 #   just cutover               convert for real, after backing up and proving it
 #
-# Built with -tags dropscutover because internal/store refuses ~/.drops/drops.db
-# in every ordinary build. The tag becomes inert once dw32p.28 deletes the guard
-# files, which is what lets the second machine run the same recipe from a clone
-# that no longer has them.
+# The -tags dropscutover build tag is inert now: it selected the one build
+# internal/store would let near ~/.drops/drops.db, and that guard was deleted at
+# cutover. It stays because the tag names no file, so the recipe is the same
+# command on a machine that has not converted yet.
 #
 # DROPS_DB is deliberately NOT exported here: this is the one command whose job
 # is to open the real store.

@@ -92,9 +92,6 @@ func dsn(path string) string {
 // Open connects to path, creating the store directory and a fresh v7 schema when
 // they do not exist, and refusing any other populated shape.
 func Open(ctx context.Context, path string) (*Store, error) {
-	if err := guardPath(path); err != nil {
-		return nil, err
-	}
 	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return nil, fmt.Errorf("create store directory: %w", err)

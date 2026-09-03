@@ -102,22 +102,6 @@ func TestOpenRefusesAPopulatedDatabaseWithNoSchemaVersion(t *testing.T) {
 	}
 }
 
-// TestOpenRefusesTheRealStore pins the development guard: the replacement binary
-// must not open ~/.drops/drops.db, which the old build still owns.
-func TestOpenRefusesTheRealStore(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	path := filepath.Join(home, ".drops", "drops.db")
-
-	_, err := store.Open(t.Context(), path)
-	if !errors.Is(err, store.ErrRealStoreRefused) {
-		t.Fatalf("open real store path: err = %v, want ErrRealStoreRefused", err)
-	}
-	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
-		t.Errorf("refused open created %s; the guard must not touch the real store", path)
-	}
-}
-
 func TestOpenTightensPermissions(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "store")
 	path := filepath.Join(dir, "drops.db")

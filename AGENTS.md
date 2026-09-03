@@ -19,10 +19,11 @@ directory.
 
 `test` and `mutate` export `DROPS_DB` to `/dev/null/no-default-store-in-tests/drops.db`
 — not a scratch store but a tripwire, so a test that reaches for `store.DefaultPath()`
-fails with ENOTDIR and names the path. Until the cutover ticket, the old
-`drops` on `PATH` has sole ownership of `~/.drops/drops.db` — the store this
-repository's own issues live in. Runtime code refuses the default real-store path
-during development; run a local binary only through a guarded recipe.
+fails with ENOTDIR and names the path. Since the cutover (`dw32p.28`) this is the
+**only** thing between a test and the real store: the binary this repository builds
+owns `~/.drops/drops.db`, so `internal/store`'s development guard is gone and nothing
+in runtime code refuses that path any more. Issues live in the store the suite must
+never open.
 
 Four tools lie about success here:
 

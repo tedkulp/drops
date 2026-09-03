@@ -121,9 +121,6 @@ type LegacyReport struct {
 // Rewrite converts an exact legacy v6 store at path into v7, in place and in one
 // transaction. It refuses any other shape, and a refusal writes nothing.
 func Rewrite(ctx context.Context, path string, plan LegacyPlan) (LegacyReport, error) {
-	if err := guardPath(path); err != nil {
-		return LegacyReport{}, err
-	}
 	if err := plan.Replica.Validate(); err != nil {
 		return LegacyReport{}, fmt.Errorf("cutover replica: %w", err)
 	}
