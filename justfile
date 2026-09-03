@@ -119,3 +119,24 @@ install: _cutover-guard test-all build
     fi
     @install -m 755 drops ~/.local/bin/drops
     @echo "installed: $(~/.local/bin/drops version)"
+
+# The one-time v6-to-v7 conversion, run once per machine. dw32p.28.
+#
+# Both machines clone this repository and convert their own ~/.drops/drops.db,
+# so nothing here names one store's row counts: tools/cutover censuses whatever
+# it is pointed at and hands that census to store.Rewrite as Expect, which rolls
+# the transaction back rather than committing a conversion that disagrees.
+#
+#   just cutover --dry-run     rehearse on a throwaway copy, writing nothing
+#   just cutover               convert for real, after backing up and proving it
+#
+# Built with -tags dropscutover because internal/store refuses ~/.drops/drops.db
+# in every ordinary build. The tag becomes inert once dw32p.28 deletes the guard
+# files, which is what lets the second machine run the same recipe from a clone
+# that no longer has them.
+#
+# DROPS_DB is deliberately NOT exported here: this is the one command whose job
+# is to open the real store.
+cutover *ARGS:
+    @go build -tags dropscutover -o .scratch/bin/cutover ./tools/cutover
+    @.scratch/bin/cutover "$@"

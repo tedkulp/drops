@@ -1,0 +1,285 @@
+{
+  "note": "Controls for tools/cutover, the one-time v6-to-v7 conversion dw32p.28 runs once per machine. The clauses are the decisions the conversion cannot derive from the data: which key each Project takes, which remote is a locator, what happens to each memory, what the outcome must be, and what is proved before anything is written. Seeded by dw32p.28.",
+  "controls": [
+    {
+      "control": "a-project-key-is-derived-from-its-slug",
+      "clause": "Two machines converting their own store independently derive the same key for a slug, so the Projects they both hold are one Project after sync (dw32p.28)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestProjectKeyForIsPinned",
+      "old": "const projectKeyDomain = \"drops.project:\"",
+      "new": "const projectKeyDomain = \"drops.project.v2:\""
+    },
+    {
+      "control": "the-derived-key-is-sixteen-bytes",
+      "clause": "A derived key is 128 bits Base32-encoded, which is the only shape model.ParseProjectKey accepts (dw32p.28)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestProjectKeyForIsStableAndValid",
+      "old": "keyEncoding.EncodeToString(sum[:16])",
+      "new": "keyEncoding.EncodeToString(sum[:20])"
+    },
+    {
+      "control": "reserved-slugs-are-never-derived",
+      "clause": "global and inbox take model's fixed keys, so deriving one would put a second spelling of a pinned identity in the tree (dw32p.7)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestProjectKeyForRefusesTheReservedSlugs",
+      "old": "\tif slug == model.GlobalProjectSlug || slug == model.InboxProjectSlug {\n\t\treturn \"\", fmt.Errorf(\"slug %q is reserved and takes its fixed key\", slug)\n\t}",
+      "new": "\tif slug == \"\\x00never\" {\n\t\treturn \"\", fmt.Errorf(\"slug %q is reserved and takes its fixed key\", slug)\n\t}"
+    },
+    {
+      "control": "reserved-slugs-are-left-out-of-the-plan",
+      "clause": "The plan's slug table omits the reserved slugs, which projectKeys.forSlug pins before it consults the plan (dw32p.28)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestProjectKeyForRefusesTheReservedSlugs",
+      "old": "if slug == model.GlobalProjectSlug || slug == model.InboxProjectSlug || slug == \"\" {\n\t\t\tcontinue\n\t\t}",
+      "new": "if slug == \"\" {\n\t\t\tcontinue\n\t\t}"
+    },
+    {
+      "control": "a-machine-local-remote-is-never-a-locator",
+      "clause": "A filesystem path cleans to exactly the shape of host/owner/repo, so the host segment must look like a host (dw32p.21)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestNormalizeLocator",
+      "old": "\tif !strings.Contains(host, \".\") {\n\t\treturn \"\"\n\t}",
+      "new": "\tif false {\n\t\treturn \"\"\n\t}"
+    },
+    {
+      "control": "scp-syntax-becomes-a-path",
+      "clause": "git@host:owner/repo is not a URL, so its colon becomes the path separator before anything parses it (dw32p.8)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestNormalizeLocator",
+      "old": "trimmed = strings.Replace(trimmed, \":\", \"/\", 1)",
+      "new": "trimmed = strings.Replace(trimmed, \":\", \"/\", 0)"
+    },
+    {
+      "control": "credentials-are-stripped-from-scp-syntax",
+      "clause": "The user part of git@host:path is not part of the repository's identity (dw32p.8)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestNormalizeLocator",
+      "old": "\t\tif at := strings.LastIndex(trimmed, \"@\"); at >= 0 {\n\t\t\ttrimmed = trimmed[at+1:]\n\t\t}",
+      "new": "\t\tif at := strings.LastIndex(trimmed, \"@\"); at < -1 {\n\t\t\ttrimmed = trimmed[at+1:]\n\t\t}"
+    },
+    {
+      "control": "the-git-suffix-is-stripped",
+      "clause": "The same repository reached as .git and without it is one locator (dw32p.8)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestNormalizeLocator",
+      "old": "cleaned = strings.TrimSuffix(cleaned, \".git\")",
+      "new": "cleaned = strings.TrimSuffix(cleaned, \".gitignore\")"
+    },
+    {
+      "control": "the-host-is-lowercased",
+      "clause": "Host case is not part of a repository's identity, while path case is (dw32p.8)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestNormalizeLocator",
+      "old": "return strings.ToLower(host) + \"/\" + path",
+      "new": "return host + \"/\" + path"
+    },
+    {
+      "control": "a-remote-with-no-locator-stays-out-of-the-table",
+      "clause": "An unnormalizable remote is reported as skipped by the conversion rather than guessed at (dw32p.28)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestLocatorsOmitsWhatItCannotNormalize",
+      "old": "if locator := NormalizeLocator(remote); locator != \"\" {",
+      "new": "if locator := NormalizeLocator(remote); true {"
+    },
+    {
+      "control": "omitted-memories-are-dropped",
+      "clause": "The 31 memories dw32p.11 omits do not migrate",
+      "file": "tools/cutover/plan.go",
+      "test": "TestCurateDropsWhatTheCurationOmitted",
+      "old": "droppedMemories[legacy.ID]; dropped {",
+      "new": "droppedMemories[legacy.ID+\"\\x00\"]; dropped {"
+    },
+    {
+      "control": "a-retained-memory-takes-its-curated-owner",
+      "clause": "Ownership is semantic: a subject-specific row filed globally moves to the Project it describes (dw32p.11)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestCurateReassignsOwnership",
+      "old": "retainedMemories[legacy.ID]; known {",
+      "new": "retainedMemories[legacy.ID+\"\\x00\"]; known {"
+    },
+    {
+      "control": "an-unscoped-memory-becomes-global",
+      "clause": "A legacy memory with no project lands in the reserved global Project (dw32p.11)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestCurateScopesAnUnscopedMemoryGlobally",
+      "old": "\tif slug == \"\" {\n\t\tslug = model.GlobalProjectSlug\n\t}",
+      "new": "\tif slug == \"\" {\n\t\tslug = model.InboxProjectSlug\n\t}"
+    },
+    {
+      "control": "the-legacy-kind-is-folded-into-the-body",
+      "clause": "v7 drops the kind column, so the kind survives as searchable prose or stops being searchable (dw32p.9)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestCurateFoldsTheLegacyKindIntoTheBody",
+      "old": "body := memorytext.MigrateBody(legacy.Body, legacy.Kind)",
+      "new": "body := legacy.Body"
+    },
+    {
+      "control": "an-unmeasured-deleted-memory-stays-deleted",
+      "clause": "v7 omission is not a tombstone, so carrying a deleted row across resurrects it rather than migrating its deletion (dw32p.28)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestCurateDropsAnUnmeasuredDeletedMemory",
+      "old": "if _, measured := retainedMemories[legacy.ID]; !measured && legacy.Deleted {",
+      "new": "if _, measured := retainedMemories[legacy.ID]; !measured && false {"
+    },
+    {
+      "control": "only-the-measured-supersessions-survive",
+      "clause": "No legacy supersession edge beyond the eight dw32p.11 named is written",
+      "file": "tools/cutover/plan.go",
+      "test": "TestCurateKeepsOnlyTheMeasuredSupersessions",
+      "old": "retainedMemories[legacy.ID]; measured {",
+      "new": "retainedMemories[legacy.ID+\"\\x00\"]; measured {"
+    },
+    {
+      "control": "an-unmeasured-link-into-a-dropped-memory-is-severed",
+      "clause": "A supersession into a dropped row makes the conversion refuse, and an unmeasured memory did not make that judgement (dw32p.28)",
+      "file": "tools/cutover/plan.go",
+      "test": "TestCurateSeversAnUnmeasuredLinkIntoADroppedMemory",
+      "old": "droppedMemories[target]; dropped {",
+      "new": "droppedMemories[target+\"\\x00\"]; dropped {"
+    },
+    {
+      "control": "an-explicit-parent-edge-is-counted-once",
+      "clause": "An explicit parent-child edge is authoritative, so its child is not also inferred from its spelling (dw32p.12)",
+      "file": "tools/cutover/census.go",
+      "test": "TestCensusCountsAnExplicitlyParentedChildOnce",
+      "old": "\t\tif explicit[id] {\n\t\t\tcontinue\n\t\t}",
+      "new": "\t\tif false {\n\t\t\tcontinue\n\t\t}"
+    },
+    {
+      "control": "a-dotted-id-with-no-parent-is-not-a-relation",
+      "clause": "A dotted spelling naming no existing Issue is not parentage evidence (dw32p.12)",
+      "file": "tools/cutover/census.go",
+      "test": "TestCensusIgnoresADottedIDWithNoParent",
+      "old": "if !exists {",
+      "new": "if exists {"
+    },
+    {
+      "control": "dotted-only-ancestry-is-admitted-within-one-project",
+      "clause": "A dotted-only pair is retained when child and parent share a Project (dw32p.12)",
+      "file": "tools/cutover/census.go",
+      "test": "TestCensusCountsWhatTheConversionShouldWrite",
+      "old": "case parent.slug == child.slug:",
+      "new": "case parent.slug != child.slug:"
+    },
+    {
+      "control": "a-live-cross-project-dotted-child-is-ambiguous",
+      "clause": "A cross-Project dotted-only pair is omitted only when its child is tombstoned; a live one refuses migration (dw32p.12)",
+      "file": "tools/cutover/census.go",
+      "test": "TestCensusRefusesALiveCrossProjectDottedChild",
+      "old": "case child.tombstone:",
+      "new": "case true:"
+    },
+    {
+      "control": "ambiguous-parentage-stops-the-run",
+      "clause": "The conversion refuses a store whose parentage the rule will not choose between, before it writes anything (dw32p.12)",
+      "file": "tools/cutover/main.go",
+      "test": "TestCensusRefusesALiveCrossProjectDottedChild",
+      "old": "\tif len(census.AmbiguousParents) > 0 {",
+      "new": "\tif false {"
+    },
+    {
+      "control": "parent-edges-leave-the-dependency-count",
+      "clause": "v7 keeps parentage in its own table, so a parent-child edge is not also a dependency (dw32p.7)",
+      "file": "tools/cutover/census.go",
+      "test": "TestCensusExcludesParentEdgesFromDependencies",
+      "old": "census.Counts.Dependencies = edges - len(explicit)",
+      "new": "census.Counts.Dependencies = edges"
+    },
+    {
+      "control": "the-reserved-projects-are-counted",
+      "clause": "v7 holds global and inbox whether or not v6 did, so the census counts them (dw32p.7)",
+      "file": "tools/cutover/census.go",
+      "test": "TestCensusCountsWhatTheConversionShouldWrite",
+      "old": "namespaces := map[string]bool{model.GlobalProjectSlug: true, model.InboxProjectSlug: true}",
+      "new": "namespaces := map[string]bool{}"
+    },
+    {
+      "control": "a-curated-memorys-namespace-is-counted",
+      "clause": "The curation moves memories into Projects the legacy store never had, and the conversion creates them (dw32p.11)",
+      "file": "tools/cutover/census.go",
+      "test": "TestCensusCountsWhatTheConversionShouldWrite",
+      "old": "\tfor slug := range owners {\n\t\tnamespaces[slug] = true\n\t}",
+      "new": "\tfor slug := range owners {\n\t\t_ = slug\n\t}"
+    },
+    {
+      "control": "the-census-is-asserted-by-the-conversion",
+      "clause": "The census is handed to Rewrite as Expect, so a conversion that disagrees with it commits nothing (dw32p.28)",
+      "file": "tools/cutover/main.go",
+      "test": "TestBuildPlanAssertsTheCensus",
+      "old": "expect := census.Counts",
+      "new": "expect := store.LegacyCounts{}"
+    },
+    {
+      "control": "the-plan-carries-the-curation",
+      "clause": "Without the curation every legacy memory migrates, including the 31 dw32p.11 omits",
+      "file": "tools/cutover/main.go",
+      "test": "TestBuildPlanAssertsTheCensus",
+      "old": "\t\tMemories: Curate,",
+      "new": "\t\tMemories: nil,"
+    },
+    {
+      "control": "the-sidecar-is-written-with-the-conversions-key",
+      "clause": "The active replica key lives only in the sidecar, so a conversion that does not write one authors later writes under a key no converted record names as its origin (dw32p.10)",
+      "file": "tools/cutover/main.go",
+      "test": "TestRunConvertsInPlaceAndWritesTheSidecar",
+      "old": "sidecar := sync.Sidecar{Replica: plan.Replica}",
+      "new": "sidecar := sync.Sidecar{Replica: model.ReplicaKey(model.GlobalProjectKey)}"
+    },
+    {
+      "control": "a-dry-run-converts-a-copy",
+      "clause": "A rehearsal converts a throwaway copy, never the store it was pointed at (dw32p.28)",
+      "file": "tools/cutover/main.go",
+      "test": "TestDryRunTouchesNothing",
+      "old": "\t\ttarget = filepath.Join(scratch, filepath.Base(path))",
+      "new": "\t\ttarget = path"
+    },
+    {
+      "control": "the-backup-is-proved",
+      "clause": "A restore is proved rather than trusted: the copy is reopened and re-counted before the conversion (AGENTS.md, dw32p.28)",
+      "file": "tools/cutover/backup.go",
+      "test": "TestBackupRefusesWhenTheCopyDisagrees",
+      "old": "\tif err := proveBackup(ctx, backup, want); err != nil {\n\t\treturn \"\", err\n\t}",
+      "new": "\tif err := proveBackup(ctx, backup, want); false {\n\t\treturn \"\", err\n\t}"
+    },
+    {
+      "control": "the-proof-compares-the-counts",
+      "clause": "Proving the backup means it holds what the store holds, not merely that it opens (dw32p.28)",
+      "file": "tools/cutover/backup.go",
+      "test": "TestBackupRefusesWhenTheCopyDisagrees",
+      "old": "\tif got.Counts != want.Counts {",
+      "new": "\tif false {"
+    },
+    {
+      "control": "an-existing-backup-is-never-overwritten",
+      "clause": "The backup is the only other copy of the pre-cutover rows (dw32p.28)",
+      "file": "tools/cutover/backup.go",
+      "test": "TestBackupRefusesToOverwriteOne",
+      "old": "if _, err := os.Stat(backup); err == nil {",
+      "new": "if _, err := os.Stat(backup); err != nil {"
+    },
+    {
+      "control": "the-v6-mirror-is-moved-aside",
+      "clause": "The v7 transport writes into the same directory and its history commits a different file set, so the v6 mirror does not stay (dw32p.28)",
+      "file": "tools/cutover/backup.go",
+      "test": "TestRunConvertsInPlaceAndWritesTheSidecar",
+      "old": "\t\tif err := os.Rename(from, filepath.Join(target, name)); err != nil {",
+      "new": "\t\tif err := error(nil); err != nil {"
+    },
+    {
+      "control": "every-fts-index-is-checked",
+      "clause": "All three FTS indexes go through the rank-1 CheckFTS, which is the form that can fail in both directions (dw32p.19)",
+      "file": "tools/cutover/main.go",
+      "test": "TestVerifyChecksEveryIndex",
+      "old": "\tfor _, index := range store.FTSIndexes() {",
+      "new": "\tfor _, index := range []string{} {"
+    },
+    {
+      "control": "the-sidecar-lands-beside-the-store",
+      "clause": "The sidecar is transport state that sits beside the database it identifies (dw32p.10)",
+      "file": "tools/cutover/main.go",
+      "test": "TestRunConvertsInPlaceAndWritesTheSidecar",
+      "old": "sidecar.Save(filepath.Dir(target))",
+      "new": "sidecar.Save(os.TempDir())"
+    }
+  ]
+}
