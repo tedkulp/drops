@@ -117,9 +117,18 @@ func TestFetchRemoteClassifiesWhatGitSaid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			transport, _ := openTransportWith(t, Options{
-				Git: gitx.Client{NetworkTimeout: 200 * time.Millisecond, WaitDelay: 50 * time.Millisecond},
-			})
+			// Only the hang case asserts the deadline, so only it gets a short
+			// one. The other three assert how a run that FINISHED is read, and
+			// a 200ms budget made that a race against process startup rather
+			// than a claim about the classifier: on macOS every one of them
+			// blew the deadline and came back "timed out", so the two cases
+			// that expect a completed run failed and the two that expect an
+			// error passed for the wrong reason.
+			git := gitx.Client{NetworkTimeout: 10 * time.Second, WaitDelay: time.Second}
+			if tt.hang {
+				git = gitx.Client{NetworkTimeout: 200 * time.Millisecond, WaitDelay: 50 * time.Millisecond}
+			}
+			transport, _ := openTransportWith(t, Options{Git: git})
 			installFetchShim(t, tt.stderr, tt.exit, tt.hang)
 
 			head, err := transport.fetchRemote(t.Context())

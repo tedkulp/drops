@@ -14,7 +14,10 @@ import (
 )
 
 func TestInspectFindsMainRepositoryFromLinkedWorktree(t *testing.T) {
-	main := filepath.Join(t.TempDir(), "main")
+	// Git reports a physical path, so the expectation has to be one too.
+	// `linked` deliberately is not resolved: Inspect is called with whatever
+	// path the caller has, and must still name the main repository.
+	main := filepath.Join(physicalTempDir(t), "main")
 	linked := filepath.Join(t.TempDir(), "linked")
 	runGit(t, "", "init", "-q", "-b", "main", main)
 	runGit(t, main, "config", "user.name", "test")
@@ -256,18 +259,28 @@ func TestMergeCommitJoinsDivergedHistories(t *testing.T) {
 }
 
 func TestWaitDelayBoundsGrandchildHoldingOutput(t *testing.T) {
+	// Looked up rather than written as a literal, and looked up before PATH is
+	// replaced: sleep(1) is /usr/bin/sleep on Linux and /bin/sleep on macOS, and
+	// a script naming the wrong one exits instantly having held nothing. That
+	// does not fail as a missing fixture — the shim then answers rev-parse too,
+	// so Fetch succeeds and this reads as a WaitDelay defect that is not there.
+	sleep, err := exec.LookPath("sleep")
+	if err != nil {
+		t.Skipf("no sleep(1) on PATH to hold the pipe with: %v", err)
+	}
 	binDir := t.TempDir()
 	gitPath := filepath.Join(binDir, "git")
-	script := "#!/bin/sh\n/usr/bin/sleep 30 &\nexit 0\n"
+	script := "#!/bin/sh\n" + sleep + " 30 &\nexit 0\n"
 	if err := os.WriteFile(gitPath, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", binDir)
 
 	client := gitx.Client{NetworkTimeout: 2 * time.Second, WaitDelay: 20 * time.Millisecond}
-	_, err := client.Fetch(context.Background(), t.TempDir(), "origin", "main")
+	_, err = client.Fetch(context.Background(), t.TempDir(), "origin", "main")
 	if err == nil {
-		t.Fatal("Fetch returned nil while a grandchild held its output pipe")
+		t.Fatal("Fetch returned nil: either WaitDelay did not bound the wait, or " +
+			"the grandchild never held the output pipe and the fixture is broken")
 	}
 	var commandErr *gitx.CommandError
 	if !errors.As(err, &commandErr) || !commandErr.TimedOut {
@@ -301,6 +314,24 @@ func TestNetworkTimeoutIsReportedAsContextDeadline(t *testing.T) {
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Fetch error does not unwrap to context deadline: %v", err)
 	}
+}
+
+// physicalTempDir is t.TempDir() with its symlinks resolved. Use it for any
+// directory whose path is later compared against one Git printed: Git always
+// reports a physical path, and on macOS the temporary directory is not one —
+// $TMPDIR sits under /var, which is a symlink to /private/var, so t.TempDir()
+// hands back a logical path that never byte-matches Git's answer for it.
+//
+// Only the comparison needs this. Production canonicalises the working
+// directory with filepath.EvalSymlinks before it ever reaches Inspect, so both
+// sides of a real resolution are physical already.
+func physicalTempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatalf("resolve temporary directory: %v", err)
+	}
+	return dir
 }
 
 func runGit(t *testing.T, dir string, args ...string) string {
