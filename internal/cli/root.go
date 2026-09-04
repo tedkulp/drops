@@ -43,10 +43,31 @@ type App struct {
 	inbox         bool
 	quiet         bool
 	noColor       bool
+
+	// warnings redirects the credential scan away from stderr, and is set by
+	// exactly one verb: `tui`. Under a full-screen program stderr is
+	// invisible, so the default sink would scan every comment you type for an
+	// AWS key or a private-key block and silently discard the finding
+	// (qy3de.7 §5). It needs no core change — the sink is already a core.New
+	// parameter — and the navigator drains the channel after every write.
+	warnings chan core.Warning
 }
+
+// warnCapacity is the redirected channel's buffer. One write scans at most
+// three fields, so a full buffer is unreachable in the one place this is used;
+// the non-blocking send is there so a sink can never wedge a commit that has
+// already happened.
+const warnCapacity = 32
 
 func (a *App) warnSink() core.WarnSink {
 	return func(w core.Warning) {
+		if a.warnings != nil {
+			select {
+			case a.warnings <- w:
+			default:
+			}
+			return
+		}
 		fmt.Fprintf(a.err, "drops: %s matched in %s %s (%s)\n", w.Family, w.Entity.Kind, w.Entity.Key, w.Field)
 	}
 }

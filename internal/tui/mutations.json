@@ -1,5 +1,5 @@
 {
-  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11 and qy3de.6 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion and the direction of every relation heading — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12.",
+  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13.",
   "controls": [
     {
       "control": "the-cursor-tracks-an-id",
@@ -208,6 +208,118 @@
       "test": "TestMovingTheLeftCursorClearsTheFollowStack",
       "old": "\tm.clearFollow()\n\tm.cursor.move(m.rows, to)",
       "new": "\tm.cursor.move(m.rows, to)"
+    },
+    {
+      "control": "a-tombstoned-issue-offers-no-actions",
+      "clause": "`x` on a tombstoned issue opens no modal at all and says so, because every core write refuses one with ErrConflict and a modal of six verbs that all fail is worse than none (qy3de.7 §8)",
+      "file": "internal/tui/actions.go",
+      "test": "TestATombstonedIssueSaysThereIsNothingToDo",
+      "old": "\tif issue.Tombstone == model.Tombstoned {\n\t\treturn nil, nil\n\t}",
+      "new": "\tif issue.Tombstone == model.Live {\n\t\treturn nil, nil\n\t}"
+    },
+    {
+      "control": "close-and-reopen-are-gated-on-status",
+      "clause": "The modal offers `close` on live work and `reopen` on a closed issue, never both and never the wrong one (qy3de.7 §8)",
+      "file": "internal/tui/actions.go",
+      "test": "TestTheActionModalOffersOnlyTheVerbsThatApply",
+      "old": "\tif live {\n\t\tadd(actClose, \"close\")\n\t}",
+      "new": "\tif true {\n\t\tadd(actClose, \"close\")\n\t}"
+    },
+    {
+      "control": "claim-and-release-are-gated-on-live-work",
+      "clause": "`claim` and `release` are withheld from a closed issue even though ClaimIssue permits one: 38 of the live store's 39 assignees sit on closed issues, so the claim is the durable record of who resolved a ticket (qy3de.7 §8)",
+      "file": "internal/tui/actions.go",
+      "test": "TestTheActionModalOffersOnlyTheVerbsThatApply",
+      "old": "\tif live && held == \"\" {",
+      "new": "\tif held == \"\" {"
+    },
+    {
+      "control": "release-is-offered-only-where-a-claim-is-held",
+      "clause": "`release` appears only on a claimed issue and `claim` only on an unclaimed one, so neither verb is ever offered where core would refuse it (qy3de.7 §8)",
+      "file": "internal/tui/actions.go",
+      "test": "TestTheActionModalOffersOnlyTheVerbsThatApply",
+      "old": "\tif live && held != \"\" {",
+      "new": "\tif live {"
+    },
+    {
+      "control": "x-targets-the-right-panes-issue",
+      "clause": "`x` acts on whatever the RIGHT PANE is showing — the followed target when the stack is non-empty, the cursor's issue otherwise. euv2e.6 said \"the right pane's issue\" before there was a follow stack that could make the two differ (qy3de.7 §8)",
+      "file": "internal/tui/actions.go",
+      "test": "TestXTargetsTheRightPanesIssueNotTheLeftCursor",
+      "old": "\tm.target = m.detailID\n",
+      "new": "\tm.target = m.cursor.id\n"
+    },
+    {
+      "control": "an-empty-editor-file-closes-nothing",
+      "clause": "An empty or whitespace-only editor file writes no close at all — a real divergence from the CLI, where `--reason` is optional and `drops close <id>` legally stores NULL (qy3de.7 §3)",
+      "file": "internal/tui/editor.go",
+      "test": "TestAnEmptyEditorFileClosesNothing",
+      "old": "\tif text == \"\" {\n\t\treturn\n\t}",
+      "new": "\tif false {\n\t\treturn\n\t}"
+    },
+    {
+      "control": "an-empty-editor-file-writes-no-comment",
+      "clause": "An empty or whitespace-only editor file writes no comment AND says nothing: letting core refuse it as ErrInvalid would put an error on the message line for something that did not happen (qy3de.7 §3)",
+      "file": "internal/tui/editor.go",
+      "test": "TestAnEmptyEditorFileWritesNoComment",
+      "old": "\ttext := strings.TrimSpace(string(raw))",
+      "new": "\ttext := string(raw)"
+    },
+    {
+      "control": "a-non-zero-editor-exit-writes-nothing",
+      "clause": "A non-zero editor exit discards the file however full it is, which is what makes `:cq` a deliberate cancel rather than a silent loss (qy3de.7 §3)",
+      "file": "internal/tui/editor.go",
+      "test": "TestARealEditorExitingNonZeroWritesNothing",
+      "old": "\tif done.err != nil {\n\t\tm.message = \"editor: \" + done.err.Error()\n\t\treturn\n\t}",
+      "new": "\tif done.err == nil && false {\n\t\tm.message = \"editor: \" + done.err.Error()\n\t\treturn\n\t}"
+    },
+    {
+      "control": "the-reopen-prompt-names-what-it-discards",
+      "clause": "`reopen`'s prompt reports the ACTUAL length of the close_reason SetIssueStatus is about to null out. It is not an \"are you sure\": it states the size of what is lost, which is the one thing the reader cannot otherwise see (qy3de.7 §7)",
+      "file": "internal/tui/actions.go",
+      "test": "TestReopenNamesTheLengthOfTheCloseReasonItWillDiscard",
+      "old": "\t\treason = *m.detailView.Issue.CloseReason",
+      "new": "\t\treason = \"\""
+    },
+    {
+      "control": "only-y-answers-the-reopen-prompt",
+      "clause": "Every key but `y` answers the reopen prompt with no, so a keypress that was not an answer cannot destroy a close reason (qy3de.7 §7)",
+      "file": "internal/tui/tui.go",
+      "test": "TestAnsweringTheReopenPromptWithAnythingButYWritesNothing",
+      "old": "\t\tif key == \"y\" {",
+      "new": "\t\tif key != \"y\" {"
+    },
+    {
+      "control": "the-warning-sink-reaches-the-frame",
+      "clause": "A credential pattern in a comment body produces a VISIBLE line rather than a silent stderr write, which under an alt screen is the same as no warning at all (qy3de.7 §5)",
+      "file": "internal/tui/actions.go",
+      "test": "TestACredentialInACommentReachesTheFrame",
+      "old": "\t\t\tm.note(warningLine(warning))",
+      "new": "\t\t\t_ = warningLine(warning)"
+    },
+    {
+      "control": "a-failed-write-surfaces-on-the-message-line",
+      "clause": "A write refused by core — realistically a claim landing between the render and the `enter` — leaves the store as it was and says so on the message line, which is the only place it can be seen under a full-screen program (qy3de.7 §10)",
+      "file": "internal/tui/actions.go",
+      "test": "TestAFailedWriteLeavesTheStoreUnchangedAndSurfacesOnTheMessageLine",
+      "old": "\terr := do()\n\tif err != nil {\n\t\tm.message = \"error: \" + err.Error()\n\t\treturn\n\t}",
+      "new": "\terr := do()\n\tif err != nil && false {\n\t\tm.message = \"error: \" + err.Error()\n\t\treturn\n\t}"
+    },
+    {
+      "control": "a-write-refresh-carries-the-cursor-to-the-rows-new-place",
+      "clause": "The re-read after a write RESTORES the cursor onto its tracked id rather than holding an index, so a priority change — which re-orders the list, since `ORDER BY issues.priority` is the store's first key — carries the cursor to the row's new position instead of selecting someone else (qy3de.7 §9)",
+      "file": "internal/tui/tui.go",
+      "test": "TestAPriorityWriteCarriesTheCursorToTheRowsNewPosition",
+      "old": "\tm.rows = matching(m.all, m.filter)\n\tm.cursor.restore(m.rows)\n\tif len(m.stack) == 0 {",
+      "new": "\tm.rows = matching(m.all, m.filter)\n\tm.cursor.move(m.rows, m.cursor.position)\n\tif len(m.stack) == 0 {"
+    },
+    {
+      "control": "the-message-line-costs-a-pane-row-not-the-footer",
+      "clause": "The message line is taken out of the PANES, so qy3de.4's disclosure line and qy3de.5's scroll indicator are undisturbed while it is up, and the row comes back when it clears (qy3de.7 §10)",
+      "file": "internal/tui/tui.go",
+      "test": "TestTheMessageLineCostsAPaneRowOnlyWhileItSaysSomething",
+      "old": "\treturn measure(m.width, m.height-m.messageLines(), m.zoomed)",
+      "new": "\treturn measure(m.width, m.height, m.zoomed)"
     }
   ]
 }

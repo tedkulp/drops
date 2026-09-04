@@ -35,6 +35,17 @@ using.
   drops for the first time. Its id column is auto-sized and uncapped, unlike the
   left pane's, because a picker's rows are siblings whose dotted ids share a
   prefix.
+- **Writing from the navigator.** `x` opens one modal on whatever the right
+  pane is showing — the followed issue when you are away from the cursor, the
+  cursor's own otherwise — offering **close, reopen, comment, priority, claim
+  and release**, each row present only where it applies. `priority` opens a
+  second picker. `close` and `comment` open `$VISUAL`, then `$EDITOR`, then
+  `vi`, on an empty `.md` temp file: an empty file or a non-zero editor exit
+  writes nothing, so quitting the editor is the cancel. `reopen` is the one
+  thing that asks first, because it clears `close_reason` — it names how many
+  characters that is before discarding them. One message line above the footer
+  carries a refused write and the credential scan, which under a full-screen
+  program would otherwise go to a stderr nobody can see.
 - **`render.Ellipsis` and `render.Cols`** are exported, so the navigator's row
   geometry — which deliberately truncates an id, the one thing `render`'s own
   rule forbids — is built on `render`'s truncation primitive rather than a

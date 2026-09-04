@@ -2,8 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/tedkulp/drops/internal/core"
 
 	"github.com/tedkulp/drops/internal/model"
 	"github.com/tedkulp/drops/internal/resolve"
@@ -11,7 +14,6 @@ import (
 )
 
 func newTUICmd(app *App) *cobra.Command {
-	var author string
 	cmd := &cobra.Command{
 		Use:   "tui",
 		Short: "Browse the current project's issues in a two-pane navigator",
@@ -22,6 +24,8 @@ func newTUICmd(app *App) *cobra.Command {
 			"resolves, and exits non-zero. Those verbs can afford a stderr advisory\n" +
 			"because it stays on the terminal; under an alt screen it is invisible, so\n" +
 			"exiting 0 would be a blank pane with no explanation.\n\n" +
+			"`x` writes: close, reopen, comment, priority, claim, release. Text goes\n" +
+			"through $VISUAL, then $EDITOR, then vi.\n\n" +
 			"Press ? for the keymap.",
 		Args: noArgs(),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -29,11 +33,32 @@ func newTUICmd(app *App) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return tui.New(app.core, project, resolveAuthor(author)).Run(app.ctx)
+			// The navigator writes, so the sidecar is minted before the
+			// screen is taken over rather than on the first `x`. That is a
+			// documented exception to "minted on the first local write":
+			// under an alt screen a failure to mint has nowhere to be
+			// reported, which is the same reason this verb refuses to start
+			// where no project resolves. It also REPLACES app.core, so it has
+			// to run before the pane is handed one.
+			if err := app.ensureReplica(); err != nil {
+				return err
+			}
+			// The credential scan goes to a channel the pane drains instead
+			// of to stderr, which an alt screen swallows (qy3de.7 §5).
+			app.warnings = make(chan core.Warning, warnCapacity)
+
+			// There is deliberately no --author flag. The flag exists on
+			// `comment add` so an agent can say who it is, and there is no
+			// agent here: an agent cannot drive an alt-screen program, so a
+			// comment written from the navigator is written by a human at a
+			// keyboard, always. A wrong name is fixed with
+			// `git config --global user.name`, which is where resolveAuthor
+			// already reads it.
+			return tui.New(app.core, project, resolveAuthor(""),
+				tui.ResolveEditor(os.Getenv("VISUAL"), os.Getenv("EDITOR")),
+				app.warnings).Run(app.ctx)
 		},
 	}
-	cmd.Flags().StringVar(&author, "author", "",
-		"who a comment written from the navigator is attributed to (default: git user.name, else the OS username)")
 	return cmd
 }
 

@@ -74,6 +74,27 @@ func frameModes(t *testing.T) []struct {
 				t.Fatalf("enter followed nothing; the depth line is not in this frame")
 			}
 		}},
+		// qy3de.7's three additions: the same picker under two more titles,
+		// and the message line, which is the one thing on this map that
+		// changes how many rows the panes get.
+		{"actions modal", func(pane *Model) { openActionsOn(t, pane) }},
+		{"priority modal", func(pane *Model) {
+			openActionsOn(t, pane)
+			chooseRow(t, pane, "priority")
+			if pane.kind != modalPriority {
+				t.Fatal("the priority step did not open; this mode proves nothing")
+			}
+		}},
+		{"prompt up", func(pane *Model) {
+			press(t, pane, "C")
+			pane.askToReopen(pane.detailID)
+		}},
+		{"message up", func(pane *Model) {
+			pane.message = "AWS access key id matched in issue " + string(pane.detailID) + " (description)"
+		}},
+		{"a message far wider than the frame", func(pane *Model) {
+			pane.message = strings.Repeat("a very long failure ", 20)
+		}},
 	}
 }
 
@@ -84,7 +105,7 @@ func openOnTheBlockedRow(t *testing.T, pane *Model) {
 	t.Helper()
 	press(t, pane, "j")
 	press(t, pane, "f")
-	if pane.follow == nil {
+	if pane.modal == nil {
 		t.Fatalf("f opened no picker on %s; this mode proves nothing", pane.detailID)
 	}
 }
@@ -284,7 +305,7 @@ func TestAHeadlessProgramRunsTheFrameAndLeavesTheAltScreen(t *testing.T) {
 	// qy3de.2 proved a real tea.Program runs with a pipe and a buffer at a
 	// pinned size, so the interactive half needs no terminal and no fake.
 	fixture := corpus(t)
-	pane := New(fixture.core, fixture.project, "tester")
+	pane := New(fixture.core, fixture.project, "tester", fixture.editor, fixture.warnings)
 
 	reader, writer := io.Pipe()
 	go func() {
@@ -298,6 +319,12 @@ func TestAHeadlessProgramRunsTheFrameAndLeavesTheAltScreen(t *testing.T) {
 		for _, key := range []string{
 			"j", "j", "k", "G", "g",
 			"j", "f", "\r", "\x7f",
+			// `x`, then `G` and enter, which lands on `claim` — a write that
+			// needs no typing. The two verbs that shell out are deliberately
+			// not pressed: bubbletea cannot re-capture a piped input after an
+			// exec, so the program could never be driven past one. Those are
+			// exercised against a real editor process in editor_test.go.
+			"x", "G", "\r",
 			"C", "a", "w", "w", "l", "0", "?", "?", "q",
 		} {
 			if _, err := writer.Write([]byte(key)); err != nil {

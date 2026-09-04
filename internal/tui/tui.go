@@ -53,16 +53,43 @@ type Model struct {
 	detailView core.IssueView
 	pageText   string
 
-	// follow is qy3de.6's relation picker: non-nil exactly while it is open,
-	// and while it is open it captures every key. choices is aligned with
-	// its rows by construction, built in the same pass.
+	// modal is the open picker: non-nil exactly while one is open, and while
+	// it is open it captures every key. One slot holds all three of the
+	// component's call sites — qy3de.6's relation picker under `f`, and
+	// qy3de.7's Actions and Priority modals under `x` — because a modal
+	// captures input, so exactly one can ever be open. kind says what
+	// `enter` does with it.
 	//
+	// choices and verbs are aligned with their picker's rows by
+	// construction, built in the same pass; target is the issue `x` was
+	// pressed on, captured then rather than re-read at `enter`.
+	modal   *picker
+	kind    modalKind
+	choices []followChoice
+	verbs   []actionVerb
+	target  model.ID
+
 	// stack is the trail BEHIND the right pane — the ids you followed out
 	// of, deepest last — so its length is the depth and its top is where
 	// `backspace` goes. The right pane's current id is not on it.
-	follow  *picker
-	choices []followChoice
-	stack   []model.ID
+	stack []model.ID
+
+	// ask is qy3de.7 §7's y/n line: the ONE thing in the write set that
+	// confirms, because `reopen` is the one write that destroys something.
+	ask *question
+
+	// message is qy3de.7 §10's line above the footer, shared by write
+	// failures and by the credential warnings the alt screen would otherwise
+	// swallow. It is cleared by the next keypress, and it costs a pane row
+	// only while it says something, so qy3de.4's footer and qy3de.5's
+	// right-hand indicator are undisturbed.
+	message  string
+	warnings <-chan core.Warning
+
+	// editor is the argv `$EDITOR` resolved to, cli's discovery rather than
+	// this package's: AGENTS.md's seam rule puts a fact about the
+	// environment in a parameter, never at the point of use.
+	editor []string
 
 	// notice is one transient line for something the pane has to say that is
 	// not an error and has nowhere else to go: `f` on an issue with no
@@ -78,14 +105,22 @@ type Model struct {
 // New builds the navigator over one core and one already-resolved project.
 //
 // Every discovered fact is a parameter, per AGENTS.md's seam rule: the core,
-// the project cli resolved, and the comment author cli worked out. Terminal
-// size is the one thing not passed, because bubbletea delivers it as a
-// message.
-func New(issues *core.Core, project model.Project, author string) *Model {
+// the project cli resolved, the comment author cli worked out, the argv cli
+// resolved $VISUAL/$EDITOR/vi to, and the channel cli redirected core's
+// warning sink onto. Terminal size is the one thing not passed, because
+// bubbletea delivers it as a message.
+//
+// The warning channel is qy3de.7 §5's fix and it needs no core change: the
+// sink is already a core.New parameter, so cli points it here and the pane
+// drains it after every write. Under an alt screen the sink's default — a line
+// on stderr — is invisible, which would silently discard a credential finding.
+func New(issues *core.Core, project model.Project, author string, editor []string, warnings <-chan core.Warning) *Model {
 	return &Model{
-		source: &source{core: issues, project: project},
-		author: author,
-		detail: viewport.New(),
+		source:   &source{core: issues, project: project},
+		author:   author,
+		editor:   editor,
+		warnings: warnings,
+		detail:   viewport.New(),
 		// A frame is composed before the first tea.WindowSizeMsg arrives;
 		// these are the size it is composed at until one does.
 		width:  render.DefaultWidth,
@@ -132,6 +167,35 @@ func (m *Model) applyFilter() error {
 	return m.showDetail(m.cursor.id)
 }
 
+// refresh re-reads the row set after a WRITE, which is a different motion from
+// reload: it keeps the follow stack and leaves the right pane where it is.
+//
+// The two consequences qy3de.7 §9 names both fall out of the cursor rule
+// rather than being coded here. Closing the cursor's issue with `C` off drops
+// its row, and restore holds the position index once the tracked id leaves, so
+// the cursor lands on the next issue and close-close-close walks the list.
+// Changing priority re-orders the set — `ORDER BY issues.priority` is the
+// store's first key — and restore finds the tracked id wherever it moved, so
+// the cursor rides the row rather than staying put and selecting someone else.
+//
+// The right pane follows the cursor only while the stack is EMPTY. Writing to
+// a followed issue leaves the left pane alone, because following never moved
+// the cursor; showTarget is what handles a followed target that the write
+// itself made unreadable.
+func (m *Model) refresh() error {
+	rows, err := m.source.rows(m.ctx, m.scope)
+	if err != nil {
+		return err
+	}
+	m.all = rows
+	m.rows = matching(m.all, m.filter)
+	m.cursor.restore(m.rows)
+	if len(m.stack) == 0 {
+		return m.showDetail(m.cursor.id)
+	}
+	return m.showTarget(m.detailID)
+}
+
 // showDetail retargets the right pane. It does NOT move the left cursor, which
 // is the whole navigational claim this map is built on.
 func (m *Model) showDetail(id model.ID) error {
@@ -140,7 +204,7 @@ func (m *Model) showDetail(id model.ID) error {
 		m.detail.SetContent("")
 		return nil
 	}
-	geo := measure(m.width, m.height, m.zoomed)
+	geo := m.geo()
 	issue, err := m.source.issue(m.ctx, id)
 	if err != nil {
 		return err
@@ -170,7 +234,22 @@ func (m *Model) selectRow(to int) error {
 // meaning to clear the stack, and it saves nothing, because the right pane has
 // already returned to the cursor's own issue by the time you could press it.
 // `j` — a key you were about to press anyway — is the clear.
-func (m *Model) clearFollow() { m.stack, m.follow, m.choices = nil, nil, nil }
+func (m *Model) clearFollow() {
+	m.stack = nil
+	m.closeModal()
+}
+
+// closeModal drops the open picker and everything built alongside it. The
+// follow stack is deliberately NOT part of it: `esc` out of a picker leaves
+// you exactly where you were reading.
+func (m *Model) closeModal() { m.modal, m.choices, m.verbs, m.target = nil, nil, nil, "" }
+
+// geo is the frame's arithmetic for the current mode. The message line's cost
+// is taken off the height HERE, once, so every caller — the viewport's own
+// resize, the picker's scroll window, ^d's half page — measures the same frame.
+func (m *Model) geo() geometry {
+	return measure(m.width, m.height-m.messageLines(), m.zoomed)
+}
 
 // openFollow is `f`: the relation picker over the FULL core graph, always.
 //
@@ -195,16 +274,31 @@ func (m *Model) openFollow() {
 	// are, and the box's border title is the frame's untruncated id, because
 	// you are picking a relation OF that issue.
 	opened := newPicker("", rows)
-	m.follow, m.choices = &opened, choices
-	m.follow.scroll(m.detailRows(measure(m.width, m.height, m.zoomed)))
+	m.modal, m.kind, m.choices = &opened, modalFollow, choices
+	m.modal.scroll(m.detailRows(m.geo()))
 }
 
-// pickFollow is `enter` inside the picker. The choice is looked up by the
-// index the picker returns, which is aligned with it by construction.
-func (m *Model) pickFollow() {
-	chosen := m.choices[m.follow.selected()]
-	m.follow, m.choices = nil, nil
-	m.fail(m.pushFollow(chosen.id))
+// pick is `enter` inside whichever modal is open. The row is looked up by the
+// index the picker returns, which is aligned with the choices or the verbs by
+// construction rather than by a lookup that could drift.
+// It returns a command because two of the six verbs behind `x` run $EDITOR,
+// which is a tea.ExecProcess and therefore a Cmd rather than a store write
+// made here and now.
+func (m *Model) pick() tea.Cmd {
+	index := m.modal.selected()
+	switch m.kind {
+	case modalFollow:
+		chosen := m.choices[index]
+		m.closeModal()
+		m.fail(m.pushFollow(chosen.id))
+	case modalActions:
+		return m.runVerb(m.verbs[index], m.target)
+	case modalPriority:
+		target := m.target
+		m.closeModal()
+		m.setPriority(target, index)
+	}
+	return nil
 }
 
 // pushFollow retargets the right pane onto a relation, remembering where it
@@ -293,17 +387,20 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyPressMsg:
 		return m, m.key(message)
+	case editorDoneMsg:
+		m.finishEdit(message)
+		return m, nil
 	}
 	return m, nil
 }
 
 // halfPage is how far ^d and ^u move the list cursor: half the rows a pane
 // shows. Both panes get the same row budget, so it is one number.
-func (m *Model) halfPage() int { return max(measure(m.width, m.height, m.zoomed).rows/2, 1) }
+func (m *Model) halfPage() int { return max(m.geo().rows/2, 1) }
 
 // resize hands the viewport the geometry the frame will use.
 func (m *Model) resize() {
-	geo := measure(m.width, m.height, m.zoomed)
+	geo := m.geo()
 	m.detail.SetWidth(geo.detailWidth)
 	m.detail.SetHeight(m.detailRows(geo))
 }
@@ -320,14 +417,32 @@ func (m *Model) fail(err error) { m.err = err }
 // key is the whole keymap.
 func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 	key := pressed.String()
-	// A notice lives until the next keypress, whatever that key was.
-	m.notice = ""
+	// A notice and a message both live until the next keypress, whatever
+	// that key was. Cleared FIRST, so a handler below can set either and
+	// have it survive the press that produced it.
+	m.notice, m.message = "", ""
 
-	// The picker captures input while it is open, which is what keeps `esc`
+	// The y/n line is answered before anything else can be reached: it is up
+	// because a write is waiting on it, and `reopen` destroying a close
+	// reason behind an unrelated keypress is the whole thing it prevents.
+	//
+	// `y` alone is yes and EVERY other key is no. A prompt that only two keys
+	// dismiss traps a reader who pressed it by accident inside a full-screen
+	// program, and the safe answer is the common one.
+	if m.ask != nil {
+		asked := m.ask
+		m.ask = nil
+		if key == "y" {
+			asked.confirm()
+		}
+		return nil
+	}
+
+	// A modal captures input while it is open, which is what keeps `esc`
 	// unambiguous: cancelling the picker is not a fourth meaning in qy3de.4's
 	// ordering, because nothing else can be reached from here.
-	if m.follow != nil {
-		return m.pickerKey(key)
+	if m.modal != nil {
+		return m.modalKey(key)
 	}
 
 	// The `/` prompt swallows every printable key, so a filter may contain
@@ -379,6 +494,10 @@ func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 	case "a":
 		m.scope.allProjects = !m.scope.allProjects
 		m.fail(m.reload())
+
+	// --- writing (qy3de.7) ---
+	case "x":
+		m.openActions()
 
 	// --- following (qy3de.6) ---
 	case "f":
@@ -437,7 +556,7 @@ func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
-// pickerKey is the whole keymap while a picker is open.
+// modalKey is the whole keymap while a modal is open, whichever one it is.
 //
 // No accelerators and no `/`: the median relation count is 1 and 60 of the
 // corpus's 77 non-empty pickers hold three rows or fewer, and `/` one pane
@@ -446,33 +565,34 @@ func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 //
 // ctrl+c still quits, for the same reason it does everywhere else: a
 // full-screen program that swallows it is worse than one that does not.
-func (m *Model) pickerKey(key string) tea.Cmd {
-	rows := m.detailRows(measure(m.width, m.height, m.zoomed))
+func (m *Model) modalKey(key string) tea.Cmd {
+	rows := m.detailRows(m.geo())
+	span := len(m.modal.rows)
 	switch key {
 	case "ctrl+c":
 		return tea.Quit
 	case "esc":
-		m.follow, m.choices = nil, nil
+		m.closeModal()
 	case "enter":
-		m.pickFollow()
+		return m.pick()
 	case "j", "down":
-		m.moveFollow(1, rows)
+		m.moveModal(1, rows)
 	case "k", "up":
-		m.moveFollow(-1, rows)
+		m.moveModal(-1, rows)
 	case "g":
-		m.moveFollow(-len(m.choices), rows)
+		m.moveModal(-span, rows)
 	case "G":
-		m.moveFollow(len(m.choices), rows)
+		m.moveModal(span, rows)
 	}
 	return nil
 }
 
-// moveFollow walks the picker's cursor and re-windows it. move deliberately
+// moveModal walks the picker's cursor and re-windows it. move deliberately
 // does not know the geometry, so the scroll is a second call rather than a
-// height parameter threaded through the component qy3de.7 also reuses.
-func (m *Model) moveFollow(delta, rows int) {
-	m.follow.move(delta)
-	m.follow.scroll(rows)
+// height parameter threaded through the shared component.
+func (m *Model) moveModal(delta, rows int) {
+	m.modal.move(delta)
+	m.modal.scroll(rows)
 }
 
 // View composes the frame. Alt screen, window title and content all ride on
@@ -496,9 +616,45 @@ func (m *Model) View() tea.View {
 // than being quietly squared off here.
 func (m *Model) frame() string { return pad(m.compose(), m.width, m.height) }
 
-// compose builds the frame: the panes, then the footer.
+// messageLines is what qy3de.7 §10's line costs the panes: one row while
+// there is something to say, none otherwise.
+//
+// It comes out of the PANES rather than out of the footer, which is the whole
+// point of it being a separate line: qy3de.4's disclosure line already carries
+// scope, count and every active mode, and qy3de.5's scroll indicator sits on
+// the same row. A write failure or a credential finding overwriting either
+// would trade one disclosure for another.
+func (m *Model) messageLines() int {
+	if m.statusLine() == "" {
+		return 0
+	}
+	// Dropped rather than composed on a terminal with no room for it: below
+	// five lines the panes are already at minBodyHeight, so taking a row from
+	// them would push the frame past its own height and leave the guard in
+	// frame to square it off — which is the one thing that guard must never
+	// be doing.
+	if m.height-footerHeight-1 < minBodyHeight {
+		return 0
+	}
+	return 1
+}
+
+// statusLine is the one slot §7's y/n prompt and §10's messages share.
+//
+// The prompt wins where both could be there, and cannot in practice: it is up
+// only while a write is waiting on an answer, so nothing has been written yet
+// for a failure or a warning to report on.
+func (m *Model) statusLine() string {
+	if m.ask != nil {
+		return m.ask.prompt
+	}
+	return m.message
+}
+
+// compose builds the frame: the panes, the message line if there is one, then
+// the footer.
 func (m *Model) compose() string {
-	geo := measure(m.width, m.height, m.zoomed)
+	geo := m.geo()
 	rows := m.detailRows(geo)
 	m.detail.SetWidth(geo.detailWidth)
 	m.detail.SetHeight(rows)
@@ -513,8 +669,8 @@ func (m *Model) compose() string {
 	// geometry already proved off-width-zero. Under `enter`-zoom the body is
 	// the full width and the picker follows it there.
 	inner := pad(m.detail.View(), geo.detailWidth, rows)
-	if m.follow != nil {
-		inner = m.follow.view(geo.detailWidth, rows)
+	if m.modal != nil {
+		inner = m.modal.view(geo.detailWidth, rows)
 	}
 	if line := m.depthLine(geo.detailWidth); line != "" {
 		inner = line + "\n" + inner
@@ -526,6 +682,9 @@ func (m *Model) compose() string {
 			m.scope.allProjects, m.emptyState())
 		body = lipgloss.JoinHorizontal(lipgloss.Top,
 			box(list, geo.listWidth, m.listTitle()), detail)
+	}
+	if m.messageLines() > 0 {
+		body += "\n" + pad(headStyle.Render(render.Ellipsis(m.statusLine(), m.width)), m.width, 1)
 	}
 	return body + "\n" + m.footer(geo)
 }
@@ -615,10 +774,10 @@ func (m *Model) footer(geo geometry) string {
 // 21-row body, and a 22nd row inside the box would cost the row it is
 // reporting on. It counts LINES, not rows, because headers take room too.
 func (m *Model) rightSlot(geo geometry) string {
-	if m.follow != nil {
+	if m.modal != nil {
 		rows := m.detailRows(geo)
-		if total := m.follow.lineCount(); total > rows {
-			return fmt.Sprintf("↕ %d of %d", m.follow.lineOf(m.follow.selected())+1, total)
+		if total := m.modal.lineCount(); total > rows {
+			return fmt.Sprintf("↕ %d of %d", m.modal.lineOf(m.modal.selected())+1, total)
 		}
 		return ""
 	}
@@ -650,6 +809,9 @@ func helpText() string {
 		"",
 		"  f                   follow a relation: pick one, Enter takes it",
 		"  Backspace           back one relation (moving the cursor clears the trail)",
+		"",
+		"  x                   write to the issue on the right: close, reopen,",
+		"                      comment, priority, claim, release",
 		"",
 		"  J K space b         scroll the detail pane vertically",
 		"  h l ← → 0 $         scroll the detail pane horizontally",

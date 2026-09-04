@@ -508,6 +508,7 @@ carries the **full untruncated id**, one glance away.
 | `a` | span every project, and add the project column |
 | `f` | pick a relation of the right pane's issue and follow it |
 | `Backspace` | back one relation |
+| `x` | write to the right pane's issue: close, reopen, comment, priority, claim, release |
 | `J` `K` `space` `b` | scroll the detail pane vertically |
 | `h` `l` `←` `→` `0` `$` | scroll it horizontally, eight columns a step |
 | `w` | soft-wrap the detail pane instead of clipping |
@@ -555,8 +556,44 @@ The footer is the disclosure line: scope, count, then active modes **as words**
 while something is narrowing and a bare `N issues` otherwise — `C` is a 6.3x
 row jump in a project this size, and that has to be visible.
 
-There is **no polling**: the pane reads its rows when it starts and again on
-`C` and `a`. A change made from another terminal is not picked up until then.
+**`x` is the whole write set**, behind one modal on whatever the right pane is
+showing. Nothing is bound at the top level, and a row appears only where it
+applies: `close` on live work, `reopen` on a closed issue, `comment` and
+`priority` always, `claim` on unclaimed live work and `release` on claimed live
+work. `priority` opens a second picker, `P0` through `P4`. A tombstoned issue
+gets no rows at all and `x` says so, because every write refuses one.
+
+`claim` and `release` are withheld from a **closed** issue even though the
+store would allow them: a claim on closed work is the durable record of who
+resolved it, and `release` would erase that in one keypress.
+
+**`close` and `comment` open `$VISUAL`, then `$EDITOR`, then `vi`**, on an
+empty `.md` temp file — no seeded content, nothing stripped. An empty or
+whitespace-only file writes nothing and says nothing; a non-zero editor exit
+(`:cq`) writes nothing and says so. That makes `close` stricter than the CLI,
+where `--reason` is optional. A comment is attributed to the same name `comment
+add` defaults to, and there is deliberately **no `--author` flag**: an agent
+cannot drive a full-screen program, so the writer is a human at a keyboard.
+`git config --global user.name` is where that name comes from.
+
+**`reopen` asks first**, and it is the only thing that does. Reopening clears
+`close_reason` — one column, so the reason is gone — and the prompt states how
+many characters it is about to discard. Any key but `y` answers no.
+
+Above the footer sits **one message line**, for a refused write and for the
+credential scan. That scan normally writes to stderr, which a full-screen
+program makes invisible, so under `tui` it is redirected onto the frame. The
+line costs a pane row only while it is up, and the next keypress clears it.
+
+Writes change the row set, and the cursor's id-tracking is what makes that
+readable: closing the cursor's issue with `C` off drops its row and lands the
+cursor on the next one, so `x`-close walks the list; changing priority
+re-orders the list and the cursor rides its row to the new position. Writing to
+a **followed** issue leaves the left pane untouched.
+
+There is **no polling**: the pane reads its rows when it starts, again on `C`
+and `a`, and again after a write of its own. A change made from another
+terminal is not picked up until then.
 
 ## Sync: the second machine
 
@@ -571,7 +608,10 @@ The transport's files sit beside the store, in `~/.drops/`:
 - `replica.json` — this installation's replica key and last export head. Machine-
   local, never replicated. It is minted on the first local write that must be
   exported, and a malformed one is a hard error rather than something silently
-  replaced.
+  replaced. **`drops tui` mints it on startup** rather than on its first `x`,
+  which is the one exception: it is a verb that writes, and once the alt screen
+  is up there is nowhere to report a failure to mint — the same reason it
+  refuses to start where no project resolves.
 - `.sync.lock` — the advisory lock serialising a sync across processes. A sync
   held by another process exits **10**.
 - `.git/` — the mirror's history, on branch `main`, pushed to and pulled from

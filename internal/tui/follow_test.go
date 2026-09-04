@@ -197,7 +197,7 @@ func TestFOnAnIssueWithNoRelationsOpensNoPicker(t *testing.T) {
 	pane := f.model(80, 24)
 
 	press(t, pane, "f")
-	if pane.follow != nil {
+	if pane.modal != nil {
 		t.Fatal("f opened a picker over an empty graph; there is nothing to choose from")
 	}
 	if footer := pane.footer(measure(80, 24, false)); !strings.Contains(footer, "nothing to follow") {
@@ -258,7 +258,7 @@ func TestFollowingRetargetsTheRightPaneAndBackspaceComesHome(t *testing.T) {
 	pane := f.model(80, 24)
 
 	press(t, pane, "f")
-	if pane.follow == nil {
+	if pane.modal == nil {
 		t.Fatal("f opened no picker")
 	}
 	pressNamed(t, pane, tea.KeyEnter)
@@ -319,7 +319,7 @@ func TestEscCancelsThePickerAndLeavesTheStackAlone(t *testing.T) {
 
 	press(t, pane, "f")
 	pressNamed(t, pane, tea.KeyEscape)
-	if pane.follow != nil {
+	if pane.modal != nil {
 		t.Fatal("esc did not cancel the picker")
 	}
 	if pane.detailID != parent.ID {
@@ -338,19 +338,19 @@ func TestThePickerCapturesTheKeysTheNavigatorWouldHaveTaken(t *testing.T) {
 
 	press(t, pane, "f")
 	press(t, pane, "j")
-	if pane.follow.selected() != 1 {
-		t.Fatalf("picker cursor = %d, want 1 — j walks the picker", pane.follow.selected())
+	if pane.modal.selected() != 1 {
+		t.Fatalf("picker cursor = %d, want 1 — j walks the picker", pane.modal.selected())
 	}
 	if pane.cursor.id != parent.ID {
 		t.Fatalf("list cursor moved to %s while the picker was open", pane.cursor.id)
 	}
 	press(t, pane, "g")
-	if pane.follow.selected() != 0 {
-		t.Fatalf("picker cursor after g = %d, want 0", pane.follow.selected())
+	if pane.modal.selected() != 0 {
+		t.Fatalf("picker cursor after g = %d, want 0", pane.modal.selected())
 	}
 	press(t, pane, "G")
-	if pane.follow.selected() != 1 {
-		t.Fatalf("picker cursor after G = %d, want the last row", pane.follow.selected())
+	if pane.modal.selected() != 1 {
+		t.Fatalf("picker cursor after G = %d, want the last row", pane.modal.selected())
 	}
 	pressNamed(t, pane, tea.KeyEnter)
 	if pane.detailID != second.ID {
