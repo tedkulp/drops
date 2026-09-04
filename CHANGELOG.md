@@ -30,6 +30,17 @@ using.
   across all 1025. `show` is byte-identical — same relations, same natural id
   order, fewer transactions — verified over 2052 corpus invocations.
 
+- **One adapter from a `core.IssueView` to a `render.Page`**, in the new
+  `internal/view` package, replacing the private one in `internal/cli`. `show`
+  and the TUI's detail pane render the same issue, and `cli` imports `tui`
+  rather than the reverse, so leaving it in `cli` meant two adapters for one
+  rendering. It is not folded into `render`: `render` imports `internal/model`
+  and nothing else, and this adapter's input is a `core` type. `show --json`
+  now derives its relations from the page instead of converting the view a
+  second time, so the machine and human surfaces cannot disagree about which
+  edges block. `show` is byte-identical over 4108 corpus invocations — all 1025
+  issues as a page and as `--json`, a 40-id page both ways, and an unknown id.
+
 - **`core.OpenBlockers` is exported**, and `Ready` and `Blocked` now honour a
   caller-supplied status set instead of overwriting it with `open`. Both are for
   the TUI's left pane, which lists `in_progress` rows and so needs a blocked-by

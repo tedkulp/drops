@@ -1,0 +1,29 @@
+{
+  "note": "Live controls for internal/view, the one adapter from a core.IssueView to a render.Page. Re-runnable proof that these tests can fail; the closed tickets' close reasons remain the historical record. Seeded by qy3de.10, which moved two of these three here with the code they mutate.",
+  "controls": [
+    {
+      "control": "a-blocker-is-a-blocks-edge",
+      "clause": "A page's blocker headings mean `blocks`: core hands over every edge type in one block, and a related or discovered-from edge is not rendered as one that blocks (qy3de.9, moved from internal/cli by qy3de.10)",
+      "file": "internal/view/page.go",
+      "test": "TestPageNamesOnlyBlocksEdges",
+      "old": "\t\tif dependency.Type == model.DepBlocks {",
+      "new": "\t\tif true {"
+    },
+    {
+      "control": "each-direction-is-named-from-the-readers-end",
+      "clause": "An outgoing edge is what BLOCKS this issue and an incoming edge is what it blocks — the headings are named from the reader's end, which is the opposite of the edge's own (qy3de.10)",
+      "file": "internal/view/page.go",
+      "test": "TestPageNamesEachDirectionFromTheReadersEnd",
+      "old": "\tpage.Blockers = toRefs(blocksRefs(view.Dependencies))\n\tpage.Blocking = toRefs(blocksRefs(view.Dependents))",
+      "new": "\tpage.Blockers = toRefs(blocksRefs(view.Dependents))\n\tpage.Blocking = toRefs(blocksRefs(view.Dependencies))"
+    },
+    {
+      "control": "a-page-carries-its-thread",
+      "clause": "A page is identity, body, every relation AND the whole comment thread (dw32p.31, moved from internal/cli by qy3de.10)",
+      "file": "internal/view/page.go",
+      "test": "TestPageCarriesItsWholeThread",
+      "old": "\tfor _, comment := range view.Comments {\n\t\tpage.Comments = append(page.Comments, render.Comment{",
+      "new": "\tfor _, comment := range view.Comments[:0] {\n\t\tpage.Comments = append(page.Comments, render.Comment{"
+    }
+  ]
+}

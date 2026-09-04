@@ -172,11 +172,11 @@ func newShowCmd(app *App) *cobra.Command {
 			pages := make([]render.Page, 0, len(args))
 			jsons := make([]showIssueJSON, 0, len(args))
 			for _, raw := range args {
-				view, err := app.core.ViewIssue(app.ctx, model.ID(raw))
+				issueView, err := app.core.ViewIssue(app.ctx, model.ID(raw))
 				if err != nil {
 					return err
 				}
-				page, j := assembleView(view)
+				page, j := assembleView(issueView)
 				pages = append(pages, page)
 				jsons = append(jsons, j)
 			}
@@ -189,72 +189,6 @@ func newShowCmd(app *App) *cobra.Command {
 			return renderPages(newConsole(app.out, app.err), pages)
 		},
 	}
-}
-
-// assembleView turns one view into the page and the JSON object show renders.
-// The relations arrive from core already named and already ordered, read in the
-// same transaction as the issue itself, so nothing here reads the store.
-func assembleView(view core.IssueView) (render.Page, showIssueJSON) {
-	page := pageForView(view)
-	out := showIssueJSON{Issue: view.Issue, Comments: view.Comments}
-
-	for _, label := range view.Labels {
-		out.Labels = append(out.Labels, label.Name)
-	}
-	if view.Parent != nil {
-		page.Parent = toPageRef(*view.Parent)
-		out.Parent = toJSONRefPtr(*view.Parent)
-	}
-
-	blockers, blocking := blocksRefs(view.Dependencies), blocksRefs(view.Dependents)
-	page.Blockers, out.Blockers = toPageRefs(blockers), toJSONRefs(blockers)
-	page.Blocking, out.Blocking = toPageRefs(blocking), toJSONRefs(blocking)
-	page.Children, out.Children = toPageRefs(view.Children), toJSONRefs(view.Children)
-
-	return page, out
-}
-
-// blocksRefs keeps the `blocks` edges of one dependency block. A page names
-// blockers and nothing else, so a `related` or `discovered-from` edge is
-// dropped here rather than rendered under a heading that would misreport it.
-//
-// The relations arrive live: store filters `tombstoned = 0` in SQL for labels,
-// dependencies and children alike, and core drops a tombstoned parent record.
-// Re-filtering that here would be a rule in the presentation layer that no
-// input can ever reach, so it is not written.
-func blocksRefs(dependencies []core.DependencyRef) []core.IssueRef {
-	refs := make([]core.IssueRef, 0, len(dependencies))
-	for _, dependency := range dependencies {
-		if dependency.Type == model.DepBlocks {
-			refs = append(refs, dependency.IssueRef)
-		}
-	}
-	return refs
-}
-
-func toPageRef(ref core.IssueRef) *render.Ref {
-	return &render.Ref{ID: ref.ID, Title: ref.Title, Status: ref.Status, Tombstoned: ref.Tombstoned}
-}
-
-func toPageRefs(refs []core.IssueRef) []render.Ref {
-	out := make([]render.Ref, 0, len(refs))
-	for _, ref := range refs {
-		out = append(out, *toPageRef(ref))
-	}
-	return out
-}
-
-func toJSONRefs(refs []core.IssueRef) []showRefJSON {
-	out := make([]showRefJSON, 0, len(refs))
-	for _, ref := range refs {
-		out = append(out, showRefJSON{ID: string(ref.ID), Title: ref.Title, Status: string(ref.Status)})
-	}
-	return out
-}
-
-func toJSONRefPtr(ref core.IssueRef) *showRefJSON {
-	out := showRefJSON{ID: string(ref.ID), Title: ref.Title, Status: string(ref.Status)}
-	return &out
 }
 
 func newUpdateCmd(app *App) *cobra.Command {

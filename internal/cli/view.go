@@ -4,6 +4,7 @@ import (
 	"github.com/tedkulp/drops/internal/core"
 	"github.com/tedkulp/drops/internal/model"
 	"github.com/tedkulp/drops/internal/render"
+	"github.com/tedkulp/drops/internal/view"
 )
 
 // showRefJSON is one related issue in show --json: the same three fields the
@@ -26,49 +27,39 @@ type showIssueJSON struct {
 	Comments []model.Comment `json:"comments"`
 }
 
-// pageForView turns a core.IssueView into the render.Page show renders.
-func pageForView(view core.IssueView) render.Page {
-	labels := make([]string, 0, len(view.Labels))
-	for _, label := range view.Labels {
-		labels = append(labels, label.Name)
+// assembleView turns one view into the page and the JSON object show renders.
+// The relations arrive from core already named and already ordered, read in the
+// same transaction as the issue itself, so nothing here reads the store.
+//
+// The JSON is derived from the PAGE rather than from the view a second time.
+// There is one adapter (internal/view) and the machine surface reads its
+// output, so the two renderings cannot disagree about which edges block, which
+// relations are live, or what order they come in — they are the same slices.
+func assembleView(issueView core.IssueView) (render.Page, showIssueJSON) {
+	page := view.Page(issueView)
+	out := showIssueJSON{
+		Issue:    issueView.Issue,
+		Labels:   page.Labels,
+		Blockers: toJSONRefs(page.Blockers),
+		Blocking: toJSONRefs(page.Blocking),
+		Children: toJSONRefs(page.Children),
+		Comments: issueView.Comments,
 	}
-	page := render.Page{
-		ID:          view.Issue.ID,
-		Project:     view.Project.Slug,
-		Title:       view.Issue.Title,
-		Status:      view.Issue.Status,
-		Tombstoned:  view.Issue.Tombstone == model.Tombstoned,
-		Type:        view.Issue.Type,
-		Priority:    view.Issue.Priority,
-		Labels:      labels,
-		CreatedAt:   view.Issue.CreatedAt,
-		UpdatedAt:   view.Issue.UpdatedAt,
-		CloseReason: stringValue(view.Issue.CloseReason),
-		Description: view.Issue.Description,
+	if page.Parent != nil {
+		parent := toJSONRef(*page.Parent)
+		out.Parent = &parent
 	}
-	if view.Issue.Assignee != nil {
-		page.Assignee = *view.Issue.Assignee
-	}
-	if view.Issue.ClosedAt != nil {
-		page.ClosedAt = *view.Issue.ClosedAt
-	}
-	if view.Issue.DeferredUntil != nil {
-		page.DeferredUntil = *view.Issue.DeferredUntil
-	}
-	for _, comment := range view.Comments {
-		page.Comments = append(page.Comments, render.Comment{
-			ID:        comment.ID,
-			Author:    comment.Author,
-			Body:      comment.Body,
-			CreatedAt: comment.CreatedAt,
-		})
-	}
-	return page
+	return page, out
 }
 
-func stringValue(value *string) string {
-	if value == nil {
-		return ""
+func toJSONRef(ref render.Ref) showRefJSON {
+	return showRefJSON{ID: string(ref.ID), Title: ref.Title, Status: string(ref.Status)}
+}
+
+func toJSONRefs(refs []render.Ref) []showRefJSON {
+	out := make([]showRefJSON, 0, len(refs))
+	for _, ref := range refs {
+		out = append(out, toJSONRef(ref))
 	}
-	return *value
+	return out
 }

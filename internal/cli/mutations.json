@@ -178,28 +178,12 @@
       "new": "\t\t\t\tif len(jsons) > 0 {\n\t\t\t\t\treturn render.EmitOne(app.out, jsons[0])\n\t\t\t\t}"
     },
     {
-      "control": "a-blocker-is-a-blocks-edge",
-      "clause": "A page's blocker headings mean `blocks`: core hands over every edge type in one block, and a related or discovered-from edge is not rendered as one that blocks (qy3de.9)",
-      "file": "internal/cli/issue.go",
-      "test": "TestPageNamesOnlyBlocksEdgesAsBlockers",
-      "old": "\t\tif dependency.Type == model.DepBlocks {",
-      "new": "\t\tif true {"
-    },
-    {
       "control": "labels-is-the-key-that-goes-absent",
       "clause": "show --json omits labels when an issue carries none, which is why .labels[] is not safe (dw32p.31)",
       "file": "internal/cli/view.go",
       "test": "TestLabelAddAndRmChangeTheIssuesLabels",
       "old": "\tLabels   []string        `json:\"labels,omitempty\"`",
       "new": "\tLabels   []string        `json:\"labels\"`"
-    },
-    {
-      "control": "a-page-carries-its-thread",
-      "clause": "show renders identity, body, every relation AND the whole comment thread (dw32p.31)",
-      "file": "internal/cli/view.go",
-      "test": "TestCommentListRendersTheThreadOldestFirst",
-      "old": "\tfor _, comment := range view.Comments {\n\t\tpage.Comments = append(page.Comments, render.Comment{",
-      "new": "\tfor _, comment := range view.Comments[:0] {\n\t\tpage.Comments = append(page.Comments, render.Comment{"
     },
     {
       "control": "pages-are-ruled-apart",

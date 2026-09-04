@@ -157,6 +157,14 @@ func newMemoryShowCmd(app *App) *cobra.Command {
 	}
 }
 
+// stringValue reads a nullable text column as the empty string a page renders.
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
 func newMemoryEditCmd(app *App) *cobra.Command {
 	var (
 		title, body, source string
