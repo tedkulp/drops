@@ -14,7 +14,7 @@ import (
 // terminal. drops is UNIX-only, so this is the ioctl path, never an
 // exec("tty").
 func isTerminal(f *os.File) bool {
-	_, err := unix.IoctlGetTermios(int(f.Fd()), unix.TCGETS)
+	_, err := unix.IoctlGetTermios(int(f.Fd()), getTermios)
 	return err == nil
 }
 

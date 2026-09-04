@@ -26,6 +26,15 @@ using.
   per row. `drops ready` and `drops blocked` pass no status set and are
   byte-identical, verified over the 1025-issue corpus.
 
+### Fixed
+
+- **The tree builds on macOS again.** `isTerminal` issued the terminal-attribute
+  ioctl by its Linux-only name, `unix.TCGETS`, so `internal/cli` did not compile
+  for darwin at all. The request is now a build-tagged constant — `TCGETS` on
+  Linux, `TIOCGETA` on darwin and the BSDs — and a portability test cross-vets
+  the tree for darwin on every run, since no test on the build machine can go
+  red for a constant that only another `GOOS` rejects.
+
 ## 0.1.0 — 2026-09-03
 
 First release, and the one that took over `~/.drops/drops.db` and the `drops`

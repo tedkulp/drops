@@ -864,6 +864,15 @@
       "test": "TestMemoryShowUsesTheMeasuredRenderWidth",
       "old": "return newConsole(app.out, app.err).MemoryPage(render.MemoryPage{",
       "new": "return (render.Console{Out: app.out}).MemoryPage(render.MemoryPage{"
+    },
+    {
+      "control": "termios-request-is-per-platform",
+      "clause": "The tree compiles for every UNIX drops runs on: the ioctl that reads terminal attributes is spelled TCGETS on Linux and TIOCGETA on darwin and the BSDs",
+      "file": "internal/cli/console_termios_bsd.go",
+      "package": ".",
+      "test": "TestTheTreeCompilesForDarwin",
+      "old": "const getTermios = unix.TIOCGETA",
+      "new": "const getTermios = unix.TCGETS"
     }
   ]
 }
