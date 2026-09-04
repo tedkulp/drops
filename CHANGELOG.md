@@ -26,6 +26,15 @@ using.
   cannot disagree about what an issue looks like. Unlike `list` and `ready`,
   `tui` **refuses to start and exits 2 where no project resolves**: a stderr
   advisory is invisible under an alt screen.
+- **Following a relation from the navigator.** `f` opens a picker over the
+  right pane's issue — grouped under a page's own headings, in a page's order —
+  and `Enter` retargets the right pane onto the one you choose **without the
+  list cursor moving**; `Backspace` walks back down the trail, and moving the
+  list cursor clears it. The picker lists **all three dependency types**, where
+  a page renders `blocks` alone, so a `discovered-from` edge is readable in
+  drops for the first time. Its id column is auto-sized and uncapped, unlike the
+  left pane's, because a picker's rows are siblings whose dotted ids share a
+  prefix.
 - **`render.Ellipsis` and `render.Cols`** are exported, so the navigator's row
   geometry — which deliberately truncates an id, the one thing `render`'s own
   rule forbids — is built on `render`'s truncation primitive rather than a

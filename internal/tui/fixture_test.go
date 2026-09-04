@@ -116,6 +116,32 @@ func (f *fixture) setStatus(id model.ID, status model.Status) {
 	}
 }
 
+// child writes an issue under a parent, which is how a fixture reaches the
+// picker's Children group and its auto-sized id column.
+func (f *fixture) child(parent model.ID, title string, priority int) model.Issue {
+	f.t.Helper()
+	created, err := f.core.CreateIssue(f.t.Context(), core.CreateIssue{
+		Project:  f.project.Key,
+		Parent:   &parent,
+		Title:    title,
+		Type:     model.TypeTask,
+		Priority: priority,
+	})
+	if err != nil {
+		f.t.Fatalf("create child of %s: %v", parent, err)
+	}
+	return created
+}
+
+// dep records one typed edge, from depending on to. It reaches the two types
+// `show` cannot read (drops://hxedy), which the picker deliberately can.
+func (f *fixture) dep(from, to model.ID, kind model.DependencyType) {
+	f.t.Helper()
+	if _, err := f.core.SetDependency(f.t.Context(), from, to, kind, true); err != nil {
+		f.t.Fatalf("dep %s -%s-> %s: %v", from, kind, to, err)
+	}
+}
+
 // blocks records that blocked depends on blocker, which is what puts the
 // ` [N]` marker on blocked's row.
 func (f *fixture) blocks(blocked, blocker model.ID) {

@@ -1,5 +1,5 @@
 {
-  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11 names — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11.",
+  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11 and qy3de.6 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion and the direction of every relation heading — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12.",
   "controls": [
     {
       "control": "the-cursor-tracks-an-id",
@@ -112,6 +112,102 @@
       "test": "TestClippedBytesAreReachableAndTheFooterSaysSo",
       "old": "\tif widest := m.widest(); widest > geo.detailWidth && !m.detail.SoftWrap {",
       "new": "\tif widest := m.widest(); false {"
+    },
+    {
+      "control": "the-picker-cursor-clamps-at-both-ends",
+      "clause": "picker.move clamps the cursor to [0, len(rows)-1] at both ends, which is also what makes `g` and `G` a delta longer than the list rather than two more branches (qy3de.6 §10 control 1)",
+      "file": "internal/tui/picker.go",
+      "test": "TestPickerMoveClampsAtBothEnds",
+      "old": "\tp.cursor = min(max(p.cursor+delta, 0), len(p.rows)-1)",
+      "new": "\tp.cursor = max(p.cursor+delta, 0)"
+    },
+    {
+      "control": "a-group-header-is-emitted-on-a-change-and-not-per-row",
+      "clause": "view emits a group header exactly where the group CHANGES — not once per row (qy3de.6 §10 control 2). Headers are never stored as rows, which is what removes the skip-the-header branch rather than testing it",
+      "file": "internal/tui/picker.go",
+      "test": "TestPickerEmitsAGroupHeaderExactlyOnAChange",
+      "old": "\treturn index == 0 || p.rows[index].Group != p.rows[index-1].Group",
+      "new": "\treturn true"
+    },
+    {
+      "control": "a-group-header-is-emitted-on-a-change-and-not-once",
+      "clause": "The same clause's other wrong implementation: a header emitted only above the FIRST row leaves every later group unlabelled, which is what a picker over seven relation kinds cannot survive (qy3de.6 §5, §10 control 2)",
+      "file": "internal/tui/picker.go",
+      "test": "TestPickerEmitsAGroupHeaderExactlyOnAChange",
+      "old": "\treturn index == 0 || p.rows[index].Group != p.rows[index-1].Group",
+      "new": "\treturn index == 0"
+    },
+    {
+      "control": "the-remembered-window-counts-lines-and-not-rows",
+      "clause": "scroll windows on the cursor's RENDERED LINE, not its row index — the one place the two coordinates disagree, because every header above a row shifts it down (qy3de.6 §10 control 3)",
+      "file": "internal/tui/picker.go",
+      "test": "TestPickerScrollCountsHeaderLinesAndNotRows",
+      "old": "\tp.offset = window(p.offset, p.lineOf(p.cursor), p.lineCount(), height)",
+      "new": "\tp.offset = window(p.offset, p.cursor, p.lineCount(), height)"
+    },
+    {
+      "control": "the-drawn-window-counts-lines-and-not-rows",
+      "clause": "view re-derives the same window from the cursor's rendered line, so a picker drawn without a scroll — after a resize, or in a test — still shows the row under the cursor (qy3de.6 §10 control 3, the second place the conversion happens)",
+      "file": "internal/tui/picker.go",
+      "test": "TestPickerViewShowsTheCursorRowWhenHeadersPushItDown",
+      "old": "\ttop := window(p.offset, p.lineOf(p.cursor), len(lines), height)",
+      "new": "\ttop := window(p.offset, p.cursor, len(lines), height)"
+    },
+    {
+      "control": "blocked-by-is-the-out-edge-and-blocks-the-in-edge",
+      "clause": "A `blocks` OUT edge is what blocks this issue and an IN edge is what this issue blocks: the direction is named from the reader's end, the opposite of the edge's own (qy3de.6 §10 control 4). A swapped pair survives a round trip and reads plausibly, which is why each kind is its own control",
+      "file": "internal/tui/follow.go",
+      "test": "TestTheFollowPickerNamesEveryDirectionFromTheReadersEnd",
+      "old": "\t\t{\"Blocked by\", refsOfType(issue.Dependencies, model.DepBlocks)},",
+      "new": "\t\t{\"Blocked by\", refsOfType(issue.Dependents, model.DepBlocks)},"
+    },
+    {
+      "control": "discovered-from-is-the-out-edge-and-discovered-the-in-edge",
+      "clause": "`A discovered-from B` means A was derived from B, so the OUT edge is where this issue came from — `Discovered from` — and the IN edge is what came out of it — `Discovered` (qy3de.6 §5, §10 control 4). This is the pair no other surface in drops renders at all (drops://hxedy), so nothing else would catch a swap",
+      "file": "internal/tui/follow.go",
+      "test": "TestTheFollowPickerNamesEveryDirectionFromTheReadersEnd",
+      "old": "\t\t{\"Discovered from\", refsOfType(issue.Dependencies, model.DepDiscoveredFrom)},",
+      "new": "\t\t{\"Discovered from\", refsOfType(issue.Dependents, model.DepDiscoveredFrom)},"
+    },
+    {
+      "control": "related-is-one-group-merging-both-directions",
+      "clause": "`related` is undirected, so it is ONE group holding both directions rather than a pair of headings named from an end that does not exist (qy3de.6 §5)",
+      "file": "internal/tui/follow.go",
+      "test": "TestTheFollowPickerNamesEveryDirectionFromTheReadersEnd",
+      "old": "\t\t{\"Related\", append(\n\t\t\trefsOfType(issue.Dependencies, model.DepRelated),\n\t\t\trefsOfType(issue.Dependents, model.DepRelated)...)},",
+      "new": "\t\t{\"Related\", refsOfType(issue.Dependencies, model.DepRelated)},"
+    },
+    {
+      "control": "the-pickers-id-column-is-auto-sized-and-uncapped",
+      "clause": "The picker's id column auto-sizes to the widest id IN THAT PICKER and does NOT inherit the left pane's twelve-column cap: a picker's rows are by construction siblings, and seven of gitops-vn4's sixteen live children collapse to the same twelve columns (qy3de.6 §4, §10 control 5)",
+      "file": "internal/tui/follow.go",
+      "test": "TestTheIDColumnAutoSizesToTheWidestIDInThatPicker",
+      "old": "\t\t\tpad = max(pad, render.Cols(string(ref.ID)))",
+      "new": "\t\t\tpad = min(max(pad, render.Cols(string(ref.ID))), idCap)"
+    },
+    {
+      "control": "f-on-zero-relations-opens-no-picker",
+      "clause": "`f` on an issue with no relations opens nothing and says `nothing to follow`, rather than an empty modal that captures every key with nothing to choose (qy3de.6 §2, §10 control 6)",
+      "file": "internal/tui/tui.go",
+      "test": "TestFOnAnIssueWithNoRelationsOpensNoPicker",
+      "old": "\tif len(choices) == 0 {\n\t\tm.notice = \"nothing to follow\"\n\t\treturn\n\t}",
+      "new": "\tif false {\n\t\tm.notice = \"nothing to follow\"\n\t\treturn\n\t}"
+    },
+    {
+      "control": "backspace-at-depth-zero-is-a-no-op",
+      "clause": "`backspace` at depth 0 is a no-op, not a pop off an empty stack (qy3de.6 §10 control 7)",
+      "file": "internal/tui/tui.go",
+      "test": "TestBackspaceAtDepthZeroIsANoOp",
+      "old": "func (m *Model) popFollow() error {\n\tif len(m.stack) == 0 {\n\t\treturn nil\n\t}",
+      "new": "func (m *Model) popFollow() error {\n\tif false {\n\t\treturn nil\n\t}"
+    },
+    {
+      "control": "moving-the-left-cursor-clears-the-follow-stack",
+      "clause": "Moving the left cursor clears the follow stack. This is the control under a key REMOVED from the design: euv2e.5's `esc clears the stack` was dropped because `j` — a key you were about to press — already does it (qy3de.6 §7, §10 control 8)",
+      "file": "internal/tui/tui.go",
+      "test": "TestMovingTheLeftCursorClearsTheFollowStack",
+      "old": "\tm.clearFollow()\n\tm.cursor.move(m.rows, to)",
+      "new": "\tm.cursor.move(m.rows, to)"
     }
   ]
 }

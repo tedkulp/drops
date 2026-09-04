@@ -64,6 +64,28 @@ func frameModes(t *testing.T) []struct {
 			}
 		}},
 		{"help", func(pane *Model) { press(t, pane, "?") }},
+		// The picker replaces the detail pane's BODY, keeping the box and
+		// its border title, so every frame law has to hold with one open.
+		{"picker open", func(pane *Model) { openOnTheBlockedRow(t, pane) }},
+		{"followed", func(pane *Model) {
+			openOnTheBlockedRow(t, pane)
+			pressNamed(t, pane, tea.KeyEnter)
+			if len(pane.stack) != 1 {
+				t.Fatalf("enter followed nothing; the depth line is not in this frame")
+			}
+		}},
+	}
+}
+
+// openOnTheBlockedRow moves to the corpus's one issue with a relation and
+// opens the picker on it. `f` on an issue with none is a no-op, which would
+// make a frame mode prove nothing.
+func openOnTheBlockedRow(t *testing.T, pane *Model) {
+	t.Helper()
+	press(t, pane, "j")
+	press(t, pane, "f")
+	if pane.follow == nil {
+		t.Fatalf("f opened no picker on %s; this mode proves nothing", pane.detailID)
 	}
 }
 
@@ -150,6 +172,35 @@ func TestEnterDropsTheListPaneAndBringsItBack(t *testing.T) {
 	press(t, pane, "enter")
 	if !strings.Contains(pane.frame(), "─ drops ─") {
 		t.Fatal("enter did not bring the list pane back")
+	}
+}
+
+func TestThePickerAndTheDepthLineRenderInsideTheDetailPane(t *testing.T) {
+	// The picker takes the detail pane's BODY and keeps qy3de.5's box, so the
+	// border title is still the issue you are picking a relation OF.
+	fixture := corpus(t)
+	pane := fixture.model(80, 24)
+	openOnTheBlockedRow(t, pane)
+
+	frame := pane.frame()
+	if !strings.Contains(frame, "Blocked by") {
+		t.Fatalf("frame carries no picker group header:\n%s", frame)
+	}
+	if !strings.Contains(frame, "─ iss01 ─") {
+		t.Fatalf("the box lost its border title while the picker was open:\n%s", frame)
+	}
+	if strings.Contains(frame, "A blocked issue whose title has to survive") &&
+		!strings.Contains(frame, "The blocker") {
+		t.Fatalf("the picker did not replace the page beneath it:\n%s", frame)
+	}
+
+	pressNamed(t, pane, tea.KeyEnter)
+	frame = pane.frame()
+	if !strings.Contains(frame, "← iss01 ·1") {
+		t.Fatalf("frame carries no depth line at depth 1:\n%s", frame)
+	}
+	if !strings.Contains(frame, "─ iss02 ─") {
+		t.Fatalf("the border title did not follow the relation:\n%s", frame)
 	}
 }
 
@@ -241,7 +292,14 @@ func TestAHeadlessProgramRunsTheFrameAndLeavesTheAltScreen(t *testing.T) {
 		// Every key that changes state, then quit. Printable keys only: an
 		// escape byte written into a pipe would be parsed with whatever
 		// follows it.
-		for _, key := range []string{"j", "j", "k", "G", "g", "C", "a", "w", "w", "l", "0", "?", "?", "q"} {
+		// "\r" and "\x7f" are enter and backspace as a terminal sends them,
+		// so the follow keys are exercised through bubbletea's own decoder
+		// rather than a message this test hand-built.
+		for _, key := range []string{
+			"j", "j", "k", "G", "g",
+			"j", "f", "\r", "\x7f",
+			"C", "a", "w", "w", "l", "0", "?", "?", "q",
+		} {
 			if _, err := writer.Write([]byte(key)); err != nil {
 				return
 			}

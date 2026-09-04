@@ -506,6 +506,8 @@ carries the **full untruncated id**, one glance away.
 | `Esc` | clear the filter. It never quits |
 | `C` | include closed issues |
 | `a` | span every project, and add the project column |
+| `f` | pick a relation of the right pane's issue and follow it |
+| `Backspace` | back one relation |
 | `J` `K` `space` `b` | scroll the detail pane vertically |
 | `h` `l` `←` `→` `0` `$` | scroll it horizontally, eight columns a step |
 | `w` | soft-wrap the detail pane instead of clipping |
@@ -517,6 +519,28 @@ The filter **survives `a` and `C`**, because "filter, then widen the scope to
 see if it exists elsewhere" is the motion `a` exists for. `drops search` is a
 different thing and has no key: it reaches descriptions and comment bodies and
 returns rows outside the current scope.
+
+**`f` follows a relation without moving the list cursor**, which is the whole
+reason this verb exists. It opens a picker over the right pane's issue in place
+of the page — grouped under the same headings a page prints, in the same order,
+`Parent · Blocked by · Blocks · Children · Discovered from · Discovered ·
+Related` — and `Enter` takes the one under the cursor. `j` `k` `g` `G` walk it,
+`Esc` cancels it. On an issue with no relations it opens nothing and says so.
+
+The picker's boundary is **wider than `show`'s**: it lists all three dependency
+types, where a page renders `blocks` alone. That is not a second opinion about
+what a relation is — it is an omission on `show`'s side, filed as
+[drops://hxedy](drops://hxedy), and until it is fixed the navigator is the only
+place a `discovered-from` edge can be read back at all. Its id column is
+auto-sized and **uncapped**, unlike the left pane's: a picker's rows are
+siblings and dotted ids share a prefix, so a cap would render seven of one
+issue's sixteen children identically.
+
+Following leaves the row set on purpose — `C` governs the left pane only, and
+half of all relation targets are closed. While you are away from the cursor's
+own issue the right pane carries a `← <where you came from> ·<depth>` line, and
+`Backspace` walks back down it. **Moving the list cursor clears the trail**,
+which is why nothing else needs to.
 
 **Horizontal scrolling is load-bearing, not a nicety.** A page truncates
 nothing, including the table rows and fenced blocks it deliberately does not

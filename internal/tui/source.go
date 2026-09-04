@@ -70,18 +70,25 @@ func (s *source) rows(ctx context.Context, sc scope) ([]row, error) {
 	return rows, nil
 }
 
-// page renders one issue's detail text at a pane width.
+// issue reads one issue and every relation rendered with it, in core's own
+// transaction, so a page and the picker over it cannot combine two revisions
+// of the graph.
+//
+// The pane KEEPS this view rather than re-reading for `f`: the relation picker
+// lists exactly what the page beside it was drawn from, and following a
+// relation costs no extra read at all.
+func (s *source) issue(ctx context.Context, id model.ID) (core.IssueView, error) {
+	return s.core.ViewIssue(ctx, id)
+}
+
+// page renders one already-read issue's detail text at a pane width.
 //
 // render.Console into a buffer, unchanged: TTY false, no pager, the measured
 // width. TTY gates Rows' truncation and nothing on a page; a nil Pager writes
 // straight through. The page truncates nothing at all, which is why the
 // viewport that clips it has to be scrollable — those bytes are off-screen,
 // not gone.
-func (s *source) page(ctx context.Context, id model.ID, width int) (string, error) {
-	issueView, err := s.core.ViewIssue(ctx, id)
-	if err != nil {
-		return "", err
-	}
+func (s *source) page(issueView core.IssueView, width int) (string, error) {
 	var buf bytes.Buffer
 	console := render.Console{Out: &buf, Width: width, TTY: false}
 	if err := console.Page(view.Page(issueView)); err != nil {

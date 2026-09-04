@@ -32,4 +32,19 @@
 // pane deliberately truncates an id and render's doc forbids exactly that. The
 // truncation primitive is still render's (render.Ellipsis, render.Cols): the
 // policy differs, the rule does not.
+//
+// # Following
+//
+// `f` opens a picker over the right pane's relations and `enter` retargets the
+// pane onto one, pushing onto a stack of ids that `backspace` walks back down;
+// moving the left cursor clears it. That there is a MODAL at all is forced
+// rather than chosen: the detail pane is an opaque render.Console buffer, so
+// the ref lines already on screen are not addressable, and re-listing them
+// from the core.IssueView is the only way to interact with one without
+// breaking that opacity (qy3de.6 §3).
+//
+// The picker's boundary is the full core graph, wider than the page beside it:
+// a page renders `blocks` alone, which is an omission on show's side rather
+// than a designed reading contract (drops://hxedy). Until that lands, this is
+// the only surface in drops that can read a `discovered-from` edge back.
 package tui
