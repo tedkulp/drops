@@ -178,6 +178,14 @@
       "new": "\t\t\t\tif len(jsons) > 0 {\n\t\t\t\t\treturn render.EmitOne(app.out, jsons[0])\n\t\t\t\t}"
     },
     {
+      "control": "a-blocker-is-a-blocks-edge",
+      "clause": "A page's blocker headings mean `blocks`: core hands over every edge type in one block, and a related or discovered-from edge is not rendered as one that blocks (qy3de.9)",
+      "file": "internal/cli/issue.go",
+      "test": "TestPageNamesOnlyBlocksEdgesAsBlockers",
+      "old": "\t\tif dependency.Type == model.DepBlocks {",
+      "new": "\t\tif true {"
+    },
+    {
       "control": "labels-is-the-key-that-goes-absent",
       "clause": "show --json omits labels when an issue carries none, which is why .labels[] is not safe (dw32p.31)",
       "file": "internal/cli/view.go",
@@ -192,38 +200,6 @@
       "test": "TestCommentListRendersTheThreadOldestFirst",
       "old": "\tfor _, comment := range view.Comments {\n\t\tpage.Comments = append(page.Comments, render.Comment{",
       "new": "\tfor _, comment := range view.Comments[:0] {\n\t\tpage.Comments = append(page.Comments, render.Comment{"
-    },
-    {
-      "control": "natural-order-compares-digit-runs-numerically",
-      "clause": "A digit run in an id compares numerically, so <p>.2 precedes <p>.10 (dw32p.31)",
-      "file": "internal/cli/view.go",
-      "test": "TestNaturalLessComparesDigitRunsNumerically",
-      "old": "\t\tif xErr == nil && yErr == nil {\n\t\t\tif x != y {\n\t\t\t\treturn x < y\n\t\t\t}\n\t\t\tcontinue\n\t\t}",
-      "new": "\t\tif xErr == nil && yErr == nil && false {\n\t\t\tif x != y {\n\t\t\t\treturn x < y\n\t\t\t}\n\t\t\tcontinue\n\t\t}"
-    },
-    {
-      "control": "natural-order-falls-back-to-bytes",
-      "clause": "A non-digit run compares as text, so an ordinary id still orders (dw32p.31)",
-      "file": "internal/cli/view.go",
-      "test": "TestNaturalLessComparesDigitRunsNumerically",
-      "old": "\t\tif as[i] != bs[i] {\n\t\t\treturn as[i] < bs[i]\n\t\t}",
-      "new": "\t\tif as[i] != bs[i] {\n\t\t\treturn as[i] > bs[i]\n\t\t}"
-    },
-    {
-      "control": "natural-order-breaks-a-prefix-tie-on-length",
-      "clause": "Two ids equal as far as the shorter goes order by length, so a parent precedes its child (dw32p.31)",
-      "file": "internal/cli/view.go",
-      "test": "TestNaturalLessComparesDigitRunsNumerically",
-      "old": "\treturn len(as) < len(bs)",
-      "new": "\treturn false"
-    },
-    {
-      "control": "id-runs-alternate-digits-and-text",
-      "clause": "An id splits into alternating digit and non-digit runs, which is the whole basis of the ordering (dw32p.31)",
-      "file": "internal/cli/view.go",
-      "test": "TestIDRunsAlternateDigitsAndText",
-      "old": "\t\tfor j < len(s) && isDigit(s[j]) == digit {",
-      "new": "\t\tfor j < len(s) && (isDigit(s[j]) == digit || true) {"
     },
     {
       "control": "pages-are-ruled-apart",

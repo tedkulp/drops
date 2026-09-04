@@ -466,6 +466,36 @@ func TestPageMarksATombstonedChildAndDoesNotCountItOpen(t *testing.T) {
 	}
 }
 
+// TestPageNamesOnlyBlocksEdgesAsBlockers: a page has one dependency heading
+// pair and it means `blocks`. Core hands over every edge type in one block, so
+// `related` and `discovered-from` are dropped here — an edge rendered under
+// "Blocked by" would report a link that does not block as one that does, and
+// `ready` would disagree with the page.
+func TestPageNamesOnlyBlocksEdgesAsBlockers(t *testing.T) {
+	db, cwd := newStore(t)
+	subject := mustRun(t, db, cwd, "q", "--inbox", "the subject")
+	blocker := mustRun(t, db, cwd, "q", "--inbox", "a real blocker")
+	related := mustRun(t, db, cwd, "q", "--inbox", "merely related")
+	mustRun(t, db, cwd, "dep", "add", subject, blocker)
+	mustRun(t, db, cwd, "dep", "add", subject, related, "--type", "related")
+
+	page := mustRun(t, db, cwd, "show", subject)
+	if !strings.Contains(page, blocker) {
+		t.Fatalf("the blocks edge left the page:\n%s", page)
+	}
+	if strings.Contains(page, related) {
+		t.Fatalf("a related edge is named among the blockers:\n%s", page)
+	}
+	view := decodeOne[map[string]any](t, mustRun(t, db, cwd, "show", subject, "--json"))
+	if got := view["blockers"].([]any); len(got) != 1 {
+		t.Fatalf("blockers in --json = %#v, want only the blocks edge", got)
+	}
+	// And the same from the other end: the related issue is not "Blocks".
+	if other := mustRun(t, db, cwd, "show", related); strings.Contains(other, "Blocks") {
+		t.Fatalf("a related edge reads as blocking from its own page:\n%s", other)
+	}
+}
+
 // TestPageDropsAWithdrawnDependency is the other tombstone on a page, and a
 // different record: `dep rm` retires the EDGE, so the relation goes rather than
 // being marked. An issue is still there; the claim that it blocks this one is

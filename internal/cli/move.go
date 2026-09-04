@@ -214,10 +214,10 @@ func (a *App) moveCrossings(movedIDs []model.ID, moving map[model.ID]bool, dest 
 			return nil, nil, err
 		}
 		if view.Parent != nil {
-			addEdge(id, view.Parent.ParentID, &parentage)
+			addEdge(id, view.Parent.ID, &parentage)
 		}
 		for _, child := range view.Children {
-			addEdge(child.ChildID, id, &parentage)
+			addEdge(child.ID, id, &parentage)
 		}
 	}
 	return blocks, parentage, nil

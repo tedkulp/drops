@@ -1,0 +1,21 @@
+{
+  "note": "Live controls for internal/store, the SQLite adapter. Most of this package is round-trip: a record written and read back, which AGENTS.md says needs no control. These are the branches a wrong query still answers through. Seeded by qy3de.9.",
+  "controls": [
+    {
+      "control": "a-batch-read-refuses-an-id-naming-no-issue",
+      "clause": "IssuesByID mirrors Issue rather than a listing: an id naming no Issue is ErrNotFound, not a key that is quietly absent, because a caller asks by ids read off relation records whose foreign keys guarantee the row (qy3de.9)",
+      "file": "internal/store/issues.go",
+      "test": "TestIssuesByIDRefusesAnIDNamingNoIssue",
+      "old": "\tfor _, id := range wanted {\n\t\tif _, ok := found[id]; !ok {",
+      "new": "\tfor _, id := range wanted {\n\t\tif _, ok := found[id]; !ok && false {"
+    },
+    {
+      "control": "a-batch-read-reaches-a-tombstoned-issue",
+      "clause": "A tombstone is a state, not an absence: IssuesByID answers for a removed Issue, which is what lets a page mark a removed relation rather than drop it (qy3de.9)",
+      "file": "internal/store/issues.go",
+      "test": "TestIssuesByIDReadsEveryNamedIssueInOneQuery",
+      "old": "\trows, err := read.ex.QueryContext(ctx, issueSelect+` WHERE issues.id IN `+placeholders, args...)",
+      "new": "\trows, err := read.ex.QueryContext(ctx, issueSelect+` WHERE issues.tombstoned = 0 AND issues.id IN `+placeholders, args...)"
+    }
+  ]
+}

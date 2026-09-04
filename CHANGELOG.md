@@ -19,6 +19,17 @@ using.
 
 ### Changed
 
+- **`core.IssueView` carries its relations resolved**, not as bare ids. Every
+  relation now arrives named — id, title, status and tombstone state, with the
+  edge type beside a dependency's far end — read in the **same transaction** as
+  the issue itself and in one query, which is what `ViewIssue`'s "so a page
+  cannot combine two revisions of the graph" always claimed and did not do. The
+  titles a page printed came from one `core.Issue` read per related id, issued
+  by `cli` after that transaction had committed: 220 un-transacted reads across
+  the 174 open issues of the staged corpus, worst `br-fmg6` at 22, and 1984
+  across all 1025. `show` is byte-identical — same relations, same natural id
+  order, fewer transactions — verified over 2052 corpus invocations.
+
 - **`core.OpenBlockers` is exported**, and `Ready` and `Blocked` now honour a
   caller-supplied status set instead of overwriting it with `open`. Both are for
   the TUI's left pane, which lists `in_progress` rows and so needs a blocked-by

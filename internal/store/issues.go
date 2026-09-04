@@ -79,6 +79,43 @@ func (read reader) Issue(ctx context.Context, id model.ID) (model.Issue, error) 
 	return issue, nil
 }
 
+// IssuesByID reads the named Issues in ONE query, tombstoned included. It
+// mirrors Issue rather than a listing, so an id naming no Issue is ErrNotFound
+// and not an absent key: a caller asks by ids it read off relation records
+// whose foreign keys guarantee the row, and a miss there is a fault. Duplicate
+// ids collapse, and the empty request runs no query at all.
+func (read reader) IssuesByID(ctx context.Context, ids []model.ID) (map[model.ID]model.Issue, error) {
+	wanted := make([]model.ID, 0, len(ids))
+	asked := make(map[model.ID]bool, len(ids))
+	for _, id := range ids {
+		if asked[id] {
+			continue
+		}
+		asked[id] = true
+		wanted = append(wanted, id)
+	}
+	found := make(map[model.ID]model.Issue, len(wanted))
+	if len(wanted) == 0 {
+		return found, nil
+	}
+
+	placeholders, args := inList(wanted, func(id model.ID) any { return string(id) })
+	rows, err := read.ex.QueryContext(ctx, issueSelect+` WHERE issues.id IN `+placeholders, args...)
+	issues, err := collect(rows, err, "read Issues by ID", scanIssue)
+	if err != nil {
+		return nil, err
+	}
+	for _, issue := range issues {
+		found[issue.ID] = issue
+	}
+	for _, id := range wanted {
+		if _, ok := found[id]; !ok {
+			return nil, fmt.Errorf("%w: Issue %s", model.ErrNotFound, id)
+		}
+	}
+	return found, nil
+}
+
 // IssueFilter selects Issues. A zero filter selects every live Issue in every
 // Project. Whether an Issue is blocked, ready or deferred is derived from other
 // records and is not asked here.

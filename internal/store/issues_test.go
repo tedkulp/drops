@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/tedkulp/drops/internal/model"
@@ -308,5 +309,73 @@ func TestIssuesFilterAndOrder(t *testing.T) {
 				t.Errorf("Issues = %v, want %v", got, testCase.want)
 			}
 		})
+	}
+}
+
+// TestIssuesByIDReadsEveryNamedIssueInOneQuery is the batch read a page's
+// relations resolve through. It mirrors Issue rather than a listing: a
+// tombstoned Issue is a state and still answers, and an id naming nothing is
+// ErrNotFound, because a caller asks by ids it read off relation records whose
+// foreign keys guarantee the row.
+func TestIssuesByIDReadsEveryNamedIssueInOneQuery(t *testing.T) {
+	opened := newStore(t)
+	project := seedProject(t, opened, newReplicaKey(t), "drops")
+
+	live := seedIssue(t, opened, project, "k3f9x", "a live issue")
+	removed := newIssue(t, project, "br-6vf", "a removed issue")
+	removed.Tombstone = model.Tombstoned
+	write(t, opened, func(ctx context.Context, tx *store.Tx) error {
+		if err := tx.PutIDOwner(ctx, model.IDOwner{
+			ID: removed.ID, Kind: model.OwnerIssue, CreationReplica: project.CreationReplica,
+		}); err != nil {
+			return err
+		}
+		return tx.PutIssue(ctx, removed)
+	})
+
+	// A repeated id is accepted and answers once: a page's relations can name
+	// one Issue from two sides.
+	found, err := opened.IssuesByID(t.Context(), []model.ID{live.ID, removed.ID, live.ID})
+	if err != nil {
+		t.Fatalf("read Issues by id: %v", err)
+	}
+	if len(found) != 2 {
+		t.Fatalf("IssuesByID returned %d Issues, want 2: %#v", len(found), found)
+	}
+	if found[live.ID].Title != "a live issue" {
+		t.Errorf("live Issue = %#v", found[live.ID])
+	}
+	if got := found[removed.ID]; got.Tombstone != model.Tombstoned || got.Title != "a removed issue" {
+		t.Errorf("a tombstoned Issue did not answer: %#v", got)
+	}
+}
+
+// The clause: a batch read is not a listing, so an id naming no Issue is a
+// fault the caller hears about rather than a key that is quietly absent.
+func TestIssuesByIDRefusesAnIDNamingNoIssue(t *testing.T) {
+	opened := newStore(t)
+	project := seedProject(t, opened, newReplicaKey(t), "drops")
+	live := seedIssue(t, opened, project, "k3f9x", "a live issue")
+
+	_, err := opened.IssuesByID(t.Context(), []model.ID{live.ID, "zzzzz"})
+	if !errors.Is(err, model.ErrNotFound) {
+		t.Fatalf("IssuesByID over an unknown id = %v, want ErrNotFound", err)
+	}
+	if !strings.Contains(err.Error(), "zzzzz") {
+		t.Errorf("the error does not name the missing id: %v", err)
+	}
+}
+
+// An empty request is an empty answer and no query: a caller with no relations
+// to resolve must not have to guard the call.
+func TestIssuesByIDAnswersAnEmptyRequestWithAnEmptyMap(t *testing.T) {
+	opened := newStore(t)
+
+	found, err := opened.IssuesByID(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("read no Issues: %v", err)
+	}
+	if len(found) != 0 {
+		t.Fatalf("IssuesByID(nil) = %#v, want an empty map", found)
 	}
 }

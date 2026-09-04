@@ -330,6 +330,94 @@
       "new": "if err == nil {"
     },
     {
+      "control": "an-outgoing-edge-names-its-far-end",
+      "clause": "A dependency names the Issue at the OTHER end of its edge, so a page's blockers are the Issues that block it rather than the Issue you are reading (qy3de.9)",
+      "file": "internal/core/views.go",
+      "test": "TestViewIssueNamesTheFarEndOfEveryRelation",
+      "old": "\t\t\t\tIssueRef: issueRef(refs[dependency.ToID]), Type: dependency.Type,",
+      "new": "\t\t\t\tIssueRef: issueRef(refs[dependency.FromID]), Type: dependency.Type,"
+    },
+    {
+      "control": "an-incoming-edge-names-its-far-end",
+      "clause": "A dependent names the Issue the incoming edge comes FROM, which is the other end from an outgoing one (qy3de.9)",
+      "file": "internal/core/views.go",
+      "test": "TestViewIssueNamesTheFarEndOfEveryRelation",
+      "old": "\t\t\t\tIssueRef: issueRef(refs[dependent.FromID]), Type: dependent.Type,",
+      "new": "\t\t\t\tIssueRef: issueRef(refs[dependent.ToID]), Type: dependent.Type,"
+    },
+    {
+      "control": "an-edge-type-travels-with-its-far-end",
+      "clause": "The edge type travels with the far end, because it is the only thing separating a blocker from a merely related Issue (qy3de.9)",
+      "file": "internal/core/views.go",
+      "test": "TestViewIssueGroupsDependenciesByTypeThenNaturalID",
+      "old": "\t\t\t\tIssueRef: issueRef(refs[dependency.ToID]), Type: dependency.Type,",
+      "new": "\t\t\t\tIssueRef: issueRef(refs[dependency.ToID]), Type: model.DepBlocks,"
+    },
+    {
+      "control": "a-tombstoned-relation-is-marked-not-withheld",
+      "clause": "A removed related Issue is still listed and is MARKED tombstoned, which is what a page draws its glyph from and what keeps it out of the open count (qy3de.9)",
+      "file": "internal/core/views.go",
+      "test": "TestViewIssueMarksATombstonedRelation",
+      "old": "\t\tTombstoned: issue.Tombstone == model.Tombstoned,",
+      "new": "\t\tTombstoned: false,"
+    },
+    {
+      "control": "every-relations-far-end-is-in-the-resolved-read-set",
+      "clause": "Every relation's far end goes into the one batch read, so a relation left out of it would be named by an Issue that was never read (qy3de.9)",
+      "file": "internal/core/views.go",
+      "test": "TestViewIssueOrdersChildrenNaturally",
+      "old": "\t\tfor _, child := range children {\n\t\t\trelated = append(related, child.ChildID)\n\t\t}",
+      "new": "\t\tfor _, child := range children[:0] {\n\t\t\trelated = append(related, child.ChildID)\n\t\t}"
+    },
+    {
+      "control": "children-are-in-natural-id-order",
+      "clause": "A relation block is ordered naturally rather than in the store's lexicographic order, so `<p>.2` precedes `<p>.10` (qy3de.9)",
+      "file": "internal/core/views.go",
+      "test": "TestViewIssueOrdersChildrenNaturally",
+      "old": "\t\tsortIssueRefs(childRefs)",
+      "new": "\t\tsortIssueRefs(childRefs[:0])"
+    },
+    {
+      "control": "a-dependency-block-groups-by-edge-type",
+      "clause": "A dependency block groups by edge type BEFORE ordering the far ends, so blockers stay together however their ids sort (qy3de.9)",
+      "file": "internal/core/views.go",
+      "test": "TestViewIssueGroupsDependenciesByTypeThenNaturalID",
+      "old": "\t\tif a.Type != b.Type {",
+      "new": "\t\tif false && a.Type != b.Type {"
+    },
+    {
+      "control": "natural-order-compares-digit-runs-numerically",
+      "clause": "A digit run in an id compares numerically, so <p>.2 precedes <p>.10 (dw32p.31, moved to core by qy3de.9)",
+      "file": "internal/core/views.go",
+      "test": "TestNaturalLessComparesDigitRunsNumerically",
+      "old": "\t\tif xErr == nil && yErr == nil {\n\t\t\tif x != y {\n\t\t\t\treturn x < y\n\t\t\t}\n\t\t\tcontinue\n\t\t}",
+      "new": "\t\tif xErr == nil && yErr == nil && false {\n\t\t\tif x != y {\n\t\t\t\treturn x < y\n\t\t\t}\n\t\t\tcontinue\n\t\t}"
+    },
+    {
+      "control": "natural-order-falls-back-to-bytes",
+      "clause": "A non-digit run compares as text, so an ordinary id still orders (dw32p.31, moved to core by qy3de.9)",
+      "file": "internal/core/views.go",
+      "test": "TestNaturalLessComparesDigitRunsNumerically",
+      "old": "\t\tif as[i] != bs[i] {\n\t\t\treturn as[i] < bs[i]\n\t\t}",
+      "new": "\t\tif as[i] != bs[i] {\n\t\t\treturn as[i] > bs[i]\n\t\t}"
+    },
+    {
+      "control": "natural-order-breaks-a-prefix-tie-on-length",
+      "clause": "Two ids equal as far as the shorter goes order by length, so a parent precedes its child (dw32p.31, moved to core by qy3de.9)",
+      "file": "internal/core/views.go",
+      "test": "TestNaturalLessComparesDigitRunsNumerically",
+      "old": "\treturn len(as) < len(bs)",
+      "new": "\treturn false"
+    },
+    {
+      "control": "id-runs-alternate-digits-and-text",
+      "clause": "An id splits into alternating digit and non-digit runs, which is the whole basis of the ordering (dw32p.31, moved to core by qy3de.9)",
+      "file": "internal/core/views.go",
+      "test": "TestIDRunsAlternateDigitsAndText",
+      "old": "\t\tfor j < len(s) && isDigit(s[j]) == digit {",
+      "new": "\t\tfor j < len(s) && (isDigit(s[j]) == digit || true) {"
+    },
+    {
       "control": "mark-exported-uses-the-captured-sequence",
       "clause": "MarkExported records the write sequence the snapshot captured, not the one current at commit, which a concurrent write may already have passed (dw32p.10)",
       "file": "internal/core/export.go",
@@ -552,7 +640,7 @@
     },
     {
       "control": "open-blockers-keep-an-in-progress-issue",
-      "clause": "Only closed and tombstoned are terminal, so an in_progress Issue still appears in the open-blocker map \u2014 which is the whole reason the pane reads OpenBlockers rather than Blocked (qy3de.8)",
+      "clause": "Only closed and tombstoned are terminal, so an in_progress Issue still appears in the open-blocker map — which is the whole reason the pane reads OpenBlockers rather than Blocked (qy3de.8)",
       "file": "internal/core/graph.go",
       "test": "TestOpenBlockersCoversTheRowsBlockedCannotSee",
       "old": "issue.Status == model.StatusClosed",
