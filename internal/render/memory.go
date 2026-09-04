@@ -30,7 +30,7 @@ type MemoryListing struct {
 func (console Console) MemoryRows(listing MemoryListing) error {
 	measured := memoryLayout{width: console.width(), truncate: console.TTY}
 	for _, row := range listing.Rows {
-		measured.idPad = max(measured.idPad, cols(string(row.ID)))
+		measured.idPad = max(measured.idPad, Cols(string(row.ID)))
 	}
 	writeRows := func(out io.Writer) error {
 		for _, row := range listing.Rows {
@@ -54,7 +54,7 @@ func (measured memoryLayout) writeRow(out io.Writer, row MemoryRow) {
 		display += " · " + state
 	}
 	if measured.truncate {
-		display = ellipsis(display, measured.width-cols(lead)-2)
+		display = Ellipsis(display, measured.width-Cols(lead)-2)
 	}
 	if display == "" {
 		fmt.Fprintln(out, lead)

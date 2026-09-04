@@ -46,6 +46,7 @@ drops q "the button double-fires"      # capture; prints k3f9x
 drops ready                            # what is actionable here
 drops show k3f9x --json                # read one, for a machine
 drops close k3f9x --reason "fixed in the debounce"
+drops tui                              # browse it, for a human at a terminal
 ```
 
 **[docs/agents/issue-tracker.md](docs/agents/issue-tracker.md) is the
@@ -72,8 +73,8 @@ store's integrity and its FTS indexes.
 
 ## Status
 
-Pre-1.0: the TUI and a good deal of cleanup come first. `drops version` says
-which build you have, and [CHANGELOG.md](CHANGELOG.md) says what is in it.
+Pre-1.0: `drops tui` has landed and a good deal of cleanup comes first.
+`drops version` says which build you have, and [CHANGELOG.md](CHANGELOG.md) says what is in it.
 
 ## Working on drops
 

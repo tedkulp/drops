@@ -2,15 +2,21 @@ package render
 
 import "strings"
 
-// cols is a string's width in terminal columns. Runes, not bytes: issue text
+// Cols is a string's width in terminal columns. Runes, not bytes: issue text
 // is full of em dashes, and a byte count wraps a paragraph of them to a third
 // of the width it was given. It does not account for double-width CJK or
 // combining marks, which no issue in the store contains.
-func cols(text string) int { return len([]rune(text)) }
+//
+// Exported for internal/tui (qy3de.3): the pane composes its own row geometry
+// because it deliberately truncates an id, which this package's own doc
+// forbids — but the PRIMITIVE is shared, because two truncation rules that
+// must agree is this repository's dominant defect class.
+func Cols(text string) int { return len([]rune(text)) }
 
-// ellipsis truncates to max runes, counting runes rather than bytes so a title
-// with an em dash or an accent is never cut mid-character.
-func ellipsis(text string, max int) string {
+// Ellipsis truncates to max runes, counting runes rather than bytes so a title
+// with an em dash or an accent is never cut mid-character. Exported alongside
+// Cols, and for the same reason.
+func Ellipsis(text string, max int) string {
 	if max < 1 {
 		return ""
 	}
@@ -160,7 +166,7 @@ func wrapWords(text string, width int, hanging string) []string {
 	var lines []string
 	current, indent := "", ""
 	for _, word := range words {
-		if current != "" && cols(current)+1+cols(word) > width {
+		if current != "" && Cols(current)+1+Cols(word) > width {
 			lines = append(lines, current)
 			current, indent = "", hanging
 		}

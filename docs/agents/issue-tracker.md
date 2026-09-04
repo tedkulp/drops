@@ -22,6 +22,7 @@ relation, and the whole comment thread.
 | what can I work on | `drops ready` |
 | what is stuck | `drops blocked` |
 | read one | `drops show <id>` for a person, `drops show <id> --json` to parse |
+| browse interactively | `drops tui` (a human at a terminal; never an agent) |
 | change one | `drops update <id> --title/-d/-p/-t/--status/-A` |
 | claim unassigned work | `drops claim <id> <who>` |
 | release a claim | `drops release <id>` |
@@ -463,6 +464,75 @@ An issue's project appears as **`project_key`**, an opaque immutable key, not as
 a slug. Slugs are renameable metadata and keys are what sync agrees on across
 machines, so the key is what travels in JSON. `drops project list --json` maps
 key to slug; the text renderer prints the slug for a human.
+
+## The navigator: `drops tui`
+
+`drops tui` opens a full-screen two-pane navigator over the current project: the
+live issues on the left, one issue in full on the right, and the right pane
+retargetable **without the list cursor moving**. It is for a human at a
+terminal. **An agent should not run it**: it takes over the screen, reads keys,
+and emits no parseable output. Every question it answers has a verb above that
+answers it on stdout.
+
+**It refuses to start where no project resolves, and exits 2**, which is the one
+place this verb is deliberately asymmetric with `list`, `ready` and `config
+show`. Those print `drops: no project resolves here` to stderr and exit 0
+because that advisory stays on the terminal; under an alt screen it would be
+invisible, so exiting 0 would put a blank pane in front of you with no
+explanation. `-P <slug>` scopes it like every other verb.
+
+**What the left pane lists** is `list`'s contract — every live issue in the
+scope, `open` **and** `in_progress` — in the same order every scanning verb
+uses, never re-sorted. Not `ready`: `ready` cannot see an `in_progress` issue
+at all, so it would structurally hide the one you are working on.
+
+The row is the CLI's row with two changes and one drop, and they are worth
+knowing because **this is the one surface in drops that truncates an id**:
+
+- the id column auto-sizes to the widest id present but **caps at 12 columns**,
+  cutting past it with the same `…` a title gets;
+- the project column, shown only under `a`, caps the same way;
+- the type column is dropped;
+- a blocked row carries a compact ` [N]` after the title, appended after the cut.
+
+The rule everywhere else — truncate what a row *displays*, never what
+*identifies* — is not broken so much as relocated: the detail pane's border
+carries the **full untruncated id**, one glance away.
+
+| key | what it does |
+|---|---|
+| `j` `k` `↓` `↑` `g` `G` `^d` `^u` | move the list cursor; the detail pane follows |
+| `/` | filter the loaded rows: a case-insensitive literal substring over id and title |
+| `Esc` | clear the filter. It never quits |
+| `C` | include closed issues |
+| `a` | span every project, and add the project column |
+| `J` `K` `space` `b` | scroll the detail pane vertically |
+| `h` `l` `←` `→` `0` `$` | scroll it horizontally, eight columns a step |
+| `w` | soft-wrap the detail pane instead of clipping |
+| `enter` | drop the two columns for the issue text alone, and back |
+| `?` | the keymap |
+| `q` `Ctrl-C` | quit |
+
+The filter **survives `a` and `C`**, because "filter, then widen the scope to
+see if it exists elsewhere" is the motion `a` exists for. `drops search` is a
+different thing and has no key: it reaches descriptions and comment bodies and
+returns rows outside the current scope.
+
+**Horizontal scrolling is load-bearing, not a nicety.** A page truncates
+nothing, including the table rows and fenced blocks it deliberately does not
+reflow, so a pane narrower than a line clips it — 43% of open issues emit a
+line too wide for the pane an 80-column terminal gives them. The clipped bytes
+are off-screen and reachable, and the footer's `↔ 49–86 of 130` says so, which
+is what stops a clipped table row reading as a whole row. `w` is the other
+answer where alignment does not matter.
+
+The footer is the disclosure line: scope, count, then active modes **as words**
+(`closed`, `wrap`, `zoom detail`, and the filter). The count reads `M of N`
+while something is narrowing and a bare `N issues` otherwise — `C` is a 6.3x
+row jump in a project this size, and that has to be visible.
+
+There is **no polling**: the pane reads its rows when it starts and again on
+`C` and `a`. A change made from another terminal is not picked up until then.
 
 ## Sync: the second machine
 

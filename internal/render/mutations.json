@@ -38,8 +38,8 @@
       "clause": "A memory listing sizes its id column to the widest permanent opaque id in the result (Should the memory verbs go through render?)",
       "file": "internal/render/memory.go",
       "test": "TestMemoryRowsRenderTheMemoryShapeAndState",
-      "old": "measured.idPad = max(measured.idPad, cols(string(row.ID)))",
-      "new": "measured.idPad = cols(string(row.ID))"
+      "old": "measured.idPad = max(measured.idPad, Cols(string(row.ID)))",
+      "new": "measured.idPad = Cols(string(row.ID))"
     },
     {
       "control": "memory-truncation-is-terminal-only",

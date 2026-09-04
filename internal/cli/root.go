@@ -245,6 +245,7 @@ func NewRootCmd(opts Options) (*cobra.Command, func()) {
 	registerMemoryCmds(root, app)
 	registerDoctorCmd(root, app)
 	registerSyncCmds(root, app)
+	root.AddCommand(newTUICmd(app))
 
 	// Cobra's --version and the version subcommand print one string, built
 	// once, so the two answers cannot drift apart.

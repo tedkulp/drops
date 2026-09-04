@@ -833,6 +833,14 @@
       "test": "TestTheTreeCompilesForDarwin",
       "old": "const getTermios = unix.TIOCGETA",
       "new": "const getTermios = unix.TCGETS"
+    },
+    {
+      "control": "the-refusal-where-no-project-resolves",
+      "clause": "`drops tui` refuses to start and exits 2 where no project resolves, unlike `list` and `ready`, which print an advisory to stderr and exit 0 — a stderr advisory is invisible under an alt screen, so exiting 0 would be a blank pane with no explanation (qy3de.4)",
+      "file": "internal/cli/tui.go",
+      "test": "TestTUIRefusesToStartWhereNoProjectResolves",
+      "old": "\t\t\t\"%w: no project resolves here; pass -P <slug> to scope explicitly\", model.ErrInvalid)",
+      "new": "\t\t\t\"%w: no project resolves here; pass -P <slug> to scope explicitly\", model.ErrNotFound)"
     }
   ]
 }

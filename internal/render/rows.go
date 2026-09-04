@@ -74,11 +74,11 @@ type layout struct {
 func (console Console) measure(listing Listing) layout {
 	measured := layout{width: console.width(), truncate: console.TTY}
 	for _, row := range listing.Rows {
-		if n := cols(string(row.ID)); n > measured.idPad {
+		if n := Cols(string(row.ID)); n > measured.idPad {
 			measured.idPad = n
 		}
 		if listing.Project {
-			if n := cols(row.Project); n > measured.projPad {
+			if n := Cols(row.Project); n > measured.projPad {
 				measured.projPad = n
 			}
 		}
@@ -98,7 +98,7 @@ func (measured layout) writeRow(out io.Writer, row Row) {
 	}
 	title := row.Title
 	if measured.truncate {
-		title = ellipsis(title, measured.width-cols(lead)-1)
+		title = Ellipsis(title, measured.width-Cols(lead)-1)
 	}
 	// No trailing space when nothing is left to print, so a row that is all
 	// gutter still ends where its last column does.

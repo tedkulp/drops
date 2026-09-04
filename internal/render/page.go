@@ -163,14 +163,14 @@ func writeRefs(out io.Writer, heading string, refs []Ref, width int) {
 	fmt.Fprintf(out, "\n%s\n", heading)
 	pad := 0
 	for _, ref := range refs {
-		if n := cols(string(ref.ID)); n > pad {
+		if n := Cols(string(ref.ID)); n > pad {
 			pad = n
 		}
 	}
 	indent := strings.Repeat(" ", refGutter+pad+refGap)
 	for _, ref := range refs {
 		label := fmt.Sprintf("  %s %-*s  ", StatusMark(ref.Status, ref.Tombstoned), pad, ref.ID)
-		writeHanging(out, label, indent, Wrap(ref.Title, width-cols(indent)))
+		writeHanging(out, label, indent, Wrap(ref.Title, width-Cols(indent)))
 	}
 }
 

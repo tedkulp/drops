@@ -71,6 +71,7 @@ var testedVerbs = map[string]string{
 	"drops show":            "TestShowJSONShape",
 	"drops supersede":       "TestSupersedeRetiresTheOldMemoryAndInheritsItsProject",
 	"drops sync":            "TestSyncWithoutARemoteIsAnError",
+	"drops tui":             "TestTUIRefusesToStartWhereNoProjectResolves",
 	"drops update":          "TestUpdateChangesOnlyTheFlagsYouPass",
 	"drops version":         "TestVersionWorksBeforeTheStoreExists",
 }

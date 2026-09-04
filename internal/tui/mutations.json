@@ -1,0 +1,117 @@
+{
+  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11 names — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11.",
+  "controls": [
+    {
+      "control": "the-cursor-tracks-an-id",
+      "clause": "The cursor tracks an issue ID and not a row index, so a reload that reorders rows cannot move the selection under the reader (qy3de.4, named there as a control rather than a preference)",
+      "file": "internal/tui/rows.go",
+      "test": "TestCursorTracksAnIDAcrossAReorder",
+      "old": "\t\tif candidate.id == c.id {",
+      "new": "\t\tif candidate.id == \"\" {"
+    },
+    {
+      "control": "the-cursor-holds-its-position-when-the-id-leaves",
+      "clause": "When the tracked id leaves the row set — filtered out, closed with `C` off, deleted — the cursor holds the position index that row last occupied, clamped, rather than jumping to the top (qy3de.4)",
+      "file": "internal/tui/rows.go",
+      "test": "TestCursorHoldsItsPositionWhenTheTrackedIDLeaves",
+      "old": "\tif c.position >= len(rows) {\n\t\tc.position = len(rows) - 1\n\t}",
+      "new": "\tif true {\n\t\tc.position = 0\n\t}"
+    },
+    {
+      "control": "the-filter-is-case-insensitive",
+      "clause": "`/` matches case-insensitively, so a lowercase needle finds a capitalised title (qy3de.4)",
+      "file": "internal/tui/rows.go",
+      "test": "TestFilterMatchesRegardlessOfCase",
+      "old": "\t\tstrings.Contains(strings.ToLower(candidate.title), needle)",
+      "new": "\t\tstrings.Contains(candidate.title, needle)"
+    },
+    {
+      "control": "the-filter-reaches-the-id-as-well-as-the-title",
+      "clause": "`/` is a substring over the id AND the title, because ids are structured and looking one up is half of what the filter is for (qy3de.4)",
+      "file": "internal/tui/rows.go",
+      "test": "TestFilterMatchesAnIDAsWellAsATitle",
+      "old": "\treturn strings.Contains(strings.ToLower(string(candidate.id)), needle) ||\n\t\tstrings.Contains(strings.ToLower(candidate.title), needle)",
+      "new": "\treturn strings.Contains(strings.ToLower(candidate.title), needle)"
+    },
+    {
+      "control": "the-blocked-marker-is-appended-after-the-cut",
+      "clause": "The ` [N]` marker is appended AFTER the title is cut, so the cut pays for it and a blocked row is never wider than its pane (euv2e.4 recorded this trap; qy3de.5 measured a 13-column marker leaving negative room on all 13 blocked rows)",
+      "file": "internal/tui/rows.go",
+      "test": "TestRowAppendsTheBlockedMarkerAfterTheCut",
+      "old": "\ttitle := render.Ellipsis(candidate.title, measured.width-render.Cols(lead)-1-render.Cols(mark))",
+      "new": "\ttitle := render.Ellipsis(candidate.title, measured.width-render.Cols(lead)-1)"
+    },
+    {
+      "control": "the-id-column-caps-at-twelve",
+      "clause": "The id column auto-sizes to the widest id present but never past twelve columns, because pad-to-widest spends twenty dead columns on 44 rows to fit two (qy3de.4)",
+      "file": "internal/tui/rows.go",
+      "test": "TestIDColumnAutoSizesButCapsAtTwelve",
+      "old": "\tmeasured.idPad = min(measured.idPad, idCap)",
+      "new": "\tmeasured.idPad = min(measured.idPad, 40)"
+    },
+    {
+      "control": "a-capped-id-is-cut-with-an-ellipsis",
+      "clause": "An id past the cap is truncated through render's own ellipsis rule rather than overflowing its column — the pane deliberately breaks render's never-truncate-an-identifier rule, and the mark is what makes that honest (qy3de.3, qy3de.4)",
+      "file": "internal/tui/rows.go",
+      "test": "TestIDColumnAutoSizesButCapsAtTwelve",
+      "old": "\t\tmeasured.idPad, render.Ellipsis(string(candidate.id), measured.idPad),",
+      "new": "\t\tmeasured.idPad, string(candidate.id),"
+    },
+    {
+      "control": "the-project-column-caps-at-twelve",
+      "clause": "The project column, shown only under `a`, is capped at twelve the same way: eight of the ten projects holding open issues have slugs of nine columns or fewer and cover 172 of 174 rows (qy3de.4)",
+      "file": "internal/tui/rows.go",
+      "test": "TestProjectColumnAppearsOnlyWhenAskedForAndCapsAtTwelve",
+      "old": "\tmeasured.projPad = min(measured.projPad, projCap)",
+      "new": "\tmeasured.projPad = min(measured.projPad, 40)"
+    },
+    {
+      "control": "the-row-set-is-open-and-in-progress",
+      "clause": "The row set is `list`'s contract — open AND in_progress — not `ready`'s, because Ready and Blocked cannot see an in_progress issue and so would structurally hide the one you are working on (qy3de.4)",
+      "file": "internal/tui/rows.go",
+      "test": "TestRowSetHoldsOpenAndInProgressIssues",
+      "old": "\tlive := []model.Status{model.StatusOpen, model.StatusInProgress}",
+      "new": "\tlive := []model.Status{model.StatusOpen}"
+    },
+    {
+      "control": "C-adds-closed-to-the-row-set",
+      "clause": "`C` includes closed issues in the row set, which is a 6.3x row jump in `drops` and is why it is disclosed in the footer as a word rather than a glyph (qy3de.4)",
+      "file": "internal/tui/rows.go",
+      "test": "TestCIncludesClosedAndAWidensToEveryProject",
+      "old": "\tif s.includeClosed {\n\t\treturn append(live, model.StatusClosed)\n\t}",
+      "new": "\tif false {\n\t\treturn append(live, model.StatusClosed)\n\t}"
+    },
+    {
+      "control": "the-detail-pane-renders-at-the-pane-width",
+      "clause": "The detail pane renders through render.Console into a buffer at the MEASURED pane width, so a resize re-wraps the page rather than clipping one wrapped for the old width (qy3de.3)",
+      "file": "internal/tui/source.go",
+      "test": "TestAResizeRerendersThePageAtTheNewPaneWidth",
+      "old": "\tconsole := render.Console{Out: &buf, Width: width, TTY: false}",
+      "new": "\tconsole := render.Console{Out: &buf, Width: render.DefaultWidth, TTY: false}"
+    },
+    {
+      "control": "a-box-asks-for-its-total-width",
+      "clause": "lipgloss Style.Width is the TOTAL rendered width, borders included, so a pane of N content columns asks for N+2 — getting it backwards leaves the top edge and the body two columns apart (qy3de.2, qy3de.5)",
+      "file": "internal/tui/layout.go",
+      "test": "TestTheComposedFrameIsSquareBeforeItIsPadded",
+      "old": "\t\tWidth(width + 2).",
+      "new": "\t\tWidth(width)."
+    },
+    {
+      "control": "every-pane-is-squared-to-its-own-height",
+      "clause": "Heights are managed by pad and never by a Style, because lipgloss Height() is the OUTER height and leaving it to a Style left the two panes at different heights (euv2e.4's trap, paid for in one place by qy3de.5)",
+      "file": "internal/tui/layout.go",
+      "test": "TestTheComposedFrameIsSquareBeforeItIsPadded",
+      "old": "\tlines = lines[:height]",
+      "new": "\tlines = lines[:max(height-1, 0)]"
+    },
+    {
+      "control": "the-scroll-indicator-appears-only-when-bytes-are-off-screen",
+      "clause": "The footer names the visible column window and the widest line whenever the page overflows the pane and is not wrapped, so a clipped table row does not read as a whole row (qy3de.5)",
+      "file": "internal/tui/tui.go",
+      "test": "TestClippedBytesAreReachableAndTheFooterSaysSo",
+      "old": "\tif widest := m.widest(); widest > geo.detailWidth && !m.detail.SoftWrap {",
+      "new": "\tif widest := m.widest(); false {"
+    }
+  ]
+}

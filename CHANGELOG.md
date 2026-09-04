@@ -13,6 +13,23 @@ using.
 
 ### Added
 
+- **`drops tui`**, a full-screen two-pane issue navigator: the current
+  project's live issues on the left, one issue in full on the right, and the
+  right pane retargetable **without the list cursor moving**. The left pane is
+  `list`'s row set — `open` and `in_progress`, in the same order every scanning
+  verb uses — with the id and project columns capped at 12 columns, the type
+  column dropped, and a compact ` [N]` on a blocked row. `/` filters on id and
+  title, `C` includes closed, `a` spans every project, `enter` drops the two
+  columns for the issue text, `w` soft-wraps, and `h l ← → 0 $` reach the bytes
+  a page emits beyond the pane's width — 43% of open issues have some. The
+  detail pane renders through `render.Console` unchanged, so a pane and a `show`
+  cannot disagree about what an issue looks like. Unlike `list` and `ready`,
+  `tui` **refuses to start and exits 2 where no project resolves**: a stderr
+  advisory is invisible under an alt screen.
+- **`render.Ellipsis` and `render.Cols`** are exported, so the navigator's row
+  geometry — which deliberately truncates an id, the one thing `render`'s own
+  rule forbids — is built on `render`'s truncation primitive rather than a
+  second implementation of it.
 - **`drops claim` and `drops release`** make wayfinder ownership explicit:
   claiming refuses to overwrite another session, while releasing writes a null
   assignee that returns the issue to the frontier.
