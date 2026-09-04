@@ -46,6 +46,20 @@ using.
   characters that is before discarding them. One message line above the footer
   carries a refused write and the credential scan, which under a full-screen
   program would otherwise go to a stderr nobody can see.
+- **The navigator notices when somebody else writes.** Every two seconds it
+  reads the store's `write_seq` — the counter bumped inside the same
+  transaction as every replicated write, so another terminal, another agent and
+  a `sync import` all move it — and puts `stale` on the footer when it has
+  moved. It deliberately does **not** reload: this store's common writer is an
+  agent, and a pane that reorders itself under a reader mid-thought is the
+  thing the navigator exists to avoid. The check is one primary-key row, 4.2µs
+  against the 1025-issue corpus, where a whole re-read is 5–10ms.
+- **`r` re-reads the store**, unconditionally, marker or no marker. It is a
+  refresh and not a navigation, so the follow stack survives it, the cursor
+  rides its tracked id wherever the row moved, the filter stands, and **the
+  detail pane holds your scroll position**: the page is re-rendered and
+  compared byte for byte, so an identical page never moves and a changed one
+  keeps your offsets. Opening a different issue still starts at the top.
 - **`render.Ellipsis` and `render.Cols`** are exported, so the navigator's row
   geometry — which deliberately truncates an id, the one thing `render`'s own
   rule forbids — is built on `render`'s truncation primitive rather than a

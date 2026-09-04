@@ -506,6 +506,7 @@ carries the **full untruncated id**, one glance away.
 | `Esc` | clear the filter. It never quits |
 | `C` | include closed issues |
 | `a` | span every project, and add the project column |
+| `r` | re-read the store |
 | `f` | pick a relation of the right pane's issue and follow it |
 | `Backspace` | back one relation |
 | `x` | write to the right pane's issue: close, reopen, comment, priority, claim, release |
@@ -552,9 +553,31 @@ is what stops a clipped table row reading as a whole row. `w` is the other
 answer where alignment does not matter.
 
 The footer is the disclosure line: scope, count, then active modes **as words**
-(`closed`, `wrap`, `zoom detail`, and the filter). The count reads `M of N`
-while something is narrowing and a bare `N issues` otherwise — `C` is a 6.3x
-row jump in a project this size, and that has to be visible.
+(`closed`, `wrap`, `zoom detail`, `stale`, and the filter). The count reads
+`M of N` while something is narrowing and a bare `N issues` otherwise — `C` is
+a 6.3x row jump in a project this size, and that has to be visible.
+
+**The pane notices when somebody else writes, and does not act on it.** Every
+two seconds it asks the store for `write_seq`, the counter bumped inside the
+same transaction as every replicated write — so another terminal, another
+agent, or a `sync import` all move it, and none can be missed. That ask is one
+primary-key row, measured at **4.2µs** against the 1025-issue corpus, where a
+whole re-read is 5–10ms; the poll is 1/1300th of the refresh it decides not to
+make.
+
+What it does with the answer is put `stale` on the footer. It does **not**
+reload: this store's common writer is an agent, and a pane that reordered
+itself under you mid-thought is the thing the navigator exists to avoid. `r`
+is what applies it — unconditionally, whether or not the marker is up, because
+an override that silently declines is the key you press twice. `r` is a
+re-read and not a navigation, so the follow stack survives it.
+
+A refresh keeps everything you were doing: the cursor rides its tracked id
+wherever the row moved, the filter and the follow stack stand, and **the detail
+pane holds your scroll position**. The page you are reading is re-rendered and
+compared byte for byte; identical means the viewport is not touched at all, and
+different means new text with your offsets carried over. Opening a *different*
+issue still starts at the top — that one you asked for.
 
 **`x` is the whole write set**, behind one modal on whatever the right pane is
 showing. Nothing is bound at the top level, and a row appears only where it

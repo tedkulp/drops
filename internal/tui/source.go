@@ -96,3 +96,24 @@ func (s *source) page(issueView core.IssueView, width int) (string, error) {
 	}
 	return buf.String(), nil
 }
+
+// seq is the store's write sequence: the change token the poll is built on.
+//
+// store_state.write_seq is bumped inside the same transaction as every
+// replicated write — issues, comments, relations, labels, parents, projects,
+// memories, locators — so a committed change can never be invisible to it, and
+// a sync import bumps once per applied record while skipping no-op merges. It
+// is one primary-key row: measured at 4.2µs against the 1025-issue corpus,
+// against 5.24ms for OpenBlockers alone, so the poll costs 1/1300th of the
+// refresh it decides not to make.
+//
+// It is deliberately COARSER than the pane: a memory write or a project rename
+// moves it while nothing on screen changes. That direction is the safe one —
+// it can raise a stale marker for nothing, never miss one.
+func (s *source) seq(ctx context.Context) (int64, error) {
+	state, err := s.core.State(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return state.WriteSeq, nil
+}

@@ -1,5 +1,5 @@
 {
-  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13.",
+  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14.",
   "controls": [
     {
       "control": "the-cursor-tracks-an-id",
@@ -320,6 +320,110 @@
       "test": "TestTheMessageLineCostsAPaneRowOnlyWhileItSaysSomething",
       "old": "\treturn measure(m.width, m.height-m.messageLines(), m.zoomed)",
       "new": "\treturn measure(m.width, m.height, m.zoomed)"
+    },
+    {
+      "control": "the-tick-notices-and-does-not-reload",
+      "clause": "A tick NOTICES and does not refresh: the poll raises the stale marker and leaves the row set exactly where the reader had it, because a surface that reorders itself mid-thought is what this map exists to avoid, and on this store the common writer is an agent (qy3de.14 §Q1)",
+      "file": "internal/tui/tui.go",
+      "test": "TestTickNoticesWithoutReloading",
+      "old": "\tcase tickMsg:\n\t\tm.poll()",
+      "new": "\tcase tickMsg:\n\t\tm.fail(m.refresh())"
+    },
+    {
+      "control": "the-tick-re-arms-the-poll",
+      "clause": "The one path that handles a tickMsg returns another tick. There is no second timer to notice the first one died, so a branch that returns nil stops the poll for the rest of the session with nothing on screen to say so (qy3de.14 §Q4)",
+      "file": "internal/tui/tui.go",
+      "test": "TestTickReArmsThePoll",
+      "old": "\t\treturn m, tick()",
+      "new": "\t\treturn m, nil"
+    },
+    {
+      "control": "init-arms-the-first-tick",
+      "clause": "Init arms the first tick, which is the one thing Run cannot do: a tea.Cmd is only run by a Program, so arming it anywhere else drops it on the floor (qy3de.14 §Q4)",
+      "file": "internal/tui/tui.go",
+      "test": "TestInitArmsTheFirstTick",
+      "old": "func (m *Model) Init() tea.Cmd { return tick() }",
+      "new": "func (m *Model) Init() tea.Cmd { return nil }"
+    },
+    {
+      "control": "the-stale-marker-is-derived-not-a-flag",
+      "clause": "The marker is DERIVED from the two sequence numbers rather than being a flag a write could forget to clear: stale is exactly observed != seq (qy3de.14 §Q5)",
+      "file": "internal/tui/tui.go",
+      "test": "TestStaleMarkerIsAFooterPartAndSurvivesAKeypress",
+      "old": "func (m *Model) stale() bool { return m.observed != m.seq }",
+      "new": "func (m *Model) stale() bool { return false }"
+    },
+    {
+      "control": "the-stale-marker-survives-a-keypress",
+      "clause": "The marker outlives the next keypress, unlike both transient slots: it is a state of the store, not a line about something that just happened, so pressing `j` while the store is still ahead must not clear it (qy3de.14 §Q5)",
+      "file": "internal/tui/tui.go",
+      "test": "TestStaleMarkerIsAFooterPartAndSurvivesAKeypress",
+      "old": "\tm.notice, m.message = \"\", \"\"",
+      "new": "\tm.notice, m.message, m.observed = \"\", \"\", m.seq"
+    },
+    {
+      "control": "the-stale-marker-costs-no-pane-row",
+      "clause": "The marker is a FOOTER part and never the message line: messageLines feeds geo, which every caller measures from, so a marker on the message row would shrink both panes by a row while a picker was open and re-scroll it under the cursor (qy3de.14 §Q5)",
+      "file": "internal/tui/tui.go",
+      "test": "TestStaleMarkerIsAFooterPartAndSurvivesAKeypress",
+      "old": "\tif m.ask != nil {\n\t\treturn m.ask.prompt\n\t}\n\treturn m.message\n}",
+      "new": "\tif m.ask != nil {\n\t\treturn m.ask.prompt\n\t}\n\tif m.stale() {\n\t\treturn \"stale\"\n\t}\n\treturn m.message\n}"
+    },
+    {
+      "control": "a-refresh-clears-the-stale-marker",
+      "clause": "The refresh that reads past the change is what clears the marker, and nothing else does: readSeq marks the pane fresh as of the token it just took (qy3de.14 §Q5)",
+      "file": "internal/tui/tui.go",
+      "test": "TestRefreshClearsTheStaleMarker",
+      "old": "\tm.seq, m.observed = seq, seq",
+      "new": "\tm.observed = seq"
+    },
+    {
+      "control": "r-refreshes-unconditionally",
+      "clause": "`r` re-reads whether or not the pane believes itself stale. An override that silently declines is the key you press twice, and a conditional one puts a branch on state the reader cannot see — the argument qy3de.6 used to drop the one-relation shortcut (qy3de.14 §Q6)",
+      "file": "internal/tui/tui.go",
+      "test": "TestRefreshRereadsWhenNothingIsStale",
+      "old": "\tcase \"r\":\n\t\t// UNCONDITIONAL",
+      "new": "\tcase \"r\":\n\t\tif !m.stale() {\n\t\t\treturn nil\n\t\t}\n\t\t// UNCONDITIONAL"
+    },
+    {
+      "control": "r-is-a-refresh-and-not-a-reload",
+      "clause": "`r` keeps the follow stack, because re-reading the store is not a navigation. reload clears it — that is what moving the cursor does — so spending reload here would drop a reader out of a followed page every time they checked for changes (qy3de.14 §Q6)",
+      "file": "internal/tui/tui.go",
+      "test": "TestRefreshKeepsTheFollowStack",
+      "old": "\t\t// re-reading the store is not a navigation.\n\t\tm.fail(m.refresh())",
+      "new": "\t\t// re-reading the store is not a navigation.\n\t\tm.fail(m.reload())"
+    },
+    {
+      "control": "a-redraw-keeps-the-readers-position",
+      "clause": "Redrawing the SAME page holds the reader's scroll offsets: a refresh that reset them would throw a reader scrolled deep into a long page back to line 0 every time an agent wrote anything, which on this store is the common case (qy3de.14 §Q2)",
+      "file": "internal/tui/tui.go",
+      "test": "TestRedrawKeepsTheReadersPosition",
+      "old": "\tif !keep {\n\t\ty, x = 0, 0\n\t}",
+      "new": "\ty, x = 0, 0"
+    },
+    {
+      "control": "retargeting-starts-at-the-top",
+      "clause": "The other half of the same branch: OPENING a different issue starts it at the top, because you asked for a different issue. Only a redraw holds the position, and a version that held it everywhere would leave a fresh page scrolled to a line the reader never chose (qy3de.14 §Q2)",
+      "file": "internal/tui/tui.go",
+      "test": "TestRetargetingStartsAtTheTop",
+      "old": "\tif !keep {\n\t\ty, x = 0, 0\n\t}",
+      "new": "\tif keep {\n\t\ty, x = 0, 0\n\t}"
+    },
+    {
+      "control": "unchanged-is-tested-on-the-rendered-text",
+      "clause": "A page counts as unchanged only when its RENDERED TEXT is identical. A comment is its own record with its own revision, so Issue.Revision is unmoved by the write most likely to change the page you are reading, and a revision test would decline to re-render exactly that (qy3de.14 §Q2)",
+      "file": "internal/tui/tui.go",
+      "test": "TestRedrawFollowsACommentOnThePageBeingRead",
+      "old": "\tsame := keep && id == m.detailID && text == m.pageText",
+      "new": "\tsame := keep && id == m.detailID && issue.Issue.Revision == m.detailView.Issue.Revision"
+    },
+    {
+      "control": "a-modal-reaches-no-refresh",
+      "clause": "§Q7's guard, written as a test rather than as code: a refresh is unreachable from inside a modal because modalKey's switch has no `r`, and this is what would catch a future key that gave it one. The suppression this ticket considered building would have been a branch whose control could never go red (qy3de.14 §Q7)",
+      "file": "internal/tui/tui.go",
+      "test": "TestModalAndPromptCannotReachARefresh",
+      "old": "\tcase \"ctrl+c\":\n\t\treturn tea.Quit\n\tcase \"esc\":\n\t\tm.closeModal()",
+      "new": "\tcase \"ctrl+c\":\n\t\treturn tea.Quit\n\tcase \"r\":\n\t\tm.fail(m.refresh())\n\tcase \"esc\":\n\t\tm.closeModal()"
     }
   ]
 }

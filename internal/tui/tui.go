@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -16,6 +17,29 @@ import (
 
 // hscrollStep is how far one horizontal keypress moves the detail pane.
 const hscrollStep = 8
+
+// pollInterval is how often the pane asks the store whether it has moved.
+//
+// The number is not chosen on cost — the ask is one primary-key row, measured
+// at 4.2µs, so a tick is 1/1300th of the refresh it might provoke. It is
+// chosen on how long a reader should look at a stale pane without being told:
+// two seconds is faster than you can switch windows, where five is long enough
+// to start distrusting the marker and one triples the wakeups for a difference
+// no reader can perceive (qy3de.14 §Q4).
+const pollInterval = 2 * time.Second
+
+// tickMsg is the poll firing. It carries nothing: what the tick reads it reads
+// itself, on the Update goroutine, because it is 4.2µs and a tea.Cmd would put
+// a store read on a second goroutine for no gain.
+type tickMsg struct{}
+
+// tick re-arms the poll. EVERY path that handles a tickMsg must return this or
+// the poll stops permanently and silently — there is no second timer to notice
+// that the first one died — which is why it is one function with one caller
+// shape rather than a tea.Tick spelled out at each return.
+func tick() tea.Cmd {
+	return tea.Tick(pollInterval, func(time.Time) tea.Msg { return tickMsg{} })
+}
 
 // The pane's colours. Colour, --no-color and NO_COLOR are still fog on the map
 // (qy3de.3 and qy3de.5 both left them open), so these are the prototype's
@@ -96,6 +120,19 @@ type Model struct {
 	// relations. It lives until the next keypress.
 	notice string
 
+	// seq is the store's write sequence as of the last read of the ROW SET,
+	// and observed is the one the poll last saw. The pane is stale exactly
+	// when they differ, so the marker is DERIVED rather than a flag a write
+	// could forget to clear (qy3de.14 §Q5).
+	//
+	// Both are read before the rows they describe, never after: a write
+	// landing mid-refresh then leaves seq behind the rows, which shows a
+	// stale marker for a change already on screen. The other order loses the
+	// write entirely, and a spurious marker costs one keypress where a
+	// missed one costs the whole point of the poll.
+	seq      int64
+	observed int64
+
 	width, height int
 	zoomed        bool
 	help          bool
@@ -151,12 +188,50 @@ func (m *Model) run(ctx context.Context, options ...tea.ProgramOption) error {
 // reload re-reads the row set for the current scope and re-points the cursor
 // and the detail pane at whatever survived.
 func (m *Model) reload() error {
+	if err := m.readSeq(); err != nil {
+		return err
+	}
 	rows, err := m.source.rows(m.ctx, m.scope)
 	if err != nil {
 		return err
 	}
 	m.all = rows
 	return m.applyFilter()
+}
+
+// readSeq takes the change token and marks the pane fresh as of it.
+//
+// Called BEFORE the rows every time, so the token can only lag what is on
+// screen, never lead it. See the seq field for why that direction is the one
+// to fail in.
+func (m *Model) readSeq() error {
+	seq, err := m.source.seq(m.ctx)
+	if err != nil {
+		return err
+	}
+	m.seq, m.observed = seq, seq
+	return nil
+}
+
+// stale reports whether the store has moved since the row set was read. It is
+// the whole marker: there is no flag, so nothing can leave one set.
+func (m *Model) stale() bool { return m.observed != m.seq }
+
+// poll is what a tickMsg does, and it deliberately does NOT refresh.
+//
+// The tick's job is NOTICING, not reloading (qy3de.14 §Q1): a surface that
+// reorders itself under a reader is the thing this map exists to avoid, and
+// this store's common writer is an agent, so "something changed" fires while
+// you are mid-thought. So the expensive read stays user-initiated behind `r`
+// and the tick buys only the one thing that was actually missing — knowing.
+//
+// A failed read is dropped rather than routed to m.err: the footer belongs to
+// the row set, and a transient poll failure that blanked the disclosure line
+// would be a worse outcome than a marker that arrives one tick late.
+func (m *Model) poll() {
+	if seq, err := m.source.seq(m.ctx); err == nil {
+		m.observed = seq
+	}
 }
 
 // applyFilter narrows the loaded set and restores the cursor onto it.
@@ -183,6 +258,9 @@ func (m *Model) applyFilter() error {
 // the cursor; showTarget is what handles a followed target that the write
 // itself made unreadable.
 func (m *Model) refresh() error {
+	if err := m.readSeq(); err != nil {
+		return err
+	}
 	rows, err := m.source.rows(m.ctx, m.scope)
 	if err != nil {
 		return err
@@ -191,14 +269,47 @@ func (m *Model) refresh() error {
 	m.rows = matching(m.all, m.filter)
 	m.cursor.restore(m.rows)
 	if len(m.stack) == 0 {
-		return m.showDetail(m.cursor.id)
+		return m.redrawDetail(m.cursor.id)
 	}
-	return m.showTarget(m.detailID)
+	return m.redrawDetail(m.detailID)
 }
 
 // showDetail retargets the right pane. It does NOT move the left cursor, which
 // is the whole navigational claim this map is built on.
-func (m *Model) showDetail(id model.ID) error {
+func (m *Model) showDetail(id model.ID) error { return m.drawDetail(id, false) }
+
+// redrawDetail is showDetail's other half: the same page, read again, with the
+// reader's position kept (qy3de.14 §Q2). It falls back DOWN the stack on a
+// failed read exactly as showTarget does, because a refresh can be the thing
+// that discovers a followed target was tombstoned by another replica.
+func (m *Model) redrawDetail(id model.ID) error {
+	for {
+		err := m.drawDetail(id, true)
+		if err == nil || len(m.stack) == 0 {
+			return err
+		}
+		id = m.stack[len(m.stack)-1]
+		m.stack = m.stack[:len(m.stack)-1]
+	}
+}
+
+// drawDetail renders one issue into the right pane. keep says whether this is
+// the SAME page being redrawn under the reader or a different one being opened.
+//
+// The distinction is the whole of qy3de.14 §Q2. Opening a page starts it at the
+// top, because you asked for a different issue. Redrawing one must not move,
+// because you did not: a refresh that reset the offsets would throw a reader
+// scrolled deep into a long page back to line 0 every time an agent wrote
+// anything — which, on this store, is the common case.
+//
+// Unchanged is tested on the RENDERED TEXT, not on the issue's revision. A
+// comment is its own record with its own revision, so `Issue.Revision` is
+// unmoved by the one write most likely to change the page you are reading. The
+// text is exact and costs nothing worth counting: the read and the render
+// together are 104µs+20µs on a typical page and 278µs+286µs on the corpus's
+// worst, against 5.24ms for the blocker map the same refresh already paid for.
+// So this is a claim about the reading position and never about cost.
+func (m *Model) drawDetail(id model.ID, keep bool) error {
 	if id == "" {
 		m.detailID, m.pageText = "", ""
 		m.detail.SetContent("")
@@ -213,10 +324,25 @@ func (m *Model) showDetail(id model.ID) error {
 	if err != nil {
 		return err
 	}
-	m.detailID, m.detailView, m.pageText = id, issue, text
+	// The view is taken even when the text is identical: `f` picks over the
+	// full core graph, which is wider than the page, so a relation can be
+	// added without changing a rendered byte.
+	same := keep && id == m.detailID && text == m.pageText
+	m.detailID, m.detailView = id, issue
+	if same {
+		return nil
+	}
+	y, x := m.detail.YOffset(), m.detail.XOffset()
+	m.pageText = text
 	m.detail.SetContent(text)
-	m.detail.SetYOffset(0)
-	m.detail.SetXOffset(0)
+	if !keep {
+		y, x = 0, 0
+	}
+	// Both clamp themselves against the content just set — measured, because
+	// a hand-rolled clamp here would be a branch no test could ever make
+	// fail, which is this repository's dominant defect wearing a costume.
+	m.detail.SetYOffset(y)
+	m.detail.SetXOffset(x)
 	return nil
 }
 
@@ -372,7 +498,10 @@ func (m *Model) depthLine(width int) string {
 // Init satisfies tea.Model. Nothing is deferred to a command: the row set is
 // already loaded by the time the program starts, so a failed read is an error
 // from Run rather than a pane that renders an apology.
-func (m *Model) Init() tea.Cmd { return nil }
+// The one thing it does defer is the poll's first tick, which cannot be armed
+// anywhere else: a tea.Cmd is only run by a Program, so arming it in Run would
+// drop it on the floor in every test that drives Update directly.
+func (m *Model) Init() tea.Cmd { return tick() }
 
 // Update handles the two messages this pane reads: the terminal's size, and a
 // key.
@@ -390,6 +519,12 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case editorDoneMsg:
 		m.finishEdit(message)
 		return m, nil
+	case tickMsg:
+		m.poll()
+		// Re-armed on the ONE path that handles a tick. Returning anything
+		// else here — including nil on some branch added later — stops the
+		// poll for the rest of the session with nothing to show for it.
+		return m, tick()
 	}
 	return m, nil
 }
@@ -494,6 +629,14 @@ func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 	case "a":
 		m.scope.allProjects = !m.scope.allProjects
 		m.fail(m.reload())
+	case "r":
+		// UNCONDITIONAL, stale or not (qy3de.14 §Q6). An override that
+		// silently declines is the thing you press twice, and making it
+		// conditional puts a branch on state the reader cannot see — the
+		// argument qy3de.6 already used to drop the one-relation shortcut.
+		// It is refresh and not reload: the follow stack survives, because
+		// re-reading the store is not a navigation.
+		m.fail(m.refresh())
 
 	// --- writing (qy3de.7) ---
 	case "x":
@@ -749,6 +892,17 @@ func (m *Model) footer(geo geometry) string {
 	if m.detail.SoftWrap {
 		parts = append(parts, "wrap")
 	}
+	// A FOOTER PART, beside the other persistent mode words, and deliberately
+	// neither of the two transient slots (qy3de.14 §Q5). m.message costs a
+	// pane row — messageLines feeds geo, which every caller measures from —
+	// so a marker there would shrink both panes by a row while a picker was
+	// open and re-scroll it under the cursor. m.notice REPLACES this whole
+	// left side, which would hide qy3de.4's disclosure line. And both die on
+	// the next keypress, where this must survive `j`: it is a state of the
+	// store, cleared only by the refresh that reads past it.
+	if m.stale() {
+		parts = append(parts, "stale · r")
+	}
 	left := strings.Join(parts, " · ")
 	if m.notice != "" {
 		left = m.notice
@@ -806,6 +960,8 @@ func helpText() string {
 		"  j k ↓ ↑ g G ^d ^u   move the list cursor (retargets the detail pane)",
 		"  / Esc               filter on id and title · clear the filter",
 		"  C a                 include closed · span every project",
+		"  r                   re-read the store (the footer says `stale` when",
+		"                      someone else has written since you last did)",
 		"",
 		"  f                   follow a relation: pick one, Enter takes it",
 		"  Backspace           back one relation (moving the cursor clears the trail)",
