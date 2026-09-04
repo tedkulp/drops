@@ -250,3 +250,179 @@ func TestDependencyCyclesReportEveryCycleInDeterministicOrder(t *testing.T) {
 // fixedNow is the clock every core test reads, so a timestamp assertion is a
 // literal rather than a re-derivation of what the code did.
 var fixedNow = time.Date(2026, 9, 2, 15, 0, 0, 0, time.UTC)
+
+// The clause: OpenBlockers reports the open-blocker map for the whole live
+// graph, not for the candidate set Ready and Blocked scope themselves to. The
+// left pane lists in_progress rows (qy3de.4), and Blocked's own default
+// candidate set cannot see one, so the annotation has to come from here.
+func TestOpenBlockersCoversTheRowsBlockedCannotSee(t *testing.T) {
+	rules, _ := openCoreWithIDs(t, "doing", "wall")
+	project := blockingGraph(t, rules,
+		[]model.ID{"doing", "wall"},
+		[][2]model.ID{{"doing", "wall"}},
+	)
+	if _, err := rules.SetIssueStatus(t.Context(), "doing", model.StatusInProgress, ""); err != nil {
+		t.Fatalf("start doing: %v", err)
+	}
+
+	blocked, err := rules.Blocked(t.Context(), core.IssueFilter{Project: &project})
+	if err != nil {
+		t.Fatalf("blocked: %v", err)
+	}
+	if len(blocked) != 0 {
+		t.Fatalf("blocked = %#v, want none: an in_progress Issue is not an open candidate", blocked)
+	}
+
+	blockers, err := rules.OpenBlockers(t.Context())
+	if err != nil {
+		t.Fatalf("open blockers: %v", err)
+	}
+	if want := []model.ID{"wall"}; !slices.Equal(blockers["doing"], want) {
+		t.Fatalf("blockers[doing] = %v, want %v", blockers["doing"], want)
+	}
+	if len(blockers) != 1 {
+		t.Fatalf("blockers = %v, want only the blocked Issue keyed", blockers)
+	}
+}
+
+// Two clauses, one graph. Ready and Blocked scope their candidates through
+// filter.Statuses when the caller names one, rather than discarding it; and an
+// unset Statuses still means open only, which is what keeps `drops ready` and
+// `drops blocked` byte-identical (neither passes a status set).
+func TestReadyAndBlockedScopeCandidatesByStatus(t *testing.T) {
+	rules, _ := openCoreWithIDs(t, "doing", "going", "wall")
+	project := blockingGraph(t, rules,
+		[]model.ID{"doing", "going", "wall"},
+		[][2]model.ID{{"doing", "wall"}},
+	)
+	for _, id := range []model.ID{"doing", "going"} {
+		if _, err := rules.SetIssueStatus(t.Context(), id, model.StatusInProgress, ""); err != nil {
+			t.Fatalf("start %s: %v", id, err)
+		}
+	}
+
+	t.Run("honours the set the caller names", func(t *testing.T) {
+		filter := core.IssueFilter{Project: &project, Statuses: []model.Status{model.StatusInProgress}}
+
+		ready, err := rules.Ready(t.Context(), filter)
+		if err != nil {
+			t.Fatalf("ready: %v", err)
+		}
+		if len(ready) != 1 || ready[0].ID != "going" {
+			t.Errorf("ready = %v, want only going: the unblocked in_progress Issue", ids(ready))
+		}
+
+		blocked, err := rules.Blocked(t.Context(), filter)
+		if err != nil {
+			t.Fatalf("blocked: %v", err)
+		}
+		if len(blocked) != 1 || blocked[0].Issue.ID != "doing" {
+			t.Fatalf("blocked = %#v, want only doing: the blocked in_progress Issue", blocked)
+		}
+		if want := []model.ID{"wall"}; !slices.Equal(blocked[0].BlockedBy, want) {
+			t.Errorf("doing blocked by %v, want %v", blocked[0].BlockedBy, want)
+		}
+	})
+
+	t.Run("defaults to open when the caller names none", func(t *testing.T) {
+		filter := core.IssueFilter{Project: &project}
+
+		ready, err := rules.Ready(t.Context(), filter)
+		if err != nil {
+			t.Fatalf("ready: %v", err)
+		}
+		if len(ready) != 1 || ready[0].ID != "wall" {
+			t.Errorf("ready = %v, want only wall: the one open Issue", ids(ready))
+		}
+
+		blocked, err := rules.Blocked(t.Context(), filter)
+		if err != nil {
+			t.Fatalf("blocked: %v", err)
+		}
+		if len(blocked) != 0 {
+			t.Errorf("blocked = %#v, want none: the only blocked Issue is in_progress", blocked)
+		}
+	})
+}
+
+func ids(issues []model.Issue) []model.ID {
+	out := make([]model.ID, len(issues))
+	for i, issue := range issues {
+		out[i] = issue.ID
+	}
+	return out
+}
+
+// The clause: only a live BLOCKS edge out of a non-terminal Issue puts a key in
+// the map. Each excluded branch gets its own would-be blocked Issue, so
+// dropping any one of the three guards keys an Issue that is not blocked.
+func TestOpenBlockersCountOnlyLiveBlocksEdgesFromLiveIssues(t *testing.T) {
+	rules, _ := openCoreWithIDs(t, "real", "wall", "hasrel", "hasdead", "gone")
+	blockingGraph(t, rules,
+		[]model.ID{"real", "wall", "hasrel", "hasdead", "gone"},
+		[][2]model.ID{{"real", "wall"}, {"gone", "wall"}},
+	)
+	// hasrel points at wall, but a related edge is not a blocking one.
+	if _, err := rules.SetDependency(t.Context(), "hasrel", "wall", model.DepRelated, true); err != nil {
+		t.Fatalf("relate hasrel to wall: %v", err)
+	}
+	// hasdead's blocks edge was removed, so it no longer blocks.
+	for _, present := range []bool{true, false} {
+		if _, err := rules.SetDependency(t.Context(), "hasdead", "wall", model.DepBlocks, present); err != nil {
+			t.Fatalf("set hasdead blocks edge to %v: %v", present, err)
+		}
+	}
+	// gone's blocks edge is live and its blocker is open, but a closed Issue is
+	// finished rather than waiting.
+	if _, err := rules.SetIssueStatus(t.Context(), "gone", model.StatusClosed, "done"); err != nil {
+		t.Fatalf("close gone: %v", err)
+	}
+
+	blockers, err := rules.OpenBlockers(t.Context())
+	if err != nil {
+		t.Fatalf("open blockers: %v", err)
+	}
+	if want := []model.ID{"wall"}; !slices.Equal(blockers["real"], want) {
+		t.Errorf("blockers[real] = %v, want %v", blockers["real"], want)
+	}
+	for _, id := range []model.ID{"hasrel", "hasdead", "gone", "wall"} {
+		if got := blockers[id]; len(got) != 0 {
+			t.Errorf("blockers[%s] = %v, want none", id, got)
+		}
+	}
+}
+
+// The clause: a limit caps the ANSWER, not the candidate pool. The store
+// applies Limit as SQL LIMIT before either verb has partitioned anything, so a
+// pool capped at N returns fewer than N whenever the first N candidates are not
+// all on the side being asked for. The graph interleaves ready and blocked in
+// candidate order — priority, then created_at DESC — so both verbs see a
+// disqualifying row inside the first two.
+func TestReadyAndBlockedLimitTheAnswerNotTheCandidatePool(t *testing.T) {
+	rules, _ := openCoreWithIDs(t, "wall", "blockedb", "freeb", "blockeda", "freea")
+	project := blockingGraph(t, rules,
+		[]model.ID{"wall", "blockedb", "freeb", "blockeda", "freea"},
+		[][2]model.ID{{"blockeda", "wall"}, {"blockedb", "wall"}},
+	)
+	filter := core.IssueFilter{Project: &project, Limit: 2}
+
+	ready, err := rules.Ready(t.Context(), filter)
+	if err != nil {
+		t.Fatalf("ready: %v", err)
+	}
+	if want := []model.ID{"freea", "freeb"}; !slices.Equal(ids(ready), want) {
+		t.Errorf("ready = %v, want %v: two answers, not the ready half of the first two rows", ids(ready), want)
+	}
+
+	blocked, err := rules.Blocked(t.Context(), filter)
+	if err != nil {
+		t.Fatalf("blocked: %v", err)
+	}
+	got := make([]model.ID, len(blocked))
+	for i, one := range blocked {
+		got[i] = one.Issue.ID
+	}
+	if want := []model.ID{"blockeda", "blockedb"}; !slices.Equal(got, want) {
+		t.Errorf("blocked = %v, want %v: two answers, not the blocked half of the first two rows", got, want)
+	}
+}

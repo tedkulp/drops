@@ -16,16 +16,16 @@ type BlockedIssue struct {
 	BlockedBy []model.ID  `json:"blocked_by"`
 }
 
-// Ready returns open, live, non-deferred Issues with no open blocks edge.
+// Ready returns the live, non-deferred Issues with no open blocks edge, over
+// the candidate set filter names. An unset filter.Statuses means open, so a
+// caller that does not ask about status gets what "actionable" has always meant.
 func (core *Core) Ready(ctx context.Context, filter IssueFilter) ([]model.Issue, error) {
 	limit := filter.Limit
-	filter.Limit = 0
-	filter.Statuses = []model.Status{model.StatusOpen}
-	candidates, err := core.store.Issues(ctx, filter)
+	candidates, err := core.candidates(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
-	blockers, err := core.openBlockers(ctx)
+	blockers, err := core.OpenBlockers(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -43,17 +43,15 @@ func (core *Core) Ready(ctx context.Context, filter IssueFilter) ([]model.Issue,
 	return ready, nil
 }
 
-// Blocked returns the exact complement of Ready over open, live,
-// non-deferred candidates.
+// Blocked returns the exact complement of Ready over the same live,
+// non-deferred candidates, and reads filter.Statuses the same way.
 func (core *Core) Blocked(ctx context.Context, filter IssueFilter) ([]BlockedIssue, error) {
 	limit := filter.Limit
-	filter.Limit = 0
-	filter.Statuses = []model.Status{model.StatusOpen}
-	candidates, err := core.store.Issues(ctx, filter)
+	candidates, err := core.candidates(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
-	blockers, err := core.openBlockers(ctx)
+	blockers, err := core.OpenBlockers(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +69,30 @@ func (core *Core) Blocked(ctx context.Context, filter IssueFilter) ([]BlockedIss
 	return blocked, nil
 }
 
-func (core *Core) openBlockers(ctx context.Context) (map[model.ID][]model.ID, error) {
+// candidates is the row set Ready and Blocked partition: the Issues the filter
+// names, unlimited so the limit applies to the answer rather than to the pool.
+// The default lives here, once, so the two verbs cannot disagree about what an
+// unstated status means.
+func (core *Core) candidates(ctx context.Context, filter IssueFilter) ([]model.Issue, error) {
+	if len(filter.Statuses) == 0 {
+		filter.Statuses = []model.Status{model.StatusOpen}
+	}
+	filter.Limit = 0
+	return core.store.Issues(ctx, filter)
+}
+
+// OpenBlockers maps each live, non-terminal Issue that still has an unfinished
+// blocker to that Issue's open blocker ids, ascending. An Issue with no open
+// blocker is absent rather than present and empty, so len(map[id]) is the
+// blocked-by count for any id at all.
+//
+// It spans the whole store in one pair of reads and takes no filter, which is
+// deliberate on both counts. A pane annotating a row set needs one call per
+// refresh, never one per row; and a blocker outside the caller's scope still
+// blocks, so a scoped map would under-report. The cost is therefore the whole
+// store's, not the scope's: two reads and 4.9ms, best of 20, over the
+// 1025-issue corpus, which keys 13 Issues (measured for qy3de.8).
+func (core *Core) OpenBlockers(ctx context.Context) (map[model.ID][]model.ID, error) {
 	issues, err := core.store.Issues(ctx, IssueFilter{IncludeTombstoned: true})
 	if err != nil {
 		return nil, err
@@ -111,7 +132,7 @@ func deferred(issue model.Issue, now time.Time) bool {
 // UnblockImpacts reports how many open candidates each named blocker alone
 // prevents from becoming ready.
 func (core *Core) UnblockImpacts(ctx context.Context, ids []model.ID) (map[model.ID]int, error) {
-	blockers, err := core.openBlockers(ctx)
+	blockers, err := core.OpenBlockers(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +158,7 @@ func (core *Core) LongestBlockerChain(ctx context.Context, id model.ID) ([]model
 	if _, err := core.store.Issue(ctx, id); err != nil {
 		return nil, err
 	}
-	graph, err := core.openBlockers(ctx)
+	graph, err := core.OpenBlockers(ctx)
 	if err != nil {
 		return nil, err
 	}

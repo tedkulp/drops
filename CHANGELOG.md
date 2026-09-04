@@ -17,6 +17,15 @@ using.
   claiming refuses to overwrite another session, while releasing writes a null
   assignee that returns the issue to the frontier.
 
+### Changed
+
+- **`core.OpenBlockers` is exported**, and `Ready` and `Blocked` now honour a
+  caller-supplied status set instead of overwriting it with `open`. Both are for
+  the TUI's left pane, which lists `in_progress` rows and so needs a blocked-by
+  count for rows `Blocked` cannot see, in one call per refresh rather than one
+  per row. `drops ready` and `drops blocked` pass no status set and are
+  byte-identical, verified over the 1025-issue corpus.
+
 ## 0.1.0 — 2026-09-03
 
 First release, and the one that took over `~/.drops/drops.db` and the `drops`

@@ -549,6 +549,62 @@
       "test": "TestRegistrationRollsBackProjectAndLocatorWhenBindingFails",
       "old": "\t\tif input.BindingPath != \"\" {\n\t\t\tif err := tx.PutWorkspaceBinding(ctx, model.WorkspaceBinding{Path: input.BindingPath, ProjectKey: key}); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t}",
       "new": "\t\tif input.BindingPath != \"\" {\n\t\t\tif err := tx.PutWorkspaceBinding(ctx, model.WorkspaceBinding{Path: input.BindingPath, ProjectKey: key}); err != nil {\n\t\t\t\treturn nil\n\t\t\t}\n\t\t}"
+    },
+    {
+      "control": "open-blockers-keep-an-in-progress-issue",
+      "clause": "Only closed and tombstoned are terminal, so an in_progress Issue still appears in the open-blocker map \u2014 which is the whole reason the pane reads OpenBlockers rather than Blocked (qy3de.8)",
+      "file": "internal/core/graph.go",
+      "test": "TestOpenBlockersCoversTheRowsBlockedCannotSee",
+      "old": "issue.Status == model.StatusClosed",
+      "new": "issue.Status != model.StatusOpen"
+    },
+    {
+      "control": "open-blockers-need-a-blocks-edge",
+      "clause": "Only a BLOCKS edge blocks: a related or discovered-from edge puts no key in the open-blocker map (qy3de.8)",
+      "file": "internal/core/graph.go",
+      "test": "TestOpenBlockersCountOnlyLiveBlocksEdgesFromLiveIssues",
+      "old": "if dependency.Tombstone == model.Tombstoned || dependency.Type != model.DepBlocks {",
+      "new": "if dependency.Tombstone == model.Tombstoned {"
+    },
+    {
+      "control": "open-blockers-ignore-a-removed-edge",
+      "clause": "A tombstoned blocks edge no longer blocks, so `dep rm` unblocks its dependent (qy3de.8)",
+      "file": "internal/core/graph.go",
+      "test": "TestOpenBlockersCountOnlyLiveBlocksEdgesFromLiveIssues",
+      "old": "if dependency.Tombstone == model.Tombstoned || dependency.Type != model.DepBlocks {",
+      "new": "if dependency.Type != model.DepBlocks {"
+    },
+    {
+      "control": "open-blockers-skip-a-finished-issue",
+      "clause": "A closed or tombstoned Issue is finished rather than waiting, so it is never keyed however many live blockers it still points at (qy3de.8)",
+      "file": "internal/core/graph.go",
+      "test": "TestOpenBlockersCountOnlyLiveBlocksEdgesFromLiveIssues",
+      "old": "if terminal[dependency.FromID] {",
+      "new": "if false {"
+    },
+    {
+      "control": "candidates-honour-a-caller-status",
+      "clause": "Ready and Blocked scope their candidates through a caller-supplied filter.Statuses rather than discarding it (qy3de.8)",
+      "file": "internal/core/graph.go",
+      "test": "TestReadyAndBlockedScopeCandidatesByStatus/honours_the_set_the_caller_names",
+      "old": "if len(filter.Statuses) == 0 {",
+      "new": "if true {"
+    },
+    {
+      "control": "candidates-default-to-open",
+      "clause": "An unset filter.Statuses means open only, which is what keeps `drops ready` and `drops blocked` byte-identical now that a caller can name a status set (qy3de.8)",
+      "file": "internal/core/graph.go",
+      "test": "TestReadyAndBlockedScopeCandidatesByStatus/defaults_to_open_when_the_caller_names_none",
+      "old": "filter.Statuses = []model.Status{model.StatusOpen}",
+      "new": "filter.Statuses = nil"
+    },
+    {
+      "control": "candidates-limit-the-answer",
+      "clause": "A limit caps the answer, not the candidate pool: the store applies Limit as SQL LIMIT before either verb has partitioned anything, so Ready and Blocked must draw from an unlimited pool (qy3de.8)",
+      "file": "internal/core/graph.go",
+      "test": "TestReadyAndBlockedLimitTheAnswerNotTheCandidatePool",
+      "old": "filter.Limit = 0",
+      "new": "_ = filter.Limit"
     }
   ]
 }
