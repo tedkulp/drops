@@ -49,12 +49,60 @@ test:
     DROPS_DB="{{no_default_store}}" go test ./... -race
 
 # A green `go test` is not a green build: vet reads the whole tree.
-# `gofmt -l` exits zero while listing files, so test its output instead.
+#
+# Two things about `gofmt -l` shape this recipe. It exits ZERO while listing
+# files, so its output is the signal and never its status. And it exits 2 on a
+# path it cannot lstat, which is the failure `set -e` is here to catch: an
+# empty list from a gofmt that never ran reads exactly like a clean tree.
+#
+# The file list comes from git rather than from walking `.`, which is d5xwd.
+# `.` includes `/.scratch/`, the gitignored development-store directory, so a
+# leftover `.go` script in there failed the gate for a reason that had nothing
+# to do with the commit under test. `go vet ./...` never had the problem: it
+# walks packages, and `.scratch/` is not one.
+#
+# `--cached --others --exclude-standard` is tracked files PLUS untracked ones
+# git would offer to add, and it is the pairing that matters: the gate still
+# sees a new .go file nobody has run `git add` on yet, so what it stops looking
+# at is only what this checkout already treats as not its own. `--exclude-
+# standard` is git's own exclude set, not `.gitignore` alone — it also reads
+# `.git/info/exclude` and the user's `core.excludesFile`. That is deliberate.
+# It makes the gate's idea of this tree the same one `git status` has, which is
+# what makes a checkout under a globally-ignored path (`.worktrees/`, say — a
+# second checkout of this repo at another commit) stay out of a formatting
+# check that is asking about THIS commit. The price is that the untracked half
+# is as machine-specific as `git status` is; the tracked half is not, because
+# `--cached` ignores excludes entirely.
+#
+# An index entry deleted from the working tree is dropped by the `-f` test, so
+# a half-done `rm` of a .go file is not reported as a formatting failure.
+#
+# The empty list is then asserted against, because it is how a broken listing
+# would otherwise say "clean". `git ls-files` prints nothing and exits 128
+# outside a work tree, and prints nothing at exit 0 for a copy of this tree
+# living somewhere an enclosing repository ignores — a `git archive` export, a
+# container COPY that dropped `.git`. Process substitution puts either status
+# out of `set -e`'s reach. This is a Go module, so zero .go files is never a
+# true answer, and saying so is a better guard than proving a work tree exists:
+# it is THIS tree being listed that the check depends on.
+#
+# The git dependency is not new: `build` already shells out to `git describe`.
 
-# go vet, plus a gofmt-clean check.
+# go vet, plus a gofmt-clean check over every file git counts as part of the tree.
 lint:
+    #!/usr/bin/env bash
+    set -euo pipefail
     go vet ./...
-    @test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+    files=()
+    while IFS= read -r -d '' f; do
+      if [ -f "$f" ]; then files+=("$f"); fi
+    done < <(git ls-files -z --cached --others --exclude-standard -- '*.go')
+    if (( ${#files[@]} == 0 )); then
+      echo "lint: git listed no .go files here; this is a Go module, so that is a broken listing, not a clean tree" >&2
+      exit 1
+    fi
+    unformatted=$(gofmt -l "${files[@]}")
+    if [ -n "$unformatted" ]; then printf '%s\n' "$unformatted"; exit 1; fi
 
 # The gate: lint, then the full race suite.
 test-all: lint test

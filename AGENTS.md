@@ -17,6 +17,15 @@ directory.
 `just test-all`: `go vet` and a gofmt check, then `go test ./... -race`. A green
 `go test` is not a green build.
 
+The gofmt check formats what **git** counts as part of this tree — tracked files
+plus untracked ones git would offer to add — and not everything under `.`. So an
+unformatted `.go` file left in the gitignored `/.scratch/` does not fail the gate,
+while a new file you have not run `git add` on still does. "What git counts" means
+git's whole exclude set, not `.gitignore` alone: `.git/info/exclude` and your
+`core.excludesFile` are read too, so the gate's view of this tree is exactly `git
+status`'s view, and the untracked half of that is as machine-specific as `git
+status` is. Tracked files are not — `--cached` ignores excludes.
+
 `test` and `mutate` export `DROPS_DB` to `/dev/null/no-default-store-in-tests/drops.db`
 — not a scratch store but a tripwire, so a test that reaches for `store.DefaultPath()`
 fails with ENOTDIR and names the path. Since the cutover (`dw32p.28`) this is the

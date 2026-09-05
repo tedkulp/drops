@@ -129,6 +129,20 @@ using.
   the tree for darwin on every run, since no test on the build machine can go
   red for a constant that only another `GOOS` rejects.
 
+### Internal
+
+- **The gate's gofmt check reads the tree from git, not from `.`.** `gofmt -l .`
+  walked `/.scratch/` — the gitignored development-store directory — so a
+  leftover `.go` script left there by an earlier session failed `just test-all`
+  for a reason that had nothing to do with the commit under test. The check now
+  formats `git ls-files --cached --others --exclude-standard -- '*.go'`:
+  tracked files plus untracked ones git would offer to add, so a new file nobody
+  has run `git add` on yet is still checked, and the gate's idea of this tree is
+  `git status`'s rather than a second exclusion list to keep in step. An empty
+  listing is refused instead of read as clean, since that is what a copy of the
+  tree with no usable `.git` produces. `go vet ./...` never had the problem — it
+  walks packages, and `.scratch/` is not one.
+
 ## 0.1.0 — 2026-09-03
 
 First release, and the one that took over `~/.drops/drops.db` and the `drops`
