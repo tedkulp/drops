@@ -77,9 +77,10 @@
 // already holds — so it goes through applyFilter, drops the follow stack the
 // way a filter keystroke does, and survives C and a because every reload
 // re-derives the visible set through that one function. It is deliberately not
-// core.Ready, which forces status={open} and so cannot see the in_progress
-// issue you are working on (drops://8bbam); keeping the predicate local is
-// what leaves the row set as list's contract under it.
+// core.Ready: re-asking the store would throw away what the pane's own modes
+// had put on screen — the closed rows C added, and a deferred issue, which
+// core.Ready omits. Keeping the predicate local is what leaves the row set as
+// list's contract under it.
 //
 // # Following
 //

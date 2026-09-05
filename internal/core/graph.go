@@ -17,8 +17,9 @@ type BlockedIssue struct {
 }
 
 // Ready returns the live, non-deferred Issues with no open blocks edge, over
-// the candidate set filter names. An unset filter.Statuses means open, so a
-// caller that does not ask about status gets what "actionable" has always meant.
+// the candidate set filter names. An unset filter.Statuses means the actionable
+// statuses, open and in_progress, so a caller that does not ask about status
+// gets everything it could pick up rather than only what nobody has started.
 func (core *Core) Ready(ctx context.Context, filter IssueFilter) ([]model.Issue, error) {
 	limit := filter.Limit
 	candidates, err := core.candidates(ctx, filter)
@@ -44,7 +45,8 @@ func (core *Core) Ready(ctx context.Context, filter IssueFilter) ([]model.Issue,
 }
 
 // Blocked returns the exact complement of Ready over the same live,
-// non-deferred candidates, and reads filter.Statuses the same way.
+// non-deferred candidates, and reads filter.Statuses the same way. So the two
+// partition one set between them: every actionable Issue is in exactly one.
 func (core *Core) Blocked(ctx context.Context, filter IssueFilter) ([]BlockedIssue, error) {
 	limit := filter.Limit
 	candidates, err := core.candidates(ctx, filter)
@@ -73,9 +75,15 @@ func (core *Core) Blocked(ctx context.Context, filter IssueFilter) ([]BlockedIss
 // names, unlimited so the limit applies to the answer rather than to the pool.
 // The default lives here, once, so the two verbs cannot disagree about what an
 // unstated status means.
+//
+// That default is `list`'s: open AND in_progress. Open alone left the Issue you
+// had started in neither answer — `ready` could not offer you the work you were
+// already doing, and `blocked` could not tell you what it was waiting on — so
+// the two verbs summed to less than the live set they claim to partition
+// (8bbam). Closed stays out: a finished Issue is neither actionable nor stuck.
 func (core *Core) candidates(ctx context.Context, filter IssueFilter) ([]model.Issue, error) {
 	if len(filter.Statuses) == 0 {
-		filter.Statuses = []model.Status{model.StatusOpen}
+		filter.Statuses = []model.Status{model.StatusOpen, model.StatusInProgress}
 	}
 	filter.Limit = 0
 	return core.store.Issues(ctx, filter)

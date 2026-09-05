@@ -83,7 +83,7 @@
     },
     {
       "control": "the-ready-predicate-is-an-open-blocker-count",
-      "clause": "`r` keeps the rows with no OPEN blocker and nothing else — a local predicate over blockedBy, not core.Ready, which forces status={open} and so cannot see an in_progress issue at all (g7b23, drops://8bbam)",
+      "clause": "`r` keeps the rows with no OPEN blocker and nothing else — a local predicate over blockedBy the pane already holds, not core.Ready, which is a different question asked of the store (g7b23)",
       "file": "internal/tui/rows.go",
       "test": "TestReadyKeepsOnlyTheRowsWithNoOpenBlocker",
       "old": "\t\tif candidate.blockedBy == 0 {\n\t\t\tkept = append(kept, candidate)\n\t\t}",

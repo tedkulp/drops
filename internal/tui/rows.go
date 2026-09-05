@@ -82,13 +82,16 @@ func matching(rows []row, needle string) []row {
 // leaving the store's alone.
 //
 // It is deliberately NOT core.Ready, and g7b23 exists because that is the
-// trap. core.Ready sets filter.Statuses = {open} unconditionally and so cannot
-// see an in_progress issue at all (drops://8bbam), which is precisely the row
-// set qy3de.4 rejected for this pane: it would structurally hide the issue you
-// are working on. This is a local predicate over rows the pane already has —
-// blockedBy, annotated once per refresh from the store-wide
-// core.OpenBlockers — so the row set stays `list`'s contract, no key can reach
-// 8bbam, and it composes with `/`, `C` and `a` the way matching already does.
+// trap. core.Ready asks the STORE a question, so it would throw away whatever
+// the pane's own modes had put on screen: the closed rows `C` added, and a
+// deferred issue, which core.Ready drops and this predicate keeps. (Until
+// drops://8bbam it also could not see an in_progress issue at all, which is
+// the row set qy3de.4 rejected for this pane; that half is fixed, and the
+// reason for keeping the predicate local is not.) This is a local predicate
+// over rows the pane already has — blockedBy, annotated once per refresh from
+// the store-wide core.OpenBlockers — so the row set stays `list`'s contract
+// under `r`, and it composes with `/`, `C` and `a` the way matching already
+// does.
 func ready(rows []row) []row {
 	kept := make([]row, 0, len(rows))
 	for _, candidate := range rows {

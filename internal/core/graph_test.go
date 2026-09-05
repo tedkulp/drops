@@ -252,9 +252,11 @@ func TestDependencyCyclesReportEveryCycleInDeterministicOrder(t *testing.T) {
 var fixedNow = time.Date(2026, 9, 2, 15, 0, 0, 0, time.UTC)
 
 // The clause: OpenBlockers reports the open-blocker map for the whole live
-// graph, not for the candidate set Ready and Blocked scope themselves to. The
-// left pane lists in_progress rows (qy3de.4), and Blocked's own default
-// candidate set cannot see one, so the annotation has to come from here.
+// graph, not for the candidate set Ready and Blocked scope themselves to. A
+// caller that narrows Blocked — here to open alone — stops seeing the
+// in_progress row, and the pane annotating rows it loaded by `list`'s contract
+// (qy3de.4) needs the row keyed whatever status it carries. Only closed and
+// tombstoned are terminal, so an in_progress Issue is still keyed here.
 func TestOpenBlockersCoversTheRowsBlockedCannotSee(t *testing.T) {
 	rules, _ := openCoreWithIDs(t, "doing", "wall")
 	project := blockingGraph(t, rules,
@@ -265,12 +267,13 @@ func TestOpenBlockersCoversTheRowsBlockedCannotSee(t *testing.T) {
 		t.Fatalf("start doing: %v", err)
 	}
 
-	blocked, err := rules.Blocked(t.Context(), core.IssueFilter{Project: &project})
+	narrowed := core.IssueFilter{Project: &project, Statuses: []model.Status{model.StatusOpen}}
+	blocked, err := rules.Blocked(t.Context(), narrowed)
 	if err != nil {
 		t.Fatalf("blocked: %v", err)
 	}
 	if len(blocked) != 0 {
-		t.Fatalf("blocked = %#v, want none: an in_progress Issue is not an open candidate", blocked)
+		t.Fatalf("blocked = %#v, want none: the caller narrowed the candidates to open", blocked)
 	}
 
 	blockers, err := rules.OpenBlockers(t.Context())
@@ -287,18 +290,22 @@ func TestOpenBlockersCoversTheRowsBlockedCannotSee(t *testing.T) {
 
 // Two clauses, one graph. Ready and Blocked scope their candidates through
 // filter.Statuses when the caller names one, rather than discarding it; and an
-// unset Statuses still means open only, which is what keeps `drops ready` and
-// `drops blocked` byte-identical (neither passes a status set).
+// unset Statuses means the ACTIONABLE statuses — open and in_progress — so the
+// two verbs partition the same live set `drops list` shows and the Issue you
+// have started is in one of them (8bbam).
 func TestReadyAndBlockedScopeCandidatesByStatus(t *testing.T) {
-	rules, _ := openCoreWithIDs(t, "doing", "going", "wall")
+	rules, _ := openCoreWithIDs(t, "doing", "done", "going", "wall")
 	project := blockingGraph(t, rules,
-		[]model.ID{"doing", "going", "wall"},
+		[]model.ID{"doing", "done", "going", "wall"},
 		[][2]model.ID{{"doing", "wall"}},
 	)
 	for _, id := range []model.ID{"doing", "going"} {
 		if _, err := rules.SetIssueStatus(t.Context(), id, model.StatusInProgress, ""); err != nil {
 			t.Fatalf("start %s: %v", id, err)
 		}
+	}
+	if _, err := rules.SetIssueStatus(t.Context(), "done", model.StatusClosed, "finished"); err != nil {
+		t.Fatalf("close done: %v", err)
 	}
 
 	t.Run("honours the set the caller names", func(t *testing.T) {
@@ -324,23 +331,41 @@ func TestReadyAndBlockedScopeCandidatesByStatus(t *testing.T) {
 		}
 	})
 
-	t.Run("defaults to open when the caller names none", func(t *testing.T) {
+	// The bug this default fixes: `ready` answers "what can I work on" and
+	// omitted every Issue anyone had started, while `blocked` omitted the
+	// same rows, so the two did not add up to the live set between them.
+	t.Run("defaults to the actionable statuses when the caller names none", func(t *testing.T) {
 		filter := core.IssueFilter{Project: &project}
 
 		ready, err := rules.Ready(t.Context(), filter)
 		if err != nil {
 			t.Fatalf("ready: %v", err)
 		}
-		if len(ready) != 1 || ready[0].ID != "wall" {
-			t.Errorf("ready = %v, want only wall: the one open Issue", ids(ready))
+		// Newest first within a priority, so wall leads going.
+		if want := []model.ID{"wall", "going"}; !slices.Equal(ids(ready), want) {
+			t.Errorf("ready = %v, want %v: the unblocked in_progress and open Issues, no closed one", ids(ready), want)
 		}
 
 		blocked, err := rules.Blocked(t.Context(), filter)
 		if err != nil {
 			t.Fatalf("blocked: %v", err)
 		}
-		if len(blocked) != 0 {
-			t.Errorf("blocked = %#v, want none: the only blocked Issue is in_progress", blocked)
+		if len(blocked) != 1 || blocked[0].Issue.ID != "doing" {
+			t.Fatalf("blocked = %#v, want only doing: the in_progress Issue with an open blocker", blocked)
+		}
+
+		// The arithmetic the ticket measured: every live actionable Issue is
+		// in exactly one of the two answers, so ready + blocked == list.
+		live, err := rules.Issues(t.Context(), core.IssueFilter{
+			Project:  &project,
+			Statuses: []model.Status{model.StatusOpen, model.StatusInProgress},
+		})
+		if err != nil {
+			t.Fatalf("list: %v", err)
+		}
+		if len(ready)+len(blocked) != len(live) {
+			t.Errorf("ready %d + blocked %d != list %d: %v and %v over %v",
+				len(ready), len(blocked), len(live), ids(ready), blocked, ids(live))
 		}
 	})
 }

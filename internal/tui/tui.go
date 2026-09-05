@@ -74,7 +74,7 @@ type Model struct {
 	// what you can actually pick up. It is not part of scope, and that is
 	// the distinction worth keeping — scope is what the STORE is asked for,
 	// and this is a predicate over rows already loaded, so it costs no read
-	// and cannot reach core.Ready's status defect (drops://8bbam).
+	// and cannot drop a row the pane's own modes put on screen.
 	readyOnly bool
 	cursor    cursor
 

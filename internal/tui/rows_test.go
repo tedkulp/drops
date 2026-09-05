@@ -210,10 +210,10 @@ func ids(rows []row) []model.ID {
 }
 
 func TestReadyKeepsOnlyTheRowsWithNoOpenBlocker(t *testing.T) {
-	// Deliberately NOT core.Ready's row set: core.Ready forces
-	// statuses={open} and so cannot see an in_progress issue at all
-	// (drops://8bbam), which is why the in_progress row here has to survive.
-	// The predicate is the count the row already carries, nothing else.
+	// Deliberately NOT core.Ready's row set: this is a predicate over the
+	// rows the pane already holds, so the only thing it may drop is a row
+	// with an open blocker. The in_progress row here has to survive it —
+	// the pane lists `list`'s contract and `r` does not narrow status.
 	rows := []row{
 		{id: "alpha", status: model.StatusOpen, blockedBy: 0},
 		{id: "bravo", status: model.StatusOpen, blockedBy: 2},

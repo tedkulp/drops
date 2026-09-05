@@ -679,12 +679,29 @@
       "new": "if true {"
     },
     {
-      "control": "candidates-default-to-open",
-      "clause": "An unset filter.Statuses means open only, which is what keeps `drops ready` and `drops blocked` byte-identical now that a caller can name a status set (qy3de.8)",
+      "control": "candidates-default-to-the-actionable-statuses",
+      "clause": "An unset filter.Statuses means the actionable statuses, open AND in_progress, so the Issue you have started is in one of `drops ready` and `drops blocked` rather than in neither (8bbam)",
       "file": "internal/core/graph.go",
-      "test": "TestReadyAndBlockedScopeCandidatesByStatus/defaults_to_open_when_the_caller_names_none",
-      "old": "filter.Statuses = []model.Status{model.StatusOpen}",
+      "test": "TestReadyAndBlockedScopeCandidatesByStatus/defaults_to_the_actionable_statuses_when_the_caller_names_none",
+      "old": "filter.Statuses = []model.Status{model.StatusOpen, model.StatusInProgress}",
+      "new": "filter.Statuses = []model.Status{model.StatusOpen}"
+    },
+    {
+      "control": "candidates-default-excludes-closed",
+      "clause": "That default is the ACTIONABLE statuses and not merely every live one: a closed Issue is neither ready nor blocked (8bbam)",
+      "file": "internal/core/graph.go",
+      "test": "TestReadyAndBlockedScopeCandidatesByStatus/defaults_to_the_actionable_statuses_when_the_caller_names_none",
+      "old": "filter.Statuses = []model.Status{model.StatusOpen, model.StatusInProgress}",
       "new": "filter.Statuses = nil"
+    },
+    {
+      "control": "ready-shows-the-issue-you-started",
+      "clause": "`drops ready` and `drops blocked` account for every live issue between them, which is the CLI contract docs/agents/issue-tracker.md states and the arithmetic 8bbam measured (160 + 13 != 174)",
+      "file": "internal/core/graph.go",
+      "test": "TestReadyAndBlockedSeeTheIssueYouStarted",
+      "package": "./internal/cli",
+      "old": "filter.Statuses = []model.Status{model.StatusOpen, model.StatusInProgress}",
+      "new": "filter.Statuses = []model.Status{model.StatusOpen}"
     },
     {
       "control": "candidates-limit-the-answer",

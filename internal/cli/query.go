@@ -88,7 +88,7 @@ func rejectIncludeClosed(app *App) error {
 		return nil
 	}
 	return invalidArgs("-a/--all is meaningless here - a ready or blocked issue is open " +
-		"by definition; use `list -a` to see closed issues")
+		"or in_progress by definition; use `list -a` to see closed issues")
 }
 
 // slugMap caches project-key to slug for the --all-projects column.
@@ -269,7 +269,7 @@ func newReadyCmd(app *App) *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "ready",
-		Short: "List actionable issues: open, not deferred, no open blockers",
+		Short: "List actionable issues: open or in_progress, not deferred, no open blockers",
 		Args:  noArgs(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := rejectIncludeClosed(app); err != nil {
@@ -316,7 +316,7 @@ func newBlockedCmd(app *App) *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "blocked",
-		Short: "List open issues waiting on an unfinished blocker",
+		Short: "List live issues waiting on an unfinished blocker",
 		Args:  noArgs(),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := rejectIncludeClosed(app); err != nil {

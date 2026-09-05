@@ -138,6 +138,17 @@ using.
 
 ### Fixed
 
+- **`drops ready` and `drops blocked` see an `in_progress` issue.** Both drew
+  their candidates from `open` alone, so the issue you had actually started was
+  in neither: `ready` could not offer you the work in front of you and `blocked`
+  could not tell you what it was waiting on. Measured across the store, `ready`
+  160 + `blocked` 13 came to 173 against a live set of 174. Their candidates are
+  now `list`'s — `open` **and** `in_progress` — so the two partition one set
+  between them and every live issue is in exactly one. Closed stays out of both,
+  which is still why `-a` is refused rather than ignored, and a deferred issue
+  still leaves both until its deferral passes. `drops tui` is unaffected: its
+  `r` key was always a predicate over the loaded rows rather than a call to
+  `ready`.
 - **The tree builds on macOS again.** `isTerminal` issued the terminal-attribute
   ioctl by its Linux-only name, `unix.TCGETS`, so `internal/cli` did not compile
   for darwin at all. The request is now a build-tagged constant — `TCGETS` on

@@ -130,8 +130,56 @@ func TestBlockedRowNamesItsBlockers(t *testing.T) {
 	}
 }
 
+// TestReadyAndBlockedSeeTheIssueYouStarted is the arithmetic 8bbam measured:
+// `ready` answers "what can I work on" and `blocked` answers "what is stuck",
+// so between them they have to account for every live issue. Statuses open
+// alone left an in_progress issue in neither — the one you had actually
+// started was the one neither verb would show you.
+func TestReadyAndBlockedSeeTheIssueYouStarted(t *testing.T) {
+	db, cwd := newStore(t)
+	wall := mustRun(t, db, cwd, "q", "--inbox", "the blocker")
+	doing := mustRun(t, db, cwd, "q", "--inbox", "started and stuck")
+	going := mustRun(t, db, cwd, "q", "--inbox", "started and free")
+	finished := mustRun(t, db, cwd, "q", "--inbox", "finished")
+	mustRun(t, db, cwd, "dep", "add", doing, wall)
+	for _, id := range []string{doing, going} {
+		mustRun(t, db, cwd, "update", id, "--status", "in_progress")
+	}
+	mustRun(t, db, cwd, "close", finished, "--reason", "done")
+
+	ready := mustRun(t, db, cwd, "ready", "--inbox")
+	if !strings.Contains(ready, going) {
+		t.Errorf("ready omitted the unblocked in_progress issue %s:\n%s", going, ready)
+	}
+	if !strings.Contains(ready, wall) {
+		t.Errorf("ready omitted the open unblocked issue %s:\n%s", wall, ready)
+	}
+	if strings.Contains(ready, doing) || strings.Contains(ready, finished) {
+		t.Errorf("ready listed a blocked or closed issue:\n%s", ready)
+	}
+
+	blocked := mustRun(t, db, cwd, "blocked", "--inbox")
+	if !strings.Contains(blocked, doing) {
+		t.Errorf("blocked omitted the in_progress issue waiting on %s:\n%s", wall, blocked)
+	}
+
+	// The sum the ticket measured: ready + blocked == list, over the same scope.
+	type row struct {
+		ID string `json:"id"`
+	}
+	type wrapped struct {
+		Issue row `json:"issue"`
+	}
+	readyRows := decodeMany[row](t, mustRun(t, db, cwd, "ready", "--inbox", "--json"))
+	blockedRows := decodeMany[wrapped](t, mustRun(t, db, cwd, "blocked", "--inbox", "--json"))
+	listRows := decodeMany[row](t, mustRun(t, db, cwd, "list", "--inbox", "--json"))
+	if len(readyRows)+len(blockedRows) != len(listRows) {
+		t.Fatalf("ready %d + blocked %d != list %d", len(readyRows), len(blockedRows), len(listRows))
+	}
+}
+
 // TestReadyAndBlockedRefuseTheAllFlag: -a is meaningless on a queue whose
-// members are open by definition, and a silently-ignored flag is worse than a
+// members are live by definition, and a silently-ignored flag is worse than a
 // refusal because it reads as an answer.
 func TestReadyAndBlockedRefuseTheAllFlag(t *testing.T) {
 	db, cwd := newStore(t)

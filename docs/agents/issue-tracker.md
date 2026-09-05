@@ -47,6 +47,14 @@ relation, and the whole comment thread.
 Issue types: `task`, `bug`, `feature`, `epic`, `chore`, `research`, `decision`.
 Priority is 0 (critical) to 4 (backlog), default 2.
 
+**`ready` and `blocked` partition `list`.** Both take their candidates from the
+same live set `list` shows — `open` **and** `in_progress` — and split it on one
+question: does this issue have an unfinished blocker? So every live issue is in
+exactly one of them, and `ready` shows the work you have already started rather
+than hiding it. Neither reaches a closed issue, which is why `-a` is refused on
+both rather than ignored. A deferred issue is the one exception to the sum: it
+leaves both until its deferral passes.
+
 Every scanning verb answers in one order: priority ascending, then newest first,
 then by id. Relevance never reorders a queue you are working through, so a
 `search` result and a `list` result put the same two issues in the same order.
@@ -483,8 +491,8 @@ explanation. `-P <slug>` scopes it like every other verb.
 
 **What the left pane lists** is `list`'s contract — every live issue in the
 scope, `open` **and** `in_progress` — in the same order every scanning verb
-uses, never re-sorted. Not `ready`: `ready` cannot see an `in_progress` issue
-at all, so it would structurally hide the one you are working on.
+uses, never re-sorted. Not `ready`: a pane you navigate from has to show the
+blocked rows too, and it annotates them rather than dropping them.
 
 The row is the CLI's row with two changes and one drop, and they are worth
 knowing because **this is the one surface in drops that truncates an id**:
@@ -530,12 +538,10 @@ survives all three, because it is a predicate over the rows already loaded —
 `blockedBy == 0`, the same count the ` [N]` marker prints — and not a different
 question asked of the store.
 
-So it is **not** `drops ready`, on purpose, and the difference is the point:
-`ready` forces `status = open` and therefore cannot see an `in_progress` issue
-at all ([drops://8bbam](drops://8bbam)), so a key wired to it would hide the
-issue you are working on. The pane's row set stays `list`'s contract under `r`;
-what leaves is the blocked rows and nothing else. A deferred issue, which
-`drops ready` also omits, stays.
+So it is **not** `drops ready`, on purpose. Re-asking the store would throw
+away whatever the pane's own modes had put on screen: the closed rows `C`
+added, and a deferred issue, which `drops ready` omits. Under `r` the row set
+stays `list`'s contract and what leaves is the blocked rows, nothing else.
 
 **`Esc` is the universal go-back key, and it pops exactly one layer a press**,
 in this order:
@@ -897,8 +903,10 @@ drops ready -t task --json | jq --arg m "<map-id>." \
   '[.[] | select(.id | startswith($m)) | select((.assignee // "") == "")]'
 ```
 
-`drops ready` already means open and unblocked. `-t task` drops the map's own
-epic, which is otherwise unblocked and shows up in its own frontier. The
+`drops ready` already means live and unblocked, `in_progress` included, so a
+ticket someone started and released comes back to the frontier. `-t task` drops
+the map's own epic, which is otherwise unblocked and shows up in its own
+frontier. The
 `assignee` filter is done here because `list` and `ready` have no assignee flag.
 It treats both an absent assignee and the historical empty string as unclaimed.
 First by id order wins.
