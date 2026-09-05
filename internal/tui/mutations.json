@@ -568,6 +568,30 @@
       "test": "TestTheHelpScreenCapturesTheKeysBehindIt",
       "old": "\tif m.help {\n\t\tswitch key {",
       "new": "\tif false {\n\t\tswitch key {"
+    },
+    {
+      "control": "ctrl-c-quits-from-the-top-level",
+      "clause": "`ctrl+c` quits the full-screen TUI from the top-level keymap instead of being swallowed (9cta5)",
+      "file": "internal/tui/tui.go",
+      "test": "TestCtrlCQuitsFromTheTopLevel",
+      "old": "\tcase \"q\", \"ctrl+c\":\n\t\t// A full-screen program that swallows ctrl+c",
+      "new": "\tcase \"q\":\n\t\t// A full-screen program that swallows ctrl+c"
+    },
+    {
+      "control": "ctrl-c-quits-from-an-open-modal",
+      "clause": "`ctrl+c` quits the full-screen TUI while a modal is open instead of being captured by the modal (9cta5)",
+      "file": "internal/tui/tui.go",
+      "test": "TestCtrlCQuitsFromAnOpenModal",
+      "old": "\tcase \"ctrl+c\":\n\t\treturn tea.Quit\n\tcase \"esc\":\n\t\tm.closeModal()",
+      "new": "\tcase \"esc\":\n\t\tm.closeModal()"
+    },
+    {
+      "control": "ctrl-c-quits-from-the-filter-prompt",
+      "clause": "`ctrl+c` quits the full-screen TUI while the `/` filter prompt is open instead of being swallowed as a non-printable key (9cta5)",
+      "file": "internal/tui/tui.go",
+      "test": "TestCtrlCQuitsFromTheFilterPrompt",
+      "old": "\tif m.typing {\n\t\tswitch key {\n\t\tcase \"ctrl+c\":\n\t\t\treturn tea.Quit\n\t\tcase \"enter\":",
+      "new": "\tif m.typing {\n\t\tswitch key {\n\t\tcase \"enter\":"
     }
   ]
 }

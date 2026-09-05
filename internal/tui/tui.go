@@ -728,6 +728,8 @@ func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 	// `q`, `a` and `C` without quitting or changing scope.
 	if m.typing {
 		switch key {
+		case "ctrl+c":
+			return tea.Quit
 		case "enter":
 			m.typing = false
 		case "esc":

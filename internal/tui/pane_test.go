@@ -150,6 +150,43 @@ func TestTheFilterPromptSwallowsItsKeys(t *testing.T) {
 	}
 }
 
+func assertCtrlCQuits(t *testing.T, pane *Model, mode string) {
+	t.Helper()
+	cmd := pane.key(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	if cmd == nil {
+		t.Fatalf("ctrl+c returned no command %s", mode)
+	}
+	msg := cmd()
+	if _, ok := msg.(tea.QuitMsg); !ok {
+		t.Fatalf("ctrl+c returned %T %s, want tea.QuitMsg", msg, mode)
+	}
+}
+
+func TestCtrlCQuitsFromTheTopLevel(t *testing.T) {
+	fixture := newFixture(t)
+	fixture.issue("An issue", 2)
+	assertCtrlCQuits(t, fixture.model(80, 24), "at the top level")
+}
+
+func TestCtrlCQuitsFromAnOpenModal(t *testing.T) {
+	fixture := newFixture(t)
+	fixture.issue("An issue", 2)
+	pane := fixture.model(80, 24)
+	press(t, pane, "x")
+	if pane.modal == nil {
+		t.Fatal("x opened no modal; this fixture proves nothing")
+	}
+	assertCtrlCQuits(t, pane, "while a modal was open")
+}
+
+func TestCtrlCQuitsFromTheFilterPrompt(t *testing.T) {
+	fixture := newFixture(t)
+	fixture.issue("An issue", 2)
+	pane := fixture.model(80, 24)
+	press(t, pane, "/")
+	assertCtrlCQuits(t, pane, "while the filter prompt was open")
+}
+
 func TestFollowingRetargetsTheDetailPaneWithoutMovingTheCursor(t *testing.T) {
 	// The one navigational claim the whole map rests on. qy3de.12 gives it a
 	// key; the mechanism is here, so it is asserted here.

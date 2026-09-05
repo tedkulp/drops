@@ -157,6 +157,10 @@ using.
 
 ### Fixed
 
+- **`Ctrl+C` quits `drops tui` while the `/` filter prompt is open.** The
+  prompt still captures printable command keys such as `q`, `a`, and `C`, but
+  no longer swallows the non-printable interrupt key.
+
 - **`drops ready` and `drops blocked` see an `in_progress` issue.** Both drew
   their candidates from `open` alone, so the issue you had actually started was
   in neither: `ready` could not offer you the work in front of you and `blocked`
