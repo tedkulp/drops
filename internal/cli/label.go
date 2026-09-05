@@ -22,9 +22,10 @@ func registerLabelCmds(root *cobra.Command, app *App) {
 
 func newLabelAddCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "add <id> <label>...",
-		Short: "Add labels to an issue",
-		Args:  minimumArgs(2),
+		Use:               "add <id> <label>...",
+		Short:             "Add labels to an issue",
+		Args:              minimumArgs(2),
+		ValidArgsFunction: completeIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
@@ -45,9 +46,10 @@ func newLabelAddCmd(app *App) *cobra.Command {
 
 func newLabelRmCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "rm <id> <label>...",
-		Short: "Remove labels from an issue",
-		Args:  minimumArgs(2),
+		Use:               "rm <id> <label>...",
+		Short:             "Remove labels from an issue",
+		Args:              minimumArgs(2),
+		ValidArgsFunction: completeIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
@@ -68,9 +70,10 @@ func newLabelRmCmd(app *App) *cobra.Command {
 
 func newLabelListCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "list [<id>]",
-		Short: "List an issue's labels, or every label with its issue count",
-		Args:  maximumArgs(1),
+		Use:               "list [<id>]",
+		Short:             "List an issue's labels, or every label with its issue count",
+		Args:              maximumArgs(1),
+		ValidArgsFunction: completeIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 1 {
 				labels, err := app.core.IssueLabels(app.ctx, model.ID(args[0]))

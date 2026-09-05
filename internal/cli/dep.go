@@ -32,10 +32,11 @@ func parseDepType(depType string) (model.DependencyType, error) {
 func newDepAddCmd(app *App) *cobra.Command {
 	var depType string
 	cmd := &cobra.Command{
-		Use:   "add <id> <blocker-id>",
-		Short: "Record that <id> depends on <blocker-id>",
-		Long:  "Record that <id> depends on <blocker-id>. With the default type\n\"blocks\", <blocker-id> blocks <id>.",
-		Args:  exactArgs(2),
+		Use:               "add <id> <blocker-id>",
+		Short:             "Record that <id> depends on <blocker-id>",
+		Long:              "Record that <id> depends on <blocker-id>. With the default type\n\"blocks\", <blocker-id> blocks <id>.",
+		Args:              exactArgs(2),
+		ValidArgsFunction: completeIssueIDs(app, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
@@ -61,9 +62,10 @@ func newDepAddCmd(app *App) *cobra.Command {
 func newDepRmCmd(app *App) *cobra.Command {
 	var depType string
 	cmd := &cobra.Command{
-		Use:   "rm <id> <blocker-id>",
-		Short: "Remove a dependency edge",
-		Args:  exactArgs(2),
+		Use:               "rm <id> <blocker-id>",
+		Short:             "Remove a dependency edge",
+		Args:              exactArgs(2),
+		ValidArgsFunction: completeIssueIDs(app, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
@@ -87,9 +89,10 @@ func newDepRmCmd(app *App) *cobra.Command {
 
 func newDepTreeCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "tree <id>",
-		Short: "Show the longest chain of open blockers, deepest last",
-		Args:  exactArgs(1),
+		Use:               "tree <id>",
+		Short:             "Show the longest chain of open blockers, deepest last",
+		Args:              exactArgs(1),
+		ValidArgsFunction: completeIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chain, err := app.core.LongestBlockerChain(app.ctx, model.ID(args[0]))
 			if err != nil {

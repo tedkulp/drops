@@ -897,6 +897,78 @@
       "test": "TestConfigShowSeparatesTheDirectoryFromTheScope",
       "old": "\t\t\tif app.inbox {",
       "new": "\t\t\tif false {"
+    },
+    {
+      "control": "issue-completion-carries-the-title",
+      "clause": "An id completion is only useful as a picker: the id carries its title as the description, so a tab press reads like a menu rather than a string of random ids (zwuh8)",
+      "file": "internal/cli/completion.go",
+      "test": "TestIssueCompletionIsAProjectScopedLivePicker",
+      "old": "\t\t\t\tcompletions = append(completions, cobra.CompletionWithDesc(id, completionDescription(issue.Title)))",
+      "new": "\t\t\t\tcompletions = append(completions, id)"
+    },
+    {
+      "control": "issue-completion-defaults-to-live",
+      "clause": "An id completion defaults to open and in_progress, list's contract, so closed issues stay out unless -a asks for them (zwuh8)",
+      "file": "internal/cli/completion.go",
+      "test": "TestIssueCompletionIsAProjectScopedLivePicker",
+      "old": "\t\treturn applyStatuses(filter, nil, app.includeClosed)",
+      "new": "\t\treturn applyStatuses(filter, []string{\"all\"}, app.includeClosed)"
+    },
+    {
+      "control": "issue-completion-include-closed-widens",
+      "clause": "-a widens an id completion to closed issues, the same flag that widens list (zwuh8)",
+      "file": "internal/cli/completion.go",
+      "test": "TestIssueCompletionIsAProjectScopedLivePicker",
+      "old": "\t\treturn applyStatuses(filter, nil, app.includeClosed)",
+      "new": "\t\treturn applyStatuses(filter, nil, false)"
+    },
+    {
+      "control": "reopen-completes-closed",
+      "clause": "reopen is the one exception to the live default: it completes closed issues, because a live-only list offers nothing it can act on (zwuh8)",
+      "file": "internal/cli/completion.go",
+      "test": "TestIssueCompletionIsAProjectScopedLivePicker",
+      "old": "\t\tfilter.Statuses = []model.Status{model.StatusClosed}",
+      "new": "\t\tfilter.Statuses = []model.Status{model.StatusOpen, model.StatusInProgress}"
+    },
+    {
+      "control": "list-status-completion-offers-all",
+      "clause": "list and count's --status completion offers the literal \"all\" widening value; update's single status does not (zwuh8)",
+      "file": "internal/cli/completion.go",
+      "test": "TestStaticFlagCompletionUsesTheClosedVocabularies",
+      "old": "\tif all {\n\t\tchoices = append(choices, \"all\")\n\t}",
+      "new": "\tif false {\n\t\tchoices = append(choices, \"all\")\n\t}"
+    },
+    {
+      "control": "project-flag-completes-archived",
+      "clause": "-P/--project completes every slug, archived included, because -P still scopes to an archived project's history (zwuh8)",
+      "file": "internal/cli/completion.go",
+      "test": "TestProjectAndLabelCompletionUseTheStore",
+      "old": "\t\t\tif (includeArchived || project.ArchivedAt == nil) && strings.HasPrefix(project.Slug, toComplete) {",
+      "new": "\t\t\tif project.ArchivedAt == nil && strings.HasPrefix(project.Slug, toComplete) {"
+    },
+    {
+      "control": "move-to-completes-live-destinations",
+      "clause": "move --to completes only live slugs, because an archived project is never a legal destination (zwuh8)",
+      "file": "internal/cli/completion.go",
+      "test": "TestProjectAndLabelCompletionUseTheStore",
+      "old": "\t\t\tif (includeArchived || project.ArchivedAt == nil) && strings.HasPrefix(project.Slug, toComplete) {",
+      "new": "\t\t\tif true && strings.HasPrefix(project.Slug, toComplete) {"
+    },
+    {
+      "control": "label-completion-reads-the-store",
+      "clause": "-l completes the labels that already exist in the selected scope, not an empty or store-wide guess (zwuh8)",
+      "file": "internal/cli/completion.go",
+      "test": "TestProjectAndLabelCompletionUseTheStore",
+      "old": "\t\tcounts, err := app.labelCounts()",
+      "new": "\t\tcounts, err := map[string]int{}, error(nil)"
+    },
+    {
+      "control": "unsupported-completion-shell-is-two",
+      "clause": "An unsupported completion shell is invalid input and exits 2, so a malformed `drops completion badshell` is distinguishable from a crash (zwuh8)",
+      "file": "internal/cli/completion.go",
+      "test": "TestCompletionGeneratesInstalledShellScriptsWithoutAStore",
+      "old": "\t\t\t\treturn invalidArgs(\"unsupported shell %q; choose bash, zsh, or fish\", args[0])",
+      "new": "\t\t\t\treturn nil"
     }
   ]
 }

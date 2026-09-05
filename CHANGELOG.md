@@ -123,6 +123,16 @@ using.
   `-P` still report them; and where two projects claim one origin the evidence
   goes to stdout **before** the exit 5, since that collision is the case the
   verb exists to explain.
+- **Shell completion.** `drops completion <bash|zsh|fish>` generates the script
+  for the three shells this UNIX-only program runs under, and — reversing
+  dw32p.1's well-measured decision — it is worth generating because it now
+  completes the store, not just verb and flag names. Issue ids complete as
+  `id\tTitle` over `list`'s scope (the current project's open and in_progress,
+  `-a` adds closed, `--all-projects` spans, `reopen` completes closed), `-P`
+  completes every slug, `move --to` only live destinations, and `-l` completes
+  existing labels. The static half — types, statuses, priorities — costs no
+  store read; the dynamic half costs one, which the ticket measured at ~14ms
+  per tab press, inside the instant-feeling budget.
 
 ### Changed
 

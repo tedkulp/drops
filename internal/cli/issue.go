@@ -95,6 +95,10 @@ func newCreateCmd(app *App) *cobra.Command {
 	f.StringVarP(&assignee, "assignee", "A", "", "assignee")
 	f.StringVar(&parent, "parent", "", "parent issue id; the new issue takes a .N child id")
 	f.StringSliceVarP(&labels, "label", "l", nil, "labels (repeatable or comma-separated)")
+	registerIssueTypeCompletion(cmd)
+	registerPriorityCompletion(cmd)
+	registerDynamicFlagCompletion(cmd, "label", completeLabels(app))
+	registerDynamicFlagCompletion(cmd, "parent", completeIssueIDs(app, 1))
 	return cmd
 }
 
@@ -165,9 +169,10 @@ func newShowCmd(app *App) *cobra.Command {
 		Long: "Show one or more issues in full: identity, body, every relation, and\n" +
 			"the whole comment thread.\n\n" +
 			"--json emits the same data as one object per issue, and its shape does\n" +
-			"not vary: parent is null when there is none, and blockers, blocking,\n" +
-			"children and comments are [] rather than absent.",
-		Args: minimumArgs(1),
+			"not vary: parent is null when there is none; blockers, blocking,\n" +
+			"children, discovered_from, discovered, related, and comments are [].",
+		Args:              minimumArgs(1),
+		ValidArgsFunction: completeIssueIDs(app, -1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			pages := make([]render.Page, 0, len(args))
 			jsons := make([]showIssueJSON, 0, len(args))
@@ -198,9 +203,10 @@ func newUpdateCmd(app *App) *cobra.Command {
 		status                                  string
 	)
 	cmd := &cobra.Command{
-		Use:   "update <id>",
-		Short: "Update an issue; only the flags you pass are changed",
-		Args:  exactArgs(1),
+		Use:               "update <id>",
+		Short:             "Update an issue; only the flags you pass are changed",
+		Args:              exactArgs(1),
+		ValidArgsFunction: completeIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
@@ -255,14 +261,18 @@ func newUpdateCmd(app *App) *cobra.Command {
 	f.StringVarP(&issueType, "type", "t", "", "new issue type")
 	f.StringVarP(&assignee, "assignee", "A", "", "new assignee")
 	f.IntVarP(&priority, "priority", "p", 2, "new priority 0-4")
+	registerStatusCompletion(cmd, false)
+	registerIssueTypeCompletion(cmd)
+	registerPriorityCompletion(cmd)
 	return cmd
 }
 
 func newClaimCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "claim <id> <who>",
-		Short: "Claim an unassigned issue",
-		Args:  exactArgs(2),
+		Use:               "claim <id> <who>",
+		Short:             "Claim an unassigned issue",
+		Args:              exactArgs(2),
+		ValidArgsFunction: completeIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
@@ -282,9 +292,10 @@ func newClaimCmd(app *App) *cobra.Command {
 
 func newReleaseCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "release <id>",
-		Short: "Release an issue's claim",
-		Args:  exactArgs(1),
+		Use:               "release <id>",
+		Short:             "Release an issue's claim",
+		Args:              exactArgs(1),
+		ValidArgsFunction: completeIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
@@ -305,9 +316,10 @@ func newReleaseCmd(app *App) *cobra.Command {
 func newCloseCmd(app *App) *cobra.Command {
 	var reason string
 	cmd := &cobra.Command{
-		Use:   "close <id>",
-		Short: "Close an issue",
-		Args:  exactArgs(1),
+		Use:               "close <id>",
+		Short:             "Close an issue",
+		Args:              exactArgs(1),
+		ValidArgsFunction: completeIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
@@ -329,9 +341,10 @@ func newCloseCmd(app *App) *cobra.Command {
 
 func newReopenCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "reopen <id>",
-		Short: "Reopen a closed issue",
-		Args:  exactArgs(1),
+		Use:               "reopen <id>",
+		Short:             "Reopen a closed issue",
+		Args:              exactArgs(1),
+		ValidArgsFunction: completeClosedIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err

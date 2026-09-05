@@ -240,6 +240,53 @@ trailing blank lines already gone and the round trip is exact.
 
 **What would overturn this.** One body above 131,071 bytes. The longest is 30,366.
 
+## Shell completion
+
+`drops completion <bash|zsh|fish>` prints the completion script for that shell to
+stdout. It does not open the store, so it works before the database exists. An
+unknown shell is refused at exit 2. PowerShell is not offered: drops is
+UNIX-only (`flock`), and a generated script nobody here can run is the dead
+weight dw32p.1 measured rather than a feature.
+
+Installation is a one-line source, and this is the step that decides whether
+the feature repeats dw32p.1's history (no script installed anywhere):
+
+```sh
+source <(drops completion bash)                 # bash
+source <(drops completion zsh)                  # zsh
+drops completion fish | source                  # fish
+```
+
+For a persistent install, write the script where the shell's framework looks:
+bash reads `~/.local/share/bash-completion/completions/drops`, zsh reads a
+`_drops` file on its `fpath`, fish reads `~/.config/fish/completions/drops.fish`.
+
+**What completes.** Two halves, costed separately because only one touches the
+store. The static half — verb and flag names, `--type`'s seven types,
+`--status`, `--priority` 0–4 — costs no store read. The dynamic half costs one:
+issue ids, project slugs, and existing labels.
+
+**Issue ids are the value, and they complete as a picker, not a prefix matcher.**
+Cobra's `id\tTitle` form carries the title as the description, so a tab press
+over the current project's issues reads like a menu rather than a list of
+random strings. The scope is `list`'s: the working directory's project, `open`
+**and** `in_progress`, widened only by the same flags — `-a` adds closed,
+`--all-projects` spans every project, `-P` scopes elsewhere. `reopen` is the
+one exception: it completes **closed** issues, because a live-only default
+would list nothing the verb can act on. Every verb that takes an issue id uses
+the same completion: `show`, `update`, `close`, `reopen`, `claim`, `release`,
+`comment add`, `comment list`, `dep add/rm/tree`, `label add/rm/list`, `move`,
+plus the `--parent` flags.
+
+**The other dynamic values follow their verbs.** `-P/--project` completes every
+slug, archived included, because `-P` still scopes to an archived project.
+`move --to` completes only live slugs, because an archived project refuses new
+work and is never a legal destination. `-l/--label` and `--label-any` complete
+the labels that already exist in the selected scope.
+
+This is a human affordance, like `drops tui`. Agents use `--json` and never
+tab-complete, so nothing here changes the machine surface.
+
 ## Moving an issue between projects
 
 `drops move <id>... --to <slug>`. **The id never changes.** A new-style `k3f9x` says nothing

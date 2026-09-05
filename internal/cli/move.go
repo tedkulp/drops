@@ -46,7 +46,8 @@ func newMoveCmd(app *App) *cobra.Command {
 			"IDS ARE NEVER REWRITTEN: an id is unique across the whole store, and its\n" +
 			"prefix records where it was minted, not where it lives.\n\n" +
 			"The destination is spelled --to, not -P.",
-		Args: minimumArgs(1),
+		Args:              minimumArgs(1),
+		ValidArgsFunction: completeIssueIDs(app, -1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
@@ -119,6 +120,7 @@ func newMoveCmd(app *App) *cobra.Command {
 	f.StringVar(&to, "to", "", "destination project slug (required)")
 	f.BoolVar(&subtree, "subtree", false, "also move every descendant")
 	f.BoolVar(&dryRun, "dry-run", false, "run the real write path and roll it back")
+	registerDynamicFlagCompletion(cmd, "to", completeProjectSlugs(app, false))
 	return cmd
 }
 

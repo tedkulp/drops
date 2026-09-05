@@ -255,6 +255,7 @@ func NewRootCmd(opts Options) (*cobra.Command, func()) {
 	f.BoolVar(&app.inbox, "inbox", false, "scope to the reserved inbox project")
 	f.BoolVarP(&app.quiet, "quiet", "q", false, "suppress informational output on stderr")
 	f.BoolVar(&app.noColor, "no-color", false, "disable coloured output")
+	registerDynamicFlagCompletion(root, "project", completeProjectSlugs(app, true))
 
 	registerIssueCmds(root, app)
 	registerMoveCmds(root, app)
@@ -274,6 +275,7 @@ func NewRootCmd(opts Options) (*cobra.Command, func()) {
 	root.SetVersionTemplate("{{.Version}}\n")
 	root.CompletionOptions.DisableDefaultCmd = true
 	root.AddCommand(newVersionCmd())
+	root.AddCommand(newCompletionCmd())
 	root.AddCommand(newConfigCmd(app, &dbPath))
 
 	return root, cleanup

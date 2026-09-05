@@ -76,11 +76,13 @@ func addTypeLimitFlags(cmd *cobra.Command, types *[]string, limit *int, limitSho
 	f := cmd.Flags()
 	f.StringSliceVarP(types, "type", "t", nil, "filter by issue type (repeatable)")
 	f.IntVarP(limit, "limit", limitShorthand, 0, "maximum results (0 = unlimited)")
+	registerIssueTypeCompletion(cmd)
 }
 
 func addStatusFlag(cmd *cobra.Command, statuses *[]string) {
 	cmd.Flags().StringSliceVarP(statuses, "status", "s", nil,
 		`filter by status (repeatable); "all" means every status including tombstones`)
+	registerStatusCompletion(cmd, true)
 }
 
 func rejectIncludeClosed(app *App) error {
@@ -219,6 +221,9 @@ func newListCmd(app *App) *cobra.Command {
 		"only issues deferred into the future (compared against now, not merely non-null)")
 	f.StringVar(&parent, "parent", "",
 		"only direct children of this issue id (a further \".\" in the tail is a grandchild, excluded)")
+	registerDynamicFlagCompletion(cmd, "label", completeLabels(app))
+	registerDynamicFlagCompletion(cmd, "label-any", completeLabels(app))
+	registerDynamicFlagCompletion(cmd, "parent", completeIssueIDs(app, 1))
 	return cmd
 }
 

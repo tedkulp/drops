@@ -34,6 +34,7 @@ var testedVerbs = map[string]string{
 	"drops comment add":     "TestCommentAddPrintsTheCommentID",
 	"drops comment list":    "TestCommentListRendersTheThreadOldestFirst",
 	"drops comment rm":      "TestCommentRmDropsOneCommentFromTheThread",
+	"drops completion":      "TestCompletionGeneratesInstalledShellScriptsWithoutAStore",
 	"drops config":          "TestBareGroupPrintsHelpAndSucceeds",
 	"drops config show":     "TestConfigShowNamesTheStoreAndTheResolvedProject",
 	"drops count":           "TestCountAnswersTheScopeAndFilters",

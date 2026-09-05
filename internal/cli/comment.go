@@ -50,7 +50,8 @@ func newCommentAddCmd(app *App) *cobra.Command {
 			"no stdin form here.\n\n" +
 			"The author defaults to the global git user.name, else the OS username.\n" +
 			"An agent commenting on its own behalf should pass --author.",
-		Args: exactArgs(2),
+		Args:              exactArgs(2),
+		ValidArgsFunction: completeIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
@@ -78,7 +79,8 @@ func newCommentListCmd(app *App) *cobra.Command {
 		Long: "Print an issue's whole comment thread, oldest first, in the same\n" +
 			"rendering `show` uses.\n\n" +
 			"--json emits a bare array, [] when the issue has no comments.",
-		Args: exactArgs(1),
+		Args:              exactArgs(1),
+		ValidArgsFunction: completeIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cs, err := app.core.IssueComments(app.ctx, model.ID(args[0]))
 			if err != nil {
