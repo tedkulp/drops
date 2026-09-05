@@ -89,6 +89,14 @@ using.
   `Esc` out of it and a wider window still start at the top, because they reflow
   the page into different lines; `/`, `C`, `a` and a taller window now leave you
   where you were, where before every one of them threw you back to line 0.
+- **`y` copies the navigator's right-pane issue id** to the system clipboard.
+  The id is the thing you leave the TUI to use — in a `drops show`, a commit
+  message, a `dep add` — and until now the only way out was to read it off the
+  screen and retype it. It names the **right pane's** issue, the one `x` already
+  writes to, so a follow trail does not make two keys mean two things. It goes
+  out as OSC 52, which needs no `xclip` or `pbcopy` and works over ssh, but is
+  unacknowledged and not universally supported: the footer therefore says `sent
+  <id> to the clipboard` — what was sent, not what your clipboard now holds.
 - **`render.Ellipsis` and `render.Cols`** are exported, so the navigator's row
   geometry — which deliberately truncates an id, the one thing `render`'s own
   rule forbids — is built on `render`'s truncation primitive rather than a

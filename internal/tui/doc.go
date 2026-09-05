@@ -95,4 +95,18 @@
 // a page renders `blocks` alone, which is an omission on show's side rather
 // than a designed reading contract (drops://hxedy). Until that lands, this is
 // the only surface in drops that can read a `discovered-from` edge back.
+//
+// # Getting an id out
+//
+// `y` (bvjgn) sends the RIGHT PANE'S id to the system clipboard over OSC 52,
+// through tea.SetClipboard, which is the whole implementation: no second
+// process, and this repository ships one static binary. It names the same
+// issue `x` does, so a follow trail cannot make two keys mean two things.
+//
+// OSC 52 is unacknowledged — the terminal takes the sequence or ignores it and
+// the program cannot tell which — so the footer says what was SENT rather than
+// what was pasted. It is m.notice and not m.message for the reason qy3de.14
+// §Q5 gave the stale marker, run the other way: a message costs a pane row,
+// and the acknowledgement of a keystroke that wrote nothing must die on the
+// next keypress rather than survive `j`.
 package tui

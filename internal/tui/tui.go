@@ -638,6 +638,39 @@ func (m *Model) resize() {
 // It takes nil too, so the next read that succeeds clears the message.
 func (m *Model) fail(err error) { m.err = err }
 
+// copyID is `y`: put the RIGHT PANE'S id on the system clipboard.
+//
+// The pane's issue and not the cursor's row. The two are the same thing until
+// you follow a relation, and under a trail the right pane is the issue you are
+// actually reading — and it is the object `x` already names, so `y` and `x`
+// act on one issue rather than two and the trail cannot silently change what a
+// key means (bvjgn).
+//
+// The mechanism is OSC 52, through tea.SetClipboard, which is why there is no
+// xclip or pbcopy here: this repository ships one static binary and the
+// navigator starts no other process. The honest limit is that OSC 52 is not
+// universally supported and the terminal never acknowledges it — it either
+// takes the sequence or ignores it, and this program cannot tell which. So the
+// notice reports what was SENT and not what was pasted.
+//
+// m.notice and not m.message. A message costs a pane row — messageLines feeds
+// geo, which every caller measures from — so spending one here would relayout
+// both panes for a keystroke that changed nothing about the store. This is an
+// acknowledgement rather than a state, and dying on the next keypress is
+// exactly its lifetime: qy3de.14 §Q5's argument for the stale marker run the
+// other way, since the marker had to survive `j` and this must not.
+func (m *Model) copyID() tea.Cmd {
+	id := m.detailID
+	// Nothing on the right is reachable on an empty row set, and it is the
+	// same refusal `x` makes there. Without it the footer would report an
+	// empty id as sent.
+	if id == "" {
+		return nil
+	}
+	m.notice = "sent " + string(id) + " to the clipboard"
+	return tea.SetClipboard(string(id))
+}
+
 // key is the whole keymap.
 func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 	key := pressed.String()
@@ -754,6 +787,16 @@ func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 	// --- writing (qy3de.7) ---
 	case "x":
 		m.openActions()
+
+	// --- getting an id out (bvjgn) ---
+	case "y":
+		// Beside `x` because it names the same issue, but NOT part of the
+		// write set: it touches no store. No guard against the y/n prompt
+		// is needed and none is wanted — that branch answers and returns
+		// above, so a `y` pressed with a write waiting on an answer never
+		// reaches here, and a guard would be a branch whose control could
+		// never go red.
+		return m.copyID()
 
 	// --- following (qy3de.6) ---
 	case "f":
@@ -1087,6 +1130,7 @@ func helpText() string {
 		"",
 		"  x                   write to the issue on the right: close, reopen,",
 		"                      comment, priority, claim, release",
+		"  y                   copy the right pane's id to the clipboard",
 		"",
 		"  J K space b         scroll the detail pane vertically",
 		"  h l ← → 0 $         scroll the detail pane horizontally",

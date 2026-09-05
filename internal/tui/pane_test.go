@@ -9,16 +9,18 @@ import (
 	"github.com/tedkulp/drops/internal/model"
 )
 
-// press feeds one key through the model the way bubbletea would.
-func press(t *testing.T, pane *Model, key string) {
+// press feeds one key through the model the way bubbletea would, and hands
+// back whatever command the keymap returned. Most callers want none of it —
+// only `q` and `y` produce one — but a command is a func, so RUNNING it is the
+// only way to see what a key sent, and returning it here is what saves the
+// package a third press helper.
+func press(t *testing.T, pane *Model, key string) tea.Cmd {
 	t.Helper()
-	if cmd := pane.key(tea.KeyPressMsg{Code: keyCode(key), Text: key}); cmd != nil {
-		// A returned command is tea.Quit here; nothing else produces one.
-		_ = cmd
-	}
+	cmd := pane.key(tea.KeyPressMsg{Code: keyCode(key), Text: key})
 	if pane.err != nil {
 		t.Fatalf("pressing %q left an error on the pane: %v", key, pane.err)
 	}
+	return cmd
 }
 
 // keyCode maps the one-rune keys these tests press. Named keys go through

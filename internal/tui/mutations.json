@@ -1,5 +1,5 @@
 {
-  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14; esc's layer ordering by m3z5y. tc2x5 re-cut the redraw/retarget pair onto the two facts the pane can read — which issue is on screen, and the width it was rendered into — instead of the intent the caller passed, and split them three ways so each clause has a mutant the other two tests stay green for. g7b23 added `r`, the ready-only narrowing, and moved refresh to `R`: its controls sit on the predicate itself, on both directions of the toggle, and on each of the two paths that re-derive the visible row set — applyFilter and refresh — because a golden frame would pass whichever rows those returned.",
+  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14; esc's layer ordering by m3z5y. tc2x5 re-cut the redraw/retarget pair onto the two facts the pane can read — which issue is on screen, and the width it was rendered into — instead of the intent the caller passed, and split them three ways so each clause has a mutant the other two tests stay green for. g7b23 added `r`, the ready-only narrowing, and moved refresh to `R`: its controls sit on the predicate itself, on both directions of the toggle, and on each of the two paths that re-derive the visible row set — applyFilter and refresh — because a golden frame would pass whichever rows those returned. bvjgn added `y`: one control on the expression that chooses the id, because a test asserting only that some clipboard command came back passes with the cursor row's id in place of the pane's, one on the refusal an empty row set gets, and one on the LINE it reports through, because m.message would relayout both panes for a keystroke that wrote nothing and a test reading the footer alone would not notice.",
   "controls": [
     {
       "control": "the-cursor-tracks-an-id",
@@ -120,6 +120,30 @@
       "test": "TestReadyNarrowingSurvivesARefresh",
       "old": "\tm.all = rows\n\tm.rows = m.visible()\n\tm.cursor.restore(m.rows)",
       "new": "\tm.all = rows\n\tm.rows = matching(m.all, m.filter)\n\tm.cursor.restore(m.rows)"
+    },
+    {
+      "control": "y-copies-the-right-panes-id",
+      "clause": "`y` copies the RIGHT PANE'S issue id, not the row under the cursor. The two differ under a follow trail, where the right pane is the issue you are reading and the object `x` already names (bvjgn)",
+      "file": "internal/tui/tui.go",
+      "test": "TestYCopiesTheRightPanesIDNotTheCursorRows",
+      "old": "\tid := m.detailID",
+      "new": "\tid := m.cursor.id"
+    },
+    {
+      "control": "y-sends-nothing-when-there-is-no-issue-on-the-right",
+      "clause": "`y` on an empty row set sends nothing and reports nothing, rather than naming an empty id as sent — the refusal `x` already makes there (bvjgn)",
+      "file": "internal/tui/tui.go",
+      "test": "TestYOnAnEmptyRowSetSendsNothing",
+      "old": "\tif id == \"\" {\n\t\treturn nil\n\t}",
+      "new": "\tif false {\n\t\treturn nil\n\t}"
+    },
+    {
+      "control": "y-reports-on-the-footer-not-the-message-line",
+      "clause": "`y` acknowledges through m.notice, which replaces the footer's left side and dies on the next keypress, and NOT m.message, which costs a pane row via messageLines and would relayout both panes for a keystroke that changed nothing about the store — qy3de.14 \u00a7Q5's argument for the stale marker run the other way (bvjgn)",
+      "file": "internal/tui/tui.go",
+      "test": "TestYSaysOnTheFooterWhatItSent",
+      "old": "\tm.notice = \"sent \" + string(id) + \" to the clipboard\"",
+      "new": "\tm.message = \"sent \" + string(id) + \" to the clipboard\""
     },
     {
       "control": "the-detail-pane-renders-at-the-pane-width",

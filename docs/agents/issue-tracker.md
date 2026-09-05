@@ -511,6 +511,7 @@ carries the **full untruncated id**, one glance away.
 | `f` | pick a relation of the right pane's issue and follow it |
 | `Backspace` | back one relation; `Esc` drops the whole trail |
 | `x` | write to the right pane's issue: close, reopen, comment, priority, claim, release |
+| `y` | copy the right pane's issue id to the system clipboard |
 | `J` `K` `space` `b` | scroll the detail pane vertically |
 | `h` `l` `←` `→` `0` `$` | scroll it horizontally, eight columns a step |
 | `w` | soft-wrap the detail pane instead of clipping |
@@ -651,6 +652,20 @@ Above the footer sits **one message line**, for a refused write and for the
 credential scan. That scan normally writes to stderr, which a full-screen
 program makes invisible, so under `tui` it is redirected onto the frame. The
 line costs a pane row only while it is up, and the next keypress clears it.
+
+**`y` copies the right pane's issue id** to the system clipboard. The pane's
+issue and not the row under the cursor, which is the same thing until you
+follow a relation and, under a trail, is the issue you are reading — the object
+`x` already names, so the two keys act on one issue and the trail does not
+silently change what a key means.
+
+It goes out as **OSC 52**, so it needs no `xclip` or `pbcopy` and works over
+ssh. The honest limit is that OSC 52 is not universally supported and the
+terminal never acknowledges it: it either takes the sequence or ignores it, and
+`drops` cannot tell which. So the footer reports what was **sent** — `sent
+<id> to the clipboard` — and not what your clipboard now holds. The notice
+lives until the next keypress, and on an empty row set there is nothing on the
+right to name, so `y` sends nothing and says nothing.
 
 Writes change the row set, and the cursor's id-tracking is what makes that
 readable: closing the cursor's issue with `C` off drops its row and lands the
