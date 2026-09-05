@@ -26,6 +26,18 @@ git's whole exclude set, not `.gitignore` alone: `.git/info/exclude` and your
 status`'s view, and the untracked half of that is as machine-specific as `git
 status` is. Tracked files are not — `--cached` ignores excludes.
 
+The vet half has the mirror-image trap, and the gate now covers it. `./...` is
+not every package in this tree: the go tool drops `testdata` directories from
+that pattern, and any directory whose name begins with `.` or `_`. So
+`internal/lockfile/testdata/holder` — the real second process the lockfile
+contention tests build and run, not sample data — was formatted but never
+vetted. The gate vets those packages by path, and the set is **derived** as the
+directories git counts minus the ones `go list ./...` reports, rather than by
+naming `testdata`, so a helper added under any skipped directory is vetted on
+arrival. Directories under a nested `go.mod` are excluded, because `go vet`
+refuses a path in another module and `tools/mutate/testdata/fixture` is a
+deliberately-mutated corpus for the mutate tool's own tests.
+
 `test` and `mutate` export `DROPS_DB` to `/dev/null/no-default-store-in-tests/drops.db`
 — not a scratch store but a tripwire, so a test that reaches for `store.DefaultPath()`
 fails with ENOTDIR and names the path. Since the cutover (`dw32p.28`) this is the

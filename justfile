@@ -87,12 +87,35 @@ test:
 # it is THIS tree being listed that the check depends on.
 #
 # The git dependency is not new: `build` already shells out to `git describe`.
+#
+# `go vet ./...` has the same shape of blind spot in reverse, which is mkh3q:
+# the right check over the wrong file set, in the other direction. `./...` is
+# not "every package here" — the go tool drops `testdata` directories from it,
+# along with any whose name starts with `.` or `_`. So a tracked `package main`
+# under one is invisible to vet while the gofmt half above checks it, and
+# `internal/lockfile/testdata/holder` is not a scrap of sample data: it is the
+# real second process the lockfile contention tests build and run. A
+# `fmt.Printf` type error planted in it left `just test-all` green.
+#
+# The uncovered set is therefore DERIVED, not named: the directories git counts
+# minus the ones `go list ./...` reports. Spelling `testdata` into this recipe
+# would have covered today's two directories and none of the other skip rules,
+# and would go stale the day the go tool grows a third. Deriving it also means a
+# helper added under a skipped directory later is vetted on arrival rather than
+# when someone remembers this recipe exists.
+#
+# A directory under a nested `go.mod` is dropped from that list. `./...` could
+# not name it either — `go vet` on a path in another module refuses with "main
+# module does not contain package" — so vetting `tools/mutate/testdata/fixture`
+# would mean building a second module, and its whole role is to be a small,
+# deliberately-mutated corpus for the mutate tool's own tests. Without this
+# guard a clean tree goes red, so it is load-bearing rather than defensive.
 
-# go vet, plus a gofmt-clean check over every file git counts as part of the tree.
+# go vet over the module plus the packages `./...` skips, and a gofmt-clean
+# check over every file git counts as part of the tree.
 lint:
     #!/usr/bin/env bash
     set -euo pipefail
-    go vet ./...
     files=()
     while IFS= read -r -d '' f; do
       if [ -f "$f" ]; then files+=("$f"); fi
@@ -101,6 +124,27 @@ lint:
       echo "lint: git listed no .go files here; this is a Go module, so that is a broken listing, not a clean tree" >&2
       exit 1
     fi
+    mod=$(go list -m)
+    declare -A covered=()
+    while IFS= read -r ip; do
+      rel=${ip#"$mod"}; rel=${rel#/}; [ -z "$rel" ] && rel=.
+      covered[$rel]=1
+    done < <(go list ./...)
+    declare -A seen=()
+    vetdirs=()
+    for f in "${files[@]}"; do
+      d=${f%/*}; [ "$d" = "$f" ] && d=.
+      [[ -v seen[$d] ]] && continue
+      seen[$d]=1
+      [[ -v covered[$d] ]] && continue
+      p=$d nested=
+      while [ "$p" != "." ]; do
+        if [ -f "$p/go.mod" ]; then nested=1; break; fi
+        if [[ $p == */* ]]; then p=${p%/*}; else p=.; fi
+      done
+      [ -n "$nested" ] || vetdirs+=("./$d/")
+    done
+    go vet ./... ${vetdirs[@]+"${vetdirs[@]}"}
     unformatted=$(gofmt -l "${files[@]}")
     if [ -n "$unformatted" ]; then printf '%s\n' "$unformatted"; exit 1; fi
 

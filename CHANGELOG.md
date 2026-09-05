@@ -188,6 +188,20 @@ using.
   listing is refused instead of read as clean, since that is what a copy of the
   tree with no usable `.git` produces. `go vet ./...` never had the problem — it
   walks packages, and `.scratch/` is not one.
+- **The gate vets the packages `go vet ./...` skips.** `./...` is not every
+  package in the tree — the go tool drops `testdata` directories from it, and
+  any directory whose name begins with `.` or `_`. So
+  `internal/lockfile/testdata/holder`, the real second process the lockfile
+  contention tests build and run rather than sample data, was checked for
+  formatting but never vetted: a `fmt.Printf` type error planted in it left
+  `just test-all` green. Those packages are now vetted by path, and the set is
+  derived as the directories git counts minus the ones `go list ./...` reports
+  rather than by naming `testdata`, so a helper added under any skipped
+  directory is vetted on arrival. Directories under a nested `go.mod` are
+  excluded, since `go vet` refuses a path in another module and
+  `tools/mutate/testdata/fixture` is a deliberately-mutated corpus for the
+  mutate tool's own tests. This is the second half of the same defect as the
+  entry above: the right check over the wrong file set.
 
 ## 0.1.0 — 2026-09-03
 
