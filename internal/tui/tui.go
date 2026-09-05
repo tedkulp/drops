@@ -199,10 +199,7 @@ func (m *Model) run(ctx context.Context, options ...tea.ProgramOption) error {
 // reload re-reads the row set for the current scope and re-points the cursor
 // and the detail pane at whatever survived.
 func (m *Model) reload() error {
-	if err := m.readSeq(); err != nil {
-		return err
-	}
-	rows, err := m.source.rows(m.ctx, m.scope)
+	rows, err := m.readRows()
 	if err != nil {
 		return err
 	}
@@ -210,18 +207,24 @@ func (m *Model) reload() error {
 	return m.applyFilter()
 }
 
-// readSeq takes the change token and marks the pane fresh as of it.
+// readRows takes the change token before reading the rows it describes, then
+// marks the pane fresh only after that row read succeeds.
 //
-// Called BEFORE the rows every time, so the token can only lag what is on
-// screen, never lead it. See the seq field for why that direction is the one
-// to fail in.
-func (m *Model) readSeq() error {
+// The order means a write landing mid-read can leave seq behind what is on
+// screen, never ahead of it. Delaying the state change until both reads succeed
+// also means a failed refresh leaves the retained row set's marker untouched.
+// See the seq field for why lagging is the safe direction.
+func (m *Model) readRows() ([]row, error) {
 	seq, err := m.source.seq(m.ctx)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	rows, err := m.source.rows(m.ctx, m.scope)
+	if err != nil {
+		return nil, err
 	}
 	m.seq, m.observed = seq, seq
-	return nil
+	return rows, nil
 }
 
 // stale reports whether the store has moved since the row set was read. It is
@@ -291,10 +294,7 @@ func (m *Model) applyFilter() error {
 // with it, and that page opens at the top like any other page the reader did
 // not scroll. showDetail decides that on identity, so nothing here has to.
 func (m *Model) refresh() error {
-	if err := m.readSeq(); err != nil {
-		return err
-	}
-	rows, err := m.source.rows(m.ctx, m.scope)
+	rows, err := m.readRows()
 	if err != nil {
 		return err
 	}

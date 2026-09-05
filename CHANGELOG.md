@@ -157,6 +157,11 @@ using.
 
 ### Fixed
 
+- **A failed TUI refresh leaves retained rows marked stale.** The navigator now
+  commits the new store sequence only after the row read succeeds, so a busy,
+  cancelled, or otherwise failed re-read cannot keep old rows while reporting
+  them fresh after its transient error clears.
+
 - **`Ctrl+C` quits `drops tui` while the `/` filter prompt is open.** The
   prompt still captures printable command keys such as `q`, `a`, and `C`, but
   no longer swallows the non-printable interrupt key.

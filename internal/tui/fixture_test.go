@@ -46,6 +46,7 @@ type fixture struct {
 	t        *testing.T
 	core     *core.Core
 	project  model.Project
+	opened   *store.Store
 	other    model.Project
 	warnings chan core.Warning
 	editor   []string
@@ -80,7 +81,7 @@ func newFixture(t *testing.T, ids ...model.ID) *fixture {
 		t.Fatalf("create project: %v", err)
 	}
 	return &fixture{
-		t: t, core: rules, project: project, other: other, warnings: warnings,
+		t: t, core: rules, opened: opened, project: project, other: other, warnings: warnings,
 		// The default editor writes nothing and exits 0, which is the
 		// silent-abort case. A test that wants text says so with editorWrites.
 		editor: shEditor(":"),

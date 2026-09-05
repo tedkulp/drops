@@ -147,6 +147,53 @@ func TestRefreshClearsTheStaleMarker(t *testing.T) {
 	}
 }
 
+func TestFailedRefreshKeepsTheStaleMarker(t *testing.T) {
+	fixture := newFixture(t)
+	fixture.issue("The one on screen", 2)
+	pane := fixture.model(80, 24)
+
+	fixture.issue("Written by somebody else", 2)
+	tickPane(t, pane)
+	if !pane.stale() {
+		t.Fatalf("pane is not stale after another writer wrote")
+	}
+
+	// Break the last read in source.rows without breaking source.seq: the
+	// sequence still comes from store_state, while OpenBlockers reads this
+	// table after the row listing. Renaming lets the real SQLite schema be
+	// repaired after the failure so the next keypress can succeed.
+	if _, err := fixture.opened.DB().ExecContext(t.Context(),
+		"ALTER TABLE dependencies RENAME TO broken_dependencies"); err != nil {
+		t.Fatalf("break blocker read: %v", err)
+	}
+
+	pane.key(tea.KeyPressMsg{Code: 'R', Text: "R"})
+
+	if pane.err == nil {
+		t.Fatal("failed refresh reported no error")
+	}
+	if len(pane.rows) != 1 {
+		t.Fatalf("rows = %d after failed refresh, want the one stale row kept", len(pane.rows))
+	}
+	if !pane.stale() {
+		t.Fatal("failed refresh marked the stale row set fresh")
+	}
+	if _, err := fixture.opened.DB().ExecContext(t.Context(),
+		"ALTER TABLE broken_dependencies RENAME TO dependencies"); err != nil {
+		t.Fatalf("repair blocker read: %v", err)
+	}
+
+	// A successful keypress clears the transient error. The persistent marker
+	// must then be all that remains to say the retained rows are stale.
+	press(t, pane, "j")
+	if pane.err != nil {
+		t.Fatalf("keypress left error %v, want it cleared", pane.err)
+	}
+	if !strings.Contains(pane.footer(pane.geo()), "stale · R") {
+		t.Fatalf("footer = %q, want the stale marker after the error clears", pane.footer(pane.geo()))
+	}
+}
+
 func TestRefreshRereadsWhenNothingIsStale(t *testing.T) {
 	fixture := newFixture(t)
 	fixture.issue("The one on screen", 2)

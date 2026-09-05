@@ -450,8 +450,16 @@
       "new": "\tif m.ask != nil {\n\t\treturn m.ask.prompt\n\t}\n\tif m.stale() {\n\t\treturn \"stale\"\n\t}\n\treturn m.message\n}"
     },
     {
+      "control": "a-failed-refresh-keeps-the-stale-marker",
+      "clause": "A failed refresh keeps the old rows and therefore keeps their sequence state: the token read before source.rows is committed only after that read succeeds, so clearing the transient error cannot leave stale rows reporting fresh (hc6jb)",
+      "file": "internal/tui/tui.go",
+      "test": "TestFailedRefreshKeepsTheStaleMarker",
+      "old": "\trows, err := m.source.rows(m.ctx, m.scope)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tm.seq, m.observed = seq, seq",
+      "new": "\trows, err := m.source.rows(m.ctx, m.scope)\n\tm.seq, m.observed = seq, seq\n\tif err != nil {\n\t\treturn nil, err\n\t}"
+    },
+    {
       "control": "a-refresh-clears-the-stale-marker",
-      "clause": "The refresh that reads past the change is what clears the marker, and nothing else does: readSeq marks the pane fresh as of the token it just took (qy3de.14 §Q5)",
+      "clause": "The refresh that reads past the change is what clears the marker, and nothing else does: readRows marks the pane fresh as of the token it took before reading those rows (qy3de.14 §Q5)",
       "file": "internal/tui/tui.go",
       "test": "TestRefreshClearsTheStaleMarker",
       "old": "\tm.seq, m.observed = seq, seq",
