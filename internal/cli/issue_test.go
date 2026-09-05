@@ -125,6 +125,67 @@ func TestShowPageOrdersIdentityBodyRelationsComments(t *testing.T) {
 	}
 }
 
+// A `related` edge is undirected to a reader, so show merges both stored
+// directions under one heading. Outgoing edges stay first because core has
+// already ordered each half of the graph.
+func TestShowReadsRelatedEdgesFromEitherEnd(t *testing.T) {
+	db, cwd := newStore(t)
+	subject := mustRun(t, db, cwd, "q", "--inbox", "the subject")
+	outgoing := mustRun(t, db, cwd, "q", "--inbox", "an outgoing peer")
+	incoming := mustRun(t, db, cwd, "q", "--inbox", "an incoming peer")
+	mustRun(t, db, cwd, "dep", "add", subject, outgoing, "--type", "related")
+	mustRun(t, db, cwd, "dep", "add", incoming, subject, "--type", "related")
+
+	page := mustRun(t, db, cwd, "show", subject)
+	if !strings.Contains(page, "\nRelated\n") ||
+		!strings.Contains(page, outgoing) || !strings.Contains(page, incoming) {
+		t.Fatalf("related edges from both directions are not one page block:\n%s", page)
+	}
+
+	jsonView := decodeOne[map[string]any](t, mustRun(t, db, cwd, "show", subject, "--json"))
+	related, ok := jsonView["related"].([]any)
+	if !ok || len(related) != 2 {
+		t.Fatalf("related in --json = %#v, want both directions", jsonView["related"])
+	}
+	got := []string{
+		related[0].(map[string]any)["id"].(string),
+		related[1].(map[string]any)["id"].(string),
+	}
+	if strings.Join(got, ",") != outgoing+","+incoming {
+		t.Fatalf("related ids = %v, want outgoing then incoming", got)
+	}
+}
+
+// A `discovered-from` edge names opposite facts at its two ends: an outgoing
+// edge is where this issue came from; an incoming edge is what came out of it.
+func TestShowNamesBothDiscoveredFromDirections(t *testing.T) {
+	db, cwd := newStore(t)
+	subject := mustRun(t, db, cwd, "q", "--inbox", "the subject")
+	origin := mustRun(t, db, cwd, "q", "--inbox", "where it came from")
+	derived := mustRun(t, db, cwd, "q", "--inbox", "what came out of it")
+	mustRun(t, db, cwd, "dep", "add", subject, origin, "--type", "discovered-from")
+	mustRun(t, db, cwd, "dep", "add", derived, subject, "--type", "discovered-from")
+
+	page := mustRun(t, db, cwd, "show", subject)
+	if !strings.Contains(page, "\nDiscovered from\n  ○ "+origin) {
+		t.Fatalf("outgoing discovered-from edge is not named as the origin:\n%s", page)
+	}
+	if !strings.Contains(page, "\nDiscovered\n  ○ "+derived) {
+		t.Fatalf("incoming discovered-from edge is not named as the derived issue:\n%s", page)
+	}
+
+	jsonView := decodeOne[map[string]any](t, mustRun(t, db, cwd, "show", subject, "--json"))
+	for key, want := range map[string]string{
+		"discovered_from": origin,
+		"discovered":      derived,
+	} {
+		refs, ok := jsonView[key].([]any)
+		if !ok || len(refs) != 1 || refs[0].(map[string]any)["id"] != want {
+			t.Errorf("%s in --json = %#v, want %s", key, jsonView[key], want)
+		}
+	}
+}
+
 // TestShowSeveralIDsEmitsAnArrayAndRulesPagesApart is the shape warning the doc
 // gives before you write a parser: one id is an object, several are an array.
 func TestShowSeveralIDsEmitsAnArrayAndRulesPagesApart(t *testing.T) {

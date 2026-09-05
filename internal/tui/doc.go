@@ -92,11 +92,6 @@
 // from the core.IssueView is the only way to interact with one without
 // breaking that opacity (qy3de.6 §3).
 //
-// The picker's boundary is the full core graph, wider than the page beside it:
-// a page renders `blocks` alone, which is an omission on show's side rather
-// than a designed reading contract (drops://hxedy). Until that lands, this is
-// the only surface in drops that can read a `discovered-from` edge back.
-//
 // # Getting an id out
 //
 // `y` (bvjgn) sends the RIGHT PANE'S id to the system clipboard over OSC 52,

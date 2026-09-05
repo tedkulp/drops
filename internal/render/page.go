@@ -29,11 +29,14 @@ type Page struct {
 	CloseReason string
 	Description string
 
-	Parent   *Ref
-	Blockers []Ref
-	Blocking []Ref
-	Children []Ref
-	Comments []Comment
+	Parent         *Ref
+	Blockers       []Ref
+	Blocking       []Ref
+	Children       []Ref
+	DiscoveredFrom []Ref
+	Discovered     []Ref
+	Related        []Ref
+	Comments       []Comment
 }
 
 // Ref is one related issue, named on a page but not rendered in full.
@@ -144,6 +147,9 @@ func (page Page) writeRelations(out io.Writer, width int) {
 		writeRefs(out, fmt.Sprintf("Children  %d, %d open",
 			len(page.Children), openRefs(page.Children)), page.Children, width)
 	}
+	writeRefs(out, "Discovered from", page.DiscoveredFrom, width)
+	writeRefs(out, "Discovered", page.Discovered, width)
+	writeRefs(out, "Related", page.Related, width)
 }
 
 // writeRefs writes one block of related issues under a heading.

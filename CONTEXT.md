@@ -84,6 +84,14 @@ An open issue with no blocking dependency on another issue that is itself unfini
 
 An open issue with at least one blocking dependency on an unfinished issue. Blocked and ready are complementary properties of the same open set; neither is a status an issue can be put into.
 
+## Related dependency
+
+A non-blocking association between two issues. `A related B` is undirected to a reader even though its replicated record has `from` and `to` fields: A and B each read the other under `Related`, and neither end implies origin or precedence.
+
+## Discovered-from dependency
+
+A directed provenance relation between two issues. `A discovered-from B` means A was discovered or derived from B: A reads B under `Discovered from`, while B reads A under `Discovered`.
+
 ## Deferral
 
 The convention of marking an issue as deliberately postponed. Deferral is expressed as an ordinary label and carries no meaning to the model: a deferred issue is an ordinary open issue, and nothing computes readiness or ordering differently because of it.

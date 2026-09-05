@@ -512,6 +512,10 @@ The memory body.
   eight columns. A blank line inside it is left bare rather than indented.
 - An **empty description contributes nothing, not a blank line**: a thin issue
   costs three lines. An empty relation block or thread prints no heading.
+- Dependency headings are named from the issue being read. `Blocked by` and
+  `Blocks` are the two ends of `blocks`. For `A discovered-from B`, A names B
+  under `Discovered from` and B names A under `Discovered`. `Related` is
+  undirected and merges edges stored in either direction.
 - `Children` carries its own count, `Children  N, M open`, where a tombstoned
   child is not open whatever its status says.
 - A relation title too long for the line **wraps under the id column**. A page
@@ -554,9 +558,10 @@ because `less` is missing would be the worse bug.
 A scanning verb emits a **bare array**, a reading verb a **bare object**, each
 followed by exactly one newline and no envelope. An empty result is `[]`, never
 `null`, and a nil list *inside* a value is `[]` too, which is what makes
-`show --json`'s `.parent`, `.blockers`, `.blocking`, `.children` and `.comments`
-safe on every issue rather than on most of them: `parent` is `null` when there
-is none, and the four lists are `[]` rather than absent. Nothing is escaped
+`show --json`'s `.parent`, `.blockers`, `.blocking`, `.children`,
+`.discovered_from`, `.discovered`, `.related` and `.comments` safe on every
+issue rather than on most of them: `parent` is `null` when there is none, and
+the seven lists are `[]` rather than absent. Nothing is escaped
 beyond what JSON requires, so an issue body full of `<`, `>` and `&` stays
 readable and stays byte-stable against the mirror. `--json` never pages.
 
@@ -674,11 +679,9 @@ of the page — grouped under the same headings a page prints, in the same order
 Related` — and `Enter` takes the one under the cursor. `j` `k` `g` `G` walk it,
 `Esc` cancels it. On an issue with no relations it opens nothing and says so.
 
-The picker's boundary is **wider than `show`'s**: it lists all three dependency
-types, where a page renders `blocks` alone. That is not a second opinion about
-what a relation is — it is an omission on `show`'s side, filed as
-[drops://hxedy](drops://hxedy), and until it is fixed the navigator is the only
-place a `discovered-from` edge can be read back at all. Its id column is
+The picker and `show` read the same full relation graph under those headings;
+the picker makes each far end selectable without changing the page contract.
+Its id column is
 auto-sized and **uncapped**, unlike the left pane's: a picker's rows are
 siblings and dotted ids share a prefix, so a cap would render seven of one
 issue's sixteen children identically.
@@ -901,9 +904,10 @@ both name what they found. Every other verb's 1 means what the table says.
 So a session does not mistake them for its own error:
 
 - **`show --json` carries relations and comments; `list --json` does not.**
-  `show` emits `parent`, `blockers`, `blocking`, `children` and `comments`
-  alongside the issue's own fields. No other verb emits them. `comments` carries
-  whole bodies, so `show --json` on a long thread is large.
+  `show` emits `parent`, `blockers`, `blocking`, `children`, `discovered_from`,
+  `discovered`, `related` and `comments` alongside the issue's own fields. No
+  other verb emits them. `comments` carries whole bodies, so `show --json` on a
+  long thread is large.
 - **`list --json` omits `labels`.** Filtering a `list` result by label in your
   own code therefore matches nothing, silently. Use the server-side `-l` /
   `--label-any` flags, which work correctly, or fetch the issue with

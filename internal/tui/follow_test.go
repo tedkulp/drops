@@ -84,27 +84,6 @@ func TestTheFollowPickerNamesEveryDirectionFromTheReadersEnd(t *testing.T) {
 	}
 }
 
-func TestTheFollowPickerListsTheFullCoreGraphAndNotShowsBoundary(t *testing.T) {
-	// `show` renders `blocks` alone. That is an omission, not a designed
-	// reading contract (drops://hxedy), and the picker deliberately does not
-	// inherit it: 18 live `discovered-from` edges in the corpus are visible
-	// nowhere else in drops.
-	f := newFixture(t)
-	here := f.issue("The issue the picker is opened on", 1)
-	origin := f.issue("Where it was discovered from", 2)
-	f.dep(here.ID, origin.ID, model.DepDiscoveredFrom)
-
-	issue := viewOf(t, f, here.ID)
-	if page := f.page(t, issue); strings.Contains(page, string(origin.ID)) {
-		t.Fatalf("`show`'s page already renders the discovered-from edge; "+
-			"this test no longer proves the picker widens the boundary:\n%s", page)
-	}
-	_, choices := followRows(issue)
-	if got := grouped(choices)["Discovered from"]; !equalIDs(got, []model.ID{origin.ID}) {
-		t.Fatalf("Discovered from = %v, want %v — the picker reads the full core graph", got, origin.ID)
-	}
-}
-
 func TestTheFollowPickerGroupsInThePagesOwnOrder(t *testing.T) {
 	f := newFixture(t)
 	parent := f.issue("The parent", 1)

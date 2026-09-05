@@ -19,12 +19,15 @@ type showRefJSON struct {
 // live label names, and the relation keys that never go absent.
 type showIssueJSON struct {
 	model.Issue
-	Labels   []string        `json:"labels,omitempty"`
-	Parent   *showRefJSON    `json:"parent"`
-	Blockers []showRefJSON   `json:"blockers"`
-	Blocking []showRefJSON   `json:"blocking"`
-	Children []showRefJSON   `json:"children"`
-	Comments []model.Comment `json:"comments"`
+	Labels         []string        `json:"labels,omitempty"`
+	Parent         *showRefJSON    `json:"parent"`
+	Blockers       []showRefJSON   `json:"blockers"`
+	Blocking       []showRefJSON   `json:"blocking"`
+	Children       []showRefJSON   `json:"children"`
+	DiscoveredFrom []showRefJSON   `json:"discovered_from"`
+	Discovered     []showRefJSON   `json:"discovered"`
+	Related        []showRefJSON   `json:"related"`
+	Comments       []model.Comment `json:"comments"`
 }
 
 // assembleView turns one view into the page and the JSON object show renders.
@@ -38,12 +41,15 @@ type showIssueJSON struct {
 func assembleView(issueView core.IssueView) (render.Page, showIssueJSON) {
 	page := view.Page(issueView)
 	out := showIssueJSON{
-		Issue:    issueView.Issue,
-		Labels:   page.Labels,
-		Blockers: toJSONRefs(page.Blockers),
-		Blocking: toJSONRefs(page.Blocking),
-		Children: toJSONRefs(page.Children),
-		Comments: issueView.Comments,
+		Issue:          issueView.Issue,
+		Labels:         page.Labels,
+		Blockers:       toJSONRefs(page.Blockers),
+		Blocking:       toJSONRefs(page.Blocking),
+		Children:       toJSONRefs(page.Children),
+		DiscoveredFrom: toJSONRefs(page.DiscoveredFrom),
+		Discovered:     toJSONRefs(page.Discovered),
+		Related:        toJSONRefs(page.Related),
+		Comments:       issueView.Comments,
 	}
 	if page.Parent != nil {
 		parent := toJSONRef(*page.Parent)

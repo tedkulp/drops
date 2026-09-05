@@ -514,11 +514,10 @@ func TestPageMarksATombstonedChildAndDoesNotCountItOpen(t *testing.T) {
 	}
 }
 
-// TestPageNamesOnlyBlocksEdgesAsBlockers: a page has one dependency heading
-// pair and it means `blocks`. Core hands over every edge type in one block, so
-// `related` and `discovered-from` are dropped here — an edge rendered under
-// "Blocked by" would report a link that does not block as one that does, and
-// `ready` would disagree with the page.
+// TestPageNamesOnlyBlocksEdgesAsBlockers: core hands over every edge type in
+// one block. The page may render all of them, but only `blocks` may appear
+// under its blocker heading or in the blocker JSON field; otherwise `ready`
+// would disagree with the page.
 func TestPageNamesOnlyBlocksEdgesAsBlockers(t *testing.T) {
 	db, cwd := newStore(t)
 	subject := mustRun(t, db, cwd, "q", "--inbox", "the subject")
@@ -531,12 +530,10 @@ func TestPageNamesOnlyBlocksEdgesAsBlockers(t *testing.T) {
 	if !strings.Contains(page, blocker) {
 		t.Fatalf("the blocks edge left the page:\n%s", page)
 	}
-	if strings.Contains(page, related) {
-		t.Fatalf("a related edge is named among the blockers:\n%s", page)
-	}
 	view := decodeOne[map[string]any](t, mustRun(t, db, cwd, "show", subject, "--json"))
-	if got := view["blockers"].([]any); len(got) != 1 {
-		t.Fatalf("blockers in --json = %#v, want only the blocks edge", got)
+	blockers := view["blockers"].([]any)
+	if len(blockers) != 1 || blockers[0].(map[string]any)["id"] != blocker {
+		t.Fatalf("blockers in --json = %#v, want only %s", blockers, blocker)
 	}
 	// And the same from the other end: the related issue is not "Blocks".
 	if other := mustRun(t, db, cwd, "show", related); strings.Contains(other, "Blocks") {

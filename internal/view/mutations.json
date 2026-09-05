@@ -24,6 +24,22 @@
       "test": "TestPageCarriesItsWholeThread",
       "old": "\tfor _, comment := range view.Comments {\n\t\tpage.Comments = append(page.Comments, render.Comment{",
       "new": "\tfor _, comment := range view.Comments[:0] {\n\t\tpage.Comments = append(page.Comments, render.Comment{"
+    },
+    {
+      "control": "discovered-from-directions-are-named-from-the-readers-end",
+      "clause": "For `A discovered-from B`, A reads B under `Discovered from` and B reads A under `Discovered` (hxedy)",
+      "file": "internal/view/page.go",
+      "test": "TestPageNamesDiscoveredFromDirectionsFromTheReadersEnd",
+      "old": "\tpage.DiscoveredFrom = discoveredRefs(view.Dependencies)\n\tpage.Discovered = discoveredRefs(view.Dependents)",
+      "new": "\tpage.DiscoveredFrom = discoveredRefs(view.Dependents)\n\tpage.Discovered = discoveredRefs(view.Dependencies)"
+    },
+    {
+      "control": "related-merges-both-stored-directions",
+      "clause": "A `related` edge is undirected to a reader: both stored directions appear in one `Related` group, with outgoing edges first (hxedy)",
+      "file": "internal/view/page.go",
+      "test": "TestPageMergesRelatedDirections",
+      "old": "\tpage.Related = relatedRefs(view.Dependencies, view.Dependents)",
+      "new": "\tpage.Related = relatedRefs(view.Dependents, view.Dependencies)"
     }
   ]
 }

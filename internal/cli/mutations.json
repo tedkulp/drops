@@ -182,8 +182,8 @@
       "clause": "show --json omits labels when an issue carries none, which is why .labels[] is not safe (dw32p.31)",
       "file": "internal/cli/view.go",
       "test": "TestLabelAddAndRmChangeTheIssuesLabels",
-      "old": "\tLabels   []string        `json:\"labels,omitempty\"`",
-      "new": "\tLabels   []string        `json:\"labels\"`"
+      "old": "\tLabels         []string        `json:\"labels,omitempty\"`",
+      "new": "\tLabels         []string        `json:\"labels\"`"
     },
     {
       "control": "pages-are-ruled-apart",

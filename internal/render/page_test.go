@@ -223,7 +223,8 @@ func TestPageOmitsRelationBlocksAnIssueHasNone(t *testing.T) {
 		ID: "k3f9x", Project: "drops", Title: "t", Status: model.StatusOpen, Type: model.TypeTask,
 		CreatedAt: "2026-09-01T10:04:00Z", UpdatedAt: "2026-09-01T10:04:00Z",
 	})
-	for _, heading := range []string{"Parent", "Blocked by", "Blocks", "Children"} {
+	for _, heading := range []string{"Parent", "Blocked by", "Blocks", "Children",
+		"Discovered from", "Discovered", "Related"} {
 		if strings.Contains(got, heading) {
 			t.Errorf("empty %q block printed: %q", heading, got)
 		}

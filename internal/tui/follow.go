@@ -29,13 +29,9 @@ type relationGroup struct {
 //
 //	Parent · Blocked by · Blocks · Children · Discovered from · Discovered · Related
 //
-// The boundary is the FULL core graph, not `show`'s (qy3de.6 §1). `show`
-// renders `blocks` alone, and that is an omission rather than a designed
-// reading contract: `dep add --type` accepts all three types and no verb can
-// read two of them back. Propagating it into a second surface on the grounds
-// that the first surface has it was rejected; the divergence is filed as
-// drops://hxedy instead, so until that lands the TUI is the only place a
-// `discovered-from` edge is visible.
+// Like the page beside it, the picker covers the full core graph. It reads the
+// IssueView directly because the rendered Console buffer is intentionally
+// opaque, so this separate mapping keeps its own controls.
 //
 // **Every direction is named from the READER's end, which is the opposite of
 // the edge's own** — the inversion view.Page documents for `blocks`, extended
@@ -51,8 +47,8 @@ type relationGroup struct {
 // than a pair. The two halves arrive already ordered from core and are
 // concatenated, out edges first, rather than re-sorted: core's natural id
 // order is unexported, and a second spelling of it here is precisely this
-// repository's dominant defect class. The corpus holds one live `related`
-// edge, so nothing will ever read the seam.
+// repository's dominant defect class. The direction fixture uses both stored
+// halves because the corpus's single live `related` edge cannot prove the merge.
 func relationGroups(issue core.IssueView) []relationGroup {
 	parent := []core.IssueRef{}
 	if issue.Parent != nil {

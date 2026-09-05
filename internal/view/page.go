@@ -76,12 +76,15 @@ func Page(view core.IssueView) render.Page {
 	page.Blockers = toRefs(blocksRefs(view.Dependencies))
 	page.Blocking = toRefs(blocksRefs(view.Dependents))
 	page.Children = toRefs(view.Children)
+	page.DiscoveredFrom = discoveredRefs(view.Dependencies)
+	page.Discovered = discoveredRefs(view.Dependents)
+	page.Related = relatedRefs(view.Dependencies, view.Dependents)
 	return page
 }
 
-// blocksRefs keeps the `blocks` edges of one dependency block. A page names
-// blockers and nothing else, so a `related` or `discovered-from` edge is
-// dropped here rather than rendered under a heading that would misreport it.
+// blocksRefs keeps the `blocks` edges of one dependency block. Only those
+// edges may reach a page's blocker fields; `related` and `discovered-from`
+// have their own fields and headings.
 //
 // The relations arrive live: store filters `tombstoned = 0` in SQL for labels,
 // dependencies and children alike, and core drops a tombstoned parent record.
@@ -92,6 +95,33 @@ func blocksRefs(dependencies []core.DependencyRef) []core.IssueRef {
 	for _, dependency := range dependencies {
 		if dependency.Type == model.DepBlocks {
 			refs = append(refs, dependency.IssueRef)
+		}
+	}
+	return refs
+}
+
+func discoveredRefs(dependencies []core.DependencyRef) []render.Ref {
+	refs := make([]render.Ref, 0, len(dependencies))
+	for _, dependency := range dependencies {
+		if dependency.Type == model.DepDiscoveredFrom {
+			refs = append(refs, toRef(dependency.IssueRef))
+		}
+	}
+	return refs
+}
+
+// relatedRefs merges both stored directions because `related` is undirected to
+// a reader. Each half keeps core's order, with outgoing edges first.
+func relatedRefs(dependencies, dependents []core.DependencyRef) []render.Ref {
+	refs := make([]render.Ref, 0, len(dependencies)+len(dependents))
+	for _, dependency := range dependencies {
+		if dependency.Type == model.DepRelated {
+			refs = append(refs, toRef(dependency.IssueRef))
+		}
+	}
+	for _, dependent := range dependents {
+		if dependent.Type == model.DepRelated {
+			refs = append(refs, toRef(dependent.IssueRef))
 		}
 	}
 	return refs

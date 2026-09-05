@@ -167,8 +167,8 @@ func (f *fixture) child(parent model.ID, title string, priority int) model.Issue
 	return created
 }
 
-// dep records one typed edge, from depending on to. It reaches the two types
-// `show` cannot read (drops://hxedy), which the picker deliberately can.
+// dep records one typed edge, from the issue that depends on the issue at to.
+// The asymmetric titles in picker fixtures make a swapped direction visible.
 func (f *fixture) dep(from, to model.ID, kind model.DependencyType) {
 	f.t.Helper()
 	if _, err := f.core.SetDependency(f.t.Context(), from, to, kind, true); err != nil {

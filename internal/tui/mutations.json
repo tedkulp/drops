@@ -243,7 +243,7 @@
     },
     {
       "control": "discovered-from-is-the-out-edge-and-discovered-the-in-edge",
-      "clause": "`A discovered-from B` means A was derived from B, so the OUT edge is where this issue came from — `Discovered from` — and the IN edge is what came out of it — `Discovered` (qy3de.6 §5, §10 control 4). This is the pair no other surface in drops renders at all (drops://hxedy), so nothing else would catch a swap",
+      "clause": "`A discovered-from B` means A was derived from B, so the OUT edge is where this issue came from — `Discovered from` — and the IN edge is what came out of it — `Discovered` (qy3de.6 §5, §10 control 4). The page has an independent control for its mapping; this control keeps the picker's separate branch from swapping the pair",
       "file": "internal/tui/follow.go",
       "test": "TestTheFollowPickerNamesEveryDirectionFromTheReadersEnd",
       "old": "\t\t{\"Discovered from\", refsOfType(issue.Dependencies, model.DepDiscoveredFrom)},",

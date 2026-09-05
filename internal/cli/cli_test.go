@@ -142,7 +142,8 @@ func TestShowJSONShape(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &view); err != nil {
 		t.Fatalf("show --json not an object: %v (%q)", err, out)
 	}
-	for _, key := range []string{"parent", "blockers", "blocking", "children", "comments"} {
+	for _, key := range []string{"parent", "blockers", "blocking", "children",
+		"discovered_from", "discovered", "related", "comments"} {
 		if _, ok := view[key]; !ok {
 			t.Fatalf("show --json missing key %q (empty relations must be present)", key)
 		}
@@ -150,7 +151,8 @@ func TestShowJSONShape(t *testing.T) {
 	if view["parent"] != nil {
 		t.Fatalf("parent = %v, want null when none", view["parent"])
 	}
-	for _, key := range []string{"blockers", "blocking", "children", "comments"} {
+	for _, key := range []string{"blockers", "blocking", "children",
+		"discovered_from", "discovered", "related", "comments"} {
 		list, ok := view[key].([]any)
 		if !ok || list == nil {
 			t.Fatalf("%s = %v, want []", key, view[key])

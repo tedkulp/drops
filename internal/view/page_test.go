@@ -99,7 +99,8 @@ func TestPageCarriesIdentityBodyAndRelations(t *testing.T) {
 		Description:   "the body",
 	}
 	got := page
-	got.Parent, got.Blockers, got.Blocking, got.Children, got.Comments = nil, nil, nil, nil, nil
+	got.Parent, got.Blockers, got.Blocking, got.Children = nil, nil, nil, nil
+	got.DiscoveredFrom, got.Discovered, got.Related, got.Comments = nil, nil, nil, nil
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("page identity and body\n got %+v\nwant %+v", got, want)
 	}
@@ -120,15 +121,15 @@ func TestPageLeavesAbsentColumnsEmpty(t *testing.T) {
 		t.Errorf("parent = %+v, want nil", page.Parent)
 	}
 	// Never nil, so a caller emitting JSON derives [] from an empty block.
-	if page.Blockers == nil || page.Blocking == nil || page.Children == nil {
+	if page.Blockers == nil || page.Blocking == nil || page.Children == nil ||
+		page.DiscoveredFrom == nil || page.Discovered == nil || page.Related == nil {
 		t.Errorf("an empty relation block is nil rather than empty: %+v", page)
 	}
 }
 
-// TestPageNamesOnlyBlocksEdges: core hands over every edge type in one block,
-// so `related` and `discovered-from` are dropped here. An edge rendered under
-// "Blocked by" would report a link that does not block as one that does, and
-// `ready` would disagree with the page.
+// TestPageNamesOnlyBlocksEdges: core hands over every edge type in one block.
+// Only `blocks` may reach the blocker fields; the other types have their own
+// fields and must never make `ready` disagree with a page.
 func TestPageNamesOnlyBlocksEdges(t *testing.T) {
 	source := issueView()
 	source.Dependencies = []core.DependencyRef{
@@ -159,6 +160,38 @@ func TestPageNamesEachDirectionFromTheReadersEnd(t *testing.T) {
 	page := view.Page(source)
 	assertIDs(t, "blockers", page.Blockers, "k3f9x.1")
 	assertIDs(t, "blocking", page.Blocking, "k3f9x.2")
+}
+
+// TestPageNamesDiscoveredFromDirectionsFromTheReadersEnd pins the asymmetric
+// provenance relation. An outgoing edge names this issue's origin; an incoming
+// edge names an issue derived from this one.
+func TestPageNamesDiscoveredFromDirectionsFromTheReadersEnd(t *testing.T) {
+	source := issueView()
+	source.Dependencies = []core.DependencyRef{
+		dependency("k3f9x.1", "where this came from", model.DepDiscoveredFrom),
+	}
+	source.Dependents = []core.DependencyRef{
+		dependency("k3f9x.2", "what came out of this", model.DepDiscoveredFrom),
+	}
+
+	page := view.Page(source)
+	assertIDs(t, "discovered from", page.DiscoveredFrom, "k3f9x.1")
+	assertIDs(t, "discovered", page.Discovered, "k3f9x.2")
+}
+
+// TestPageMergesRelatedDirections keeps both stored halves of an undirected
+// reader-facing relation, with core's outgoing half first.
+func TestPageMergesRelatedDirections(t *testing.T) {
+	source := issueView()
+	source.Dependencies = []core.DependencyRef{
+		dependency("k3f9x.1", "an outgoing peer", model.DepRelated),
+	}
+	source.Dependents = []core.DependencyRef{
+		dependency("k3f9x.2", "an incoming peer", model.DepRelated),
+	}
+
+	page := view.Page(source)
+	assertIDs(t, "related", page.Related, "k3f9x.1", "k3f9x.2")
 }
 
 // TestPageCarriesItsWholeThread: a page is identity, body, every relation AND

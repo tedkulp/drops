@@ -31,9 +31,8 @@ using.
   and `Enter` retargets the right pane onto the one you choose **without the
   list cursor moving**; `Backspace` walks back down the trail one level at a
   time, `Esc` drops all of it at once, and moving the list cursor clears it.
-  The picker lists **all three dependency types**, where a page renders
-  `blocks` alone, so a `discovered-from` edge is readable in drops for the
-  first time. Its id column is auto-sized and uncapped, unlike the
+  The picker lists **all three dependency types** under the same direction-aware
+  headings the page uses. Its id column is auto-sized and uncapped, unlike the
   left pane's, because a picker's rows are siblings whose dotted ids share a
   prefix.
 - **`Esc` is the navigator's universal go-back key.** It pops exactly one layer
@@ -166,6 +165,12 @@ using.
   byte-identical, verified over the 1025-issue corpus.
 
 ### Fixed
+
+- **`show` no longer drops `related` and `discovered-from` dependencies.**
+  Text pages name discovery provenance as `Discovered from` / `Discovered` and
+  merge both directions of the undirected `Related` relation. `show --json`
+  exposes the same graph as `discovered_from`, `discovered`, and `related`
+  arrays, all present as `[]` when empty.
 
 - **A failed TUI refresh leaves retained rows marked stale.** The navigator now
   commits the new store sequence only after the row read succeeds, so a busy,
