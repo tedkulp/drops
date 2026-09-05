@@ -392,6 +392,46 @@ func TestAResizeRerendersThePageAtTheNewPaneWidth(t *testing.T) {
 	}
 }
 
+// A width change reflows the page, so the offset the reader left behind names a
+// line that is no longer the line they were reading. Every motion that changes
+// the pane's width therefore starts at the top, exactly as opening a different
+// issue does — the two facts showDetail decides on, and the reason deleting the
+// `keep` flag for tc2x5 left these three motions where they already were.
+func TestAWidthChangeStartsThePageAtTheTop(t *testing.T) {
+	long := strings.Repeat("A line of the body that is worth scrolling past.\n", 60)
+
+	for _, motion := range []struct {
+		name string
+		do   func(t *testing.T, pane *Model)
+	}{
+		{"enter-zoom", func(t *testing.T, pane *Model) { pressNamed(t, pane, tea.KeyEnter) }},
+		{"the esc out of it", func(t *testing.T, pane *Model) {
+			pressNamed(t, pane, tea.KeyEnter)
+			scrollDetail(t, pane)
+			pressNamed(t, pane, tea.KeyEsc)
+		}},
+		{"a resize", func(t *testing.T, pane *Model) {
+			pane.Update(tea.WindowSizeMsg{Width: 120, Height: 24})
+		}},
+	} {
+		t.Run(motion.name, func(t *testing.T) {
+			fixture := newFixture(t)
+			issue := fixture.issueWith("A long page", long, 2)
+			pane := fixture.model(80, 24)
+
+			scrollDetail(t, pane)
+			motion.do(t, pane)
+
+			if pane.detailID != issue.ID {
+				t.Fatalf("detail = %s, want the same issue %s", pane.detailID, issue.ID)
+			}
+			if got := pane.detail.YOffset(); got != 0 {
+				t.Fatalf("y offset = %d after the page was reflowed, want 0", got)
+			}
+		})
+	}
+}
+
 func TestTheCursorRowIsTheOnlyStyledRow(t *testing.T) {
 	fixture := corpus(t)
 	pane := fixture.model(80, 24)

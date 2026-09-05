@@ -596,8 +596,17 @@ A refresh keeps everything you were doing: the cursor rides its tracked id
 wherever the row moved, the filter and the follow stack stand, and **the detail
 pane holds your scroll position**. The page you are reading is re-rendered and
 compared byte for byte; identical means the viewport is not touched at all, and
-different means new text with your offsets carried over. Opening a *different*
-issue still starts at the top — that one you asked for.
+different means new text with your offsets carried over.
+
+What decides that is **what is on screen, not which key you pressed**: your
+place is kept while the same issue stands there at the same pane width, and a
+page that is a different issue — or the same issue reflowed to a new width —
+starts at the top. So `/`, `C`, `a` and a taller window leave you where you
+were, while `enter`-zoom, the `Esc` out of it and a wider window start you at
+the top, because the page has been re-cut into different lines. A refresh that
+finds the issue you were reading closed elsewhere moves the cursor to the next
+one and opens **that** at the top: it is a page you never scrolled, whatever
+motion put it there.
 
 **`x` is the whole write set**, behind one modal on whatever the right pane is
 showing. Nothing is bound at the top level, and a row appears only where it

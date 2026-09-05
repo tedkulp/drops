@@ -1,5 +1,5 @@
 {
-  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14; esc's layer ordering by m3z5y.",
+  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14; esc's layer ordering by m3z5y. tc2x5 re-cut the redraw/retarget pair onto the two facts the pane can read — which issue is on screen, and the width it was rendered into — instead of the intent the caller passed, and split them three ways so each clause has a mutant the other two tests stay green for.",
   "controls": [
     {
       "control": "the-cursor-tracks-an-id",
@@ -398,24 +398,32 @@
       "clause": "Redrawing the SAME page holds the reader's scroll offsets: a refresh that reset them would throw a reader scrolled deep into a long page back to line 0 every time an agent wrote anything, which on this store is the common case (qy3de.14 §Q2)",
       "file": "internal/tui/tui.go",
       "test": "TestRedrawKeepsTheReadersPosition",
-      "old": "\tif !keep {\n\t\ty, x = 0, 0\n\t}",
-      "new": "\ty, x = 0, 0"
+      "old": "\tresume := id == m.detailID && geo.detailWidth == m.pageWidth",
+      "new": "\tresume := false"
+    },
+    {
+      "control": "a-width-change-starts-the-page-at-the-top",
+      "clause": "A width change reflows the page, so the offset the reader left behind names a line that is no longer the one they were reading: `enter`-zoom, the `esc` out of it and a terminal resize all start the page at the top, where a redraw at the SAME width holds. The width is the second of the two facts showDetail decides on, and the one that keeps deleting the `keep` flag from moving any motion that was not broken (tc2x5)",
+      "file": "internal/tui/tui.go",
+      "test": "TestAWidthChangeStartsThePageAtTheTop",
+      "old": "\tresume := id == m.detailID && geo.detailWidth == m.pageWidth",
+      "new": "\tresume := id == m.detailID"
     },
     {
       "control": "retargeting-starts-at-the-top",
-      "clause": "The other half of the same branch: OPENING a different issue starts it at the top, because you asked for a different issue. Only a redraw holds the position, and a version that held it everywhere would leave a fresh page scrolled to a line the reader never chose (qy3de.14 §Q2)",
+      "clause": "The other half of the same branch: opening a DIFFERENT page starts it at the top, whether the reader opened it with `j` or a refresh's cursor restore walked onto it (tc2x5). It is decided on IDENTITY and not on the caller's intent, which is what the old `keep` flag got wrong: refresh redrew with keep=true at whatever id the restore landed on, so a page the reader had never scrolled opened at the offset of the page they were reading (qy3de.14 §Q2)",
       "file": "internal/tui/tui.go",
       "test": "TestRetargetingStartsAtTheTop",
-      "old": "\tif !keep {\n\t\ty, x = 0, 0\n\t}",
-      "new": "\tif keep {\n\t\ty, x = 0, 0\n\t}"
+      "old": "\tresume := id == m.detailID && geo.detailWidth == m.pageWidth",
+      "new": "\tresume := geo.detailWidth == m.pageWidth"
     },
     {
       "control": "unchanged-is-tested-on-the-rendered-text",
       "clause": "A page counts as unchanged only when its RENDERED TEXT is identical. A comment is its own record with its own revision, so Issue.Revision is unmoved by the write most likely to change the page you are reading, and a revision test would decline to re-render exactly that (qy3de.14 §Q2)",
       "file": "internal/tui/tui.go",
       "test": "TestRedrawFollowsACommentOnThePageBeingRead",
-      "old": "\tsame := keep && id == m.detailID && text == m.pageText",
-      "new": "\tsame := keep && id == m.detailID && issue.Issue.Revision == m.detailView.Issue.Revision"
+      "old": "\tsame := resume && text == m.pageText",
+      "new": "\tsame := resume && issue.Issue.Revision == m.detailView.Issue.Revision"
     },
     {
       "control": "a-modal-reaches-no-refresh",

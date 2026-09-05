@@ -53,10 +53,18 @@
 // stack, because the row set underneath it changed. refresh is what a write
 // and r do: the stack stands, the filter stands, the cursor rides its tracked
 // id, and the right pane is REDRAWN rather than reopened — same page, same
-// scroll position. drawDetail's keep parameter is that distinction, and
-// unchanged is tested on the rendered text rather than the issue's revision,
-// because a comment is its own record and would not move the revision of the
-// page it appears on.
+// scroll position.
+//
+// That last part is decided on WHAT IS ON SCREEN and not on which motion the
+// caller meant. showDetail holds the reader's offsets while the id it is handed
+// is the one already there and the width it renders into is the width that page
+// was rendered at, and starts at the top otherwise: a different issue is a page
+// nobody scrolled, and a different width has reflowed the one they did. So a
+// refresh whose cursor restore walked onto another issue opens it at line 0
+// (tc2x5, which is what a `keep` flag believed instead), and `enter`-zoom and a
+// resize start at the top as they always did. Unchanged is tested on the
+// rendered text rather than the issue's revision, because a comment is its own
+// record and would not move the revision of the page it appears on.
 //
 // There is deliberately no suppression around any of this. A refresh cannot be
 // reached from inside a modal or the / prompt — both capture every key before

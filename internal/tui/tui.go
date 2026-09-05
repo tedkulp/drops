@@ -75,7 +75,12 @@ type Model struct {
 	detail     viewport.Model
 	detailID   model.ID
 	detailView core.IssueView
-	pageText   string
+	// pageText and pageWidth are the page on screen and the width it was
+	// rendered into. Together they are what "the same page" means: the text
+	// says whether a redraw changed anything, and the width says whether the
+	// reader's line number still points at the line they were reading.
+	pageText  string
+	pageWidth int
 
 	// modal is the open picker: non-nil exactly while one is open, and while
 	// it is open it captures every key. One slot holds all three of the
@@ -243,7 +248,8 @@ func (m *Model) applyFilter() error {
 }
 
 // refresh re-reads the row set after a WRITE, which is a different motion from
-// reload: it keeps the follow stack and leaves the right pane where it is.
+// reload: it keeps the follow stack and leaves the right pane on the page it
+// was reading, at the line it was read to.
 //
 // The two consequences qy3de.7 §9 names both fall out of the cursor rule
 // rather than being coded here. Closing the cursor's issue with `C` off drops
@@ -257,6 +263,11 @@ func (m *Model) applyFilter() error {
 // a followed issue leaves the left pane alone, because following never moved
 // the cursor; showTarget is what handles a followed target that the write
 // itself made unreadable.
+//
+// "Where it is" is not unconditional, and tc2x5 is the case that says so: the
+// same restore that walks the cursor onto the NEXT issue retargets the pane
+// with it, and that page opens at the top like any other page the reader did
+// not scroll. showDetail decides that on identity, so nothing here has to.
 func (m *Model) refresh() error {
 	if err := m.readSeq(); err != nil {
 		return err
@@ -269,38 +280,46 @@ func (m *Model) refresh() error {
 	m.rows = matching(m.all, m.filter)
 	m.cursor.restore(m.rows)
 	if len(m.stack) == 0 {
-		return m.redrawDetail(m.cursor.id)
+		return m.showTarget(m.cursor.id)
 	}
-	return m.redrawDetail(m.detailID)
+	return m.showTarget(m.detailID)
 }
 
-// showDetail retargets the right pane. It does NOT move the left cursor, which
-// is the whole navigational claim this map is built on.
-func (m *Model) showDetail(id model.ID) error { return m.drawDetail(id, false) }
-
-// redrawDetail is showDetail's other half: the same page, read again, with the
-// reader's position kept (qy3de.14 §Q2). It falls back DOWN the stack on a
-// failed read exactly as showTarget does, because a refresh can be the thing
-// that discovers a followed target was tombstoned by another replica.
-func (m *Model) redrawDetail(id model.ID) error {
-	for {
-		err := m.drawDetail(id, true)
-		if err == nil || len(m.stack) == 0 {
-			return err
-		}
-		id = m.stack[len(m.stack)-1]
-		m.stack = m.stack[:len(m.stack)-1]
-	}
-}
-
-// drawDetail renders one issue into the right pane. keep says whether this is
-// the SAME page being redrawn under the reader or a different one being opened.
+// showDetail renders one issue into the right pane. It does NOT move the left
+// cursor, which is the whole navigational claim this map is built on.
 //
-// The distinction is the whole of qy3de.14 §Q2. Opening a page starts it at the
-// top, because you asked for a different issue. Redrawing one must not move,
-// because you did not: a refresh that reset the offsets would throw a reader
-// scrolled deep into a long page back to line 0 every time an agent wrote
-// anything — which, on this store, is the common case.
+// Whether the reader's scroll position survives is decided HERE, on what is
+// already on screen, and not by the caller. It survives when this is the same
+// issue rendered into the same width, and nothing else: a different issue is a
+// page the reader never opened, and a different width has reflowed the page, so
+// the line they were on is not the line their offset now names.
+//
+// Redrawing must not move, because the reader did not: a refresh that reset the
+// offsets would throw a reader scrolled deep into a long page back to line 0
+// every time an agent wrote anything — which, on this store, is the common case.
+// That is qy3de.14 §Q2, whose decision states the rule as identity — "opening a
+// different issue starts at the top; redrawing the same one holds".
+//
+// It was a `keep` flag saying which motion the caller MEANT, and tc2x5 is what
+// that costs: refresh redrew with keep=true at whatever id the cursor restore
+// landed on, and closing the cursor's own issue with `C` off makes that a
+// different issue, so the pane opened a page the reader had never scrolled at
+// the offset of the page they were reading. Intent is the caller's belief about
+// what is on screen; what is on screen is right here to be read.
+//
+// Every caller that used to pass keep=false says one of the two facts instead:
+// `j` and the `esc` that clears the follow stack change the id, `enter`-zoom and
+// the `esc` out of it change the width. What is left over is the motions that
+// change NEITHER — a `/` keystroke, `C`, `a`, the `esc` that clears the filter,
+// a `k` at the top of the list, a height-only resize — and every one of them
+// now holds the reader's place where the flag reset it. None of them puts a
+// different page on screen, so that is this rule applying and not an exception
+// to it.
+//
+// The width is a proxy for the line mapping, and a deliberate one. A page whose
+// bytes happen to be identical at both widths starts at the top anyway, which
+// costs that reader one scroll; measuring the mapping instead would cost a
+// branch that nothing on this store could make fail.
 //
 // Unchanged is tested on the RENDERED TEXT, not on the issue's revision. A
 // comment is its own record with its own revision, so `Issue.Revision` is
@@ -309,9 +328,9 @@ func (m *Model) redrawDetail(id model.ID) error {
 // together are 104µs+20µs on a typical page and 278µs+286µs on the corpus's
 // worst, against 5.24ms for the blocker map the same refresh already paid for.
 // So this is a claim about the reading position and never about cost.
-func (m *Model) drawDetail(id model.ID, keep bool) error {
+func (m *Model) showDetail(id model.ID) error {
 	if id == "" {
-		m.detailID, m.pageText = "", ""
+		m.detailID, m.pageText, m.pageWidth = "", "", 0
 		m.detail.SetContent("")
 		return nil
 	}
@@ -327,15 +346,16 @@ func (m *Model) drawDetail(id model.ID, keep bool) error {
 	// The view is taken even when the text is identical: `f` picks over the
 	// full core graph, which is wider than the page, so a relation can be
 	// added without changing a rendered byte.
-	same := keep && id == m.detailID && text == m.pageText
+	resume := id == m.detailID && geo.detailWidth == m.pageWidth
+	same := resume && text == m.pageText
 	m.detailID, m.detailView = id, issue
 	if same {
 		return nil
 	}
 	y, x := m.detail.YOffset(), m.detail.XOffset()
-	m.pageText = text
+	m.pageText, m.pageWidth = text, geo.detailWidth
 	m.detail.SetContent(text)
-	if !keep {
+	if !resume {
 		y, x = 0, 0
 	}
 	// Both clamp themselves against the content just set — measured, because
@@ -491,7 +511,10 @@ func (m *Model) popFollow() error {
 }
 
 // showTarget retargets the right pane, falling back DOWN the stack when the
-// read fails (qy3de.6 §9).
+// read fails (qy3de.6 §9). A refresh's redraw is the same walk and not a
+// second one: a refresh can be the thing that discovers a followed target was
+// tombstoned by another replica, and whether the reader's position survives is
+// showDetail's question rather than this one's.
 //
 // Following leaves the row set on purpose: 52% of relation targets in the
 // corpus are closed, and `C` governs the left pane only. So a target can be

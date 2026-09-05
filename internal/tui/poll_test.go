@@ -189,11 +189,76 @@ func TestRefreshKeepsTheFollowStack(t *testing.T) {
 }
 
 func TestRedrawKeepsTheReadersPosition(t *testing.T) {
-	fixture := newFixture(t)
 	long := strings.Repeat("A line of the body that is worth scrolling past.\n", 60)
-	issue := fixture.issueWith("A long page", long, 2)
-	pane := fixture.model(80, 24)
 
+	// The refresh a write leaves behind, which is the motion the clause was
+	// written for. The page being read is the one that CHANGES: an unrelated
+	// write takes the identical-text path instead, where the offsets are
+	// never touched and this clause is not exercised at all.
+	t.Run("a refresh", func(t *testing.T) {
+		fixture := newFixture(t)
+		issue := fixture.issueWith("A long page", long, 2)
+		pane := fixture.model(80, 24)
+
+		scrolled := scrollDetail(t, pane)
+		if _, err := fixture.core.AddComment(t.Context(), issue.ID, "somebody", "written from another terminal"); err != nil {
+			t.Fatalf("add comment: %v", err)
+		}
+		press(t, pane, "r")
+
+		if !strings.Contains(pane.pageText, "written from another terminal") {
+			t.Fatalf("the page did not change, so this test cannot fail for its clause")
+		}
+		if got := pane.detail.YOffset(); got != scrolled {
+			t.Fatalf("y offset = %d after a refresh, want %d — the reader was thrown back up the page", got, scrolled)
+		}
+		if pane.detailID != issue.ID {
+			t.Fatalf("detail = %s, want %s", pane.detailID, issue.ID)
+		}
+	})
+
+	// And every other motion that leaves the same page on screen at the same
+	// width. These reach the rule through applyFilter and reload rather than
+	// refresh, and each of them reset the reader to line 0 while the pane
+	// decided this on the caller's intent instead (tc2x5).
+	for _, motion := range []struct {
+		name string
+		do   func(t *testing.T, pane *Model)
+	}{
+		{"a keystroke into the filter", func(t *testing.T, pane *Model) {
+			press(t, pane, "/")
+			press(t, pane, "l")
+		}},
+		{"C", func(t *testing.T, pane *Model) { press(t, pane, "C") }},
+		{"a height-only resize", func(t *testing.T, pane *Model) {
+			pane.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+		}},
+	} {
+		t.Run(motion.name, func(t *testing.T) {
+			fixture := newFixture(t)
+			// One row, so a motion that narrows the row set cannot move
+			// the cursor onto another issue and pass for the wrong reason.
+			issue := fixture.issueWith("A long page", long, 2)
+			pane := fixture.model(80, 24)
+
+			scrolled := scrollDetail(t, pane)
+			motion.do(t, pane)
+
+			if pane.detailID != issue.ID {
+				t.Fatalf("detail = %s, want the page still under the reader, %s", pane.detailID, issue.ID)
+			}
+			if got := pane.detail.YOffset(); got != scrolled {
+				t.Fatalf("y offset = %d, want %d — the reader was thrown back up a page they never left", got, scrolled)
+			}
+		})
+	}
+}
+
+// scrollDetail moves the right pane off line 0 and returns where it landed,
+// failing if it could not: an offset assertion made on an unscrolled page is
+// green whatever the production branch does.
+func scrollDetail(t *testing.T, pane *Model) int {
+	t.Helper()
 	for range 4 {
 		press(t, pane, "J")
 	}
@@ -201,49 +266,53 @@ func TestRedrawKeepsTheReadersPosition(t *testing.T) {
 	if scrolled == 0 {
 		t.Fatalf("the page did not scroll, so this test cannot fail for its clause")
 	}
-
-	// The page being read is the one that CHANGES: an unrelated write takes
-	// the identical-text path instead, where the offsets are never touched
-	// and this clause is not exercised at all.
-	if _, err := fixture.core.AddComment(t.Context(), issue.ID, "somebody", "written from another terminal"); err != nil {
-		t.Fatalf("add comment: %v", err)
-	}
-	press(t, pane, "r")
-
-	if !strings.Contains(pane.pageText, "written from another terminal") {
-		t.Fatalf("the page did not change, so this test cannot fail for its clause")
-	}
-	if got := pane.detail.YOffset(); got != scrolled {
-		t.Fatalf("y offset = %d after a refresh, want %d — the reader was thrown back up the page", got, scrolled)
-	}
-	if pane.detailID != issue.ID {
-		t.Fatalf("detail = %s, want %s", pane.detailID, issue.ID)
-	}
+	return scrolled
 }
 
 func TestRetargetingStartsAtTheTop(t *testing.T) {
-	fixture := newFixture(t)
-	long := strings.Repeat("A line of the body that is worth scrolling past.\n", 60)
-	fixture.issueWith("A long page", long, 1)
 	// The page moved TO is long as well, or the viewport clamps a carried
-	// offset back to zero on its own and this clause cannot fail either way.
-	fixture.issueWith("Another long page", long, 2)
-	pane := fixture.model(80, 24)
+	// offset back to zero on its own and neither half can fail either way.
+	long := strings.Repeat("A line of the body that is worth scrolling past.\n", 60)
 
-	for range 4 {
-		press(t, pane, "J")
-	}
-	if pane.detail.YOffset() == 0 {
-		t.Fatalf("the page did not scroll, so this test cannot fail for its clause")
-	}
+	// The reader's own motion: opening a DIFFERENT issue starts at the top,
+	// because you asked for a different issue. Only a redraw holds.
+	t.Run("the cursor moves", func(t *testing.T) {
+		fixture := newFixture(t)
+		fixture.issueWith("A long page", long, 1)
+		fixture.issueWith("Another long page", long, 2)
+		pane := fixture.model(80, 24)
 
-	// The other half of the same branch: opening a DIFFERENT issue starts at
-	// the top, because you asked for a different issue. Only a redraw holds.
-	press(t, pane, "j")
+		scrollDetail(t, pane)
+		press(t, pane, "j")
 
-	if got := pane.detail.YOffset(); got != 0 {
-		t.Fatalf("y offset = %d on a newly opened page, want 0", got)
-	}
+		if got := pane.detail.YOffset(); got != 0 {
+			t.Fatalf("y offset = %d on a newly opened page, want 0", got)
+		}
+	})
+
+	// The writer's (tc2x5). A refresh redraws with the reader's position
+	// kept, but the same refresh can move the cursor onto a different issue:
+	// closing the cursor's own row with `C` off is the case refresh's doc
+	// comment describes. That page is one the reader has never scrolled, so
+	// intent is not enough — the retarget is decided on IDENTITY.
+	t.Run("a refresh lands on another issue", func(t *testing.T) {
+		fixture := newFixture(t)
+		read := fixture.issueWith("A long page", long, 1)
+		next := fixture.issueWith("Another long page", long, 2)
+		pane := fixture.model(80, 24)
+
+		scrollDetail(t, pane)
+		fixture.close(read.ID, "closed from another terminal")
+		press(t, pane, "r")
+
+		if pane.detailID != next.ID {
+			t.Fatalf("detail = %s after the refresh, want %s — it did not retarget, so this cannot fail for its clause",
+				pane.detailID, next.ID)
+		}
+		if got := pane.detail.YOffset(); got != 0 {
+			t.Fatalf("y offset = %d on a page the reader never opened, want 0", got)
+		}
+	})
 }
 
 func TestRedrawFollowsACommentOnThePageBeingRead(t *testing.T) {

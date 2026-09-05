@@ -73,7 +73,14 @@ using.
   rides its tracked id wherever the row moved, the filter stands, and **the
   detail pane holds your scroll position**: the page is re-rendered and
   compared byte for byte, so an identical page never moves and a changed one
-  keeps your offsets. Opening a different issue still starts at the top.
+  keeps your offsets. Whether your place is held is decided on **what is on
+  screen** — the same issue, at the same pane width — and never on which motion
+  asked for the draw, so a page you never opened starts at the top however you
+  arrived on it, including the refresh that moves the cursor on because the
+  issue you were reading was closed from another terminal. `enter`-zoom, the
+  `Esc` out of it and a wider window still start at the top, because they reflow
+  the page into different lines; `/`, `C`, `a` and a taller window now leave you
+  where you were, where before every one of them threw you back to line 0.
 - **`render.Ellipsis` and `render.Cols`** are exported, so the navigator's row
   geometry — which deliberately truncates an id, the one thing `render`'s own
   rule forbids — is built on `render`'s truncation primitive rather than a
