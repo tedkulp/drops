@@ -161,6 +161,10 @@ using.
   prompt still captures printable command keys such as `q`, `a`, and `C`, but
   no longer swallows the non-printable interrupt key.
 
+- **An overflowing TUI footer closes its dim style.** Footer text is now
+  truncated by display width before styling, preserving the trailing SGR reset
+  instead of leaking dim foreground colour past a narrow frame.
+
 - **`drops ready` and `drops blocked` see an `in_progress` issue.** Both drew
   their candidates from `open` alone, so the issue you had actually started was
   in neither: `ready` could not offer you the work in front of you and `blocked`

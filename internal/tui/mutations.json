@@ -122,6 +122,14 @@
       "new": "\tm.all = rows\n\tm.rows = matching(m.all, m.filter)\n\tm.cursor.restore(m.rows)"
     },
     {
+      "control": "an-overflowing-footer-closes-its-dim-style",
+      "clause": "An overflowing footer truncates its plain text before applying the dim style, so the emitted SGR reset survives and the footer cannot leak colour past the frame (edgud)",
+      "file": "internal/tui/tui.go",
+      "test": "TestAnOverflowingFooterClosesItsDimStyle",
+      "old": "\t\treturn pad(dimStyle.Render(cut(left, m.width)), m.width, 1)",
+      "new": "\t\treturn pad(dimStyle.Render(left), m.width, 1)"
+    },
+    {
       "control": "y-copies-the-right-panes-id",
       "clause": "`y` copies the RIGHT PANE'S issue id, not the row under the cursor. The two differ under a follow trail, where the right pane is the issue you are reading and the object `x` already names (bvjgn)",
       "file": "internal/tui/tui.go",

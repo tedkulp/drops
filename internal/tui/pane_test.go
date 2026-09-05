@@ -347,6 +347,19 @@ func TestTheFooterDisclosesReadyAsAWord(t *testing.T) {
 	}
 }
 
+func TestAnOverflowingFooterClosesItsDimStyle(t *testing.T) {
+	fixture := newFixture(t)
+	fixture.issue("Something you can pick up", 2)
+	pane := fixture.model(30, 24)
+	pane.filter = strings.Repeat("界", 30)
+
+	footer := pane.footer(pane.geo())
+
+	if !strings.HasSuffix(footer, "\x1b[m") && !strings.HasSuffix(footer, "\x1b[0m") {
+		t.Fatalf("overflowing footer = %q, want its trailing SGR reset", footer)
+	}
+}
+
 func TestRHidesTheBlockedRowsAndPressingItAgainBringsThemBack(t *testing.T) {
 	fixture := newFixture(t)
 	free := fixture.issue("Something you can pick up", 2)

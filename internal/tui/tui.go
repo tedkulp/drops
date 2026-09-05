@@ -1076,7 +1076,7 @@ func (m *Model) footer(geo geometry) string {
 
 	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right)
 	if gap < 1 {
-		return pad(dimStyle.Render(left), m.width, 1)
+		return pad(dimStyle.Render(cut(left, m.width)), m.width, 1)
 	}
 	return dimStyle.Render(left) + strings.Repeat(" ", gap) + dimStyle.Render(right)
 }

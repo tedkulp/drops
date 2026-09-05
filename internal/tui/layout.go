@@ -70,8 +70,8 @@ func pad(block string, width, height int) string {
 }
 
 // cut drops runes off the end of a line until it fits width. It measures with
-// lipgloss.Width rather than counting runes because a line reaching here may
-// already carry SGR escapes, which are zero columns wide and many bytes long.
+// lipgloss.Width because a line reaching here may carry SGR escapes, but it
+// cannot preserve an escape sequence or trailing reset that it cuts through.
 func cut(line string, width int) string {
 	runes := []rune(line)
 	for len(runes) > 0 && lipgloss.Width(string(runes)) > width {
