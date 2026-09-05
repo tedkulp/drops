@@ -63,12 +63,20 @@ using.
 - **The navigator notices when somebody else writes.** Every two seconds it
   reads the store's `write_seq` — the counter bumped inside the same
   transaction as every replicated write, so another terminal, another agent and
-  a `sync import` all move it — and puts `stale` on the footer when it has
+  a `sync import` all move it — and puts `stale · R` on the footer when it has
   moved. It deliberately does **not** reload: this store's common writer is an
   agent, and a pane that reorders itself under a reader mid-thought is the
   thing the navigator exists to avoid. The check is one primary-key row, 4.2µs
   against the 1025-issue corpus, where a whole re-read is 5–10ms.
-- **`r` re-reads the store**, unconditionally, marker or no marker. It is a
+- **`r` hides the navigator's blocked rows**, leaving what you can actually
+  pick up, and the footer says `ready` while it is on. It stacks with `/`, `a`
+  and `C` and survives all three. It is deliberately **not** `drops ready`: that
+  verb forces `status = open` and so cannot see an `in_progress` issue at all,
+  which would hide the issue you are working on the moment you pressed the key.
+  This is a predicate over rows already on screen — the same open-blocker count
+  the ` [N]` marker prints — so it costs no store read and leaves the row set as
+  `list`'s contract. Refresh moves to **`R`** to make room for it.
+- **`R` re-reads the store**, unconditionally, marker or no marker. It is a
   refresh and not a navigation, so the follow stack survives it, the cursor
   rides its tracked id wherever the row moved, the filter stands, and **the
   detail pane holds your scroll position**: the page is re-rendered and

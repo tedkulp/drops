@@ -36,9 +36,9 @@
 // # Refreshing
 //
 // The pane reads the store when it starts, on C and a, after a write, and on
-// r. It also POLLS, every pollInterval, and the poll's job is noticing rather
+// R. It also POLLS, every pollInterval, and the poll's job is noticing rather
 // than reloading: it reads store_state.write_seq — the counter bumped inside
-// the same transaction as every replicated write — and puts `stale` on the
+// the same transaction as every replicated write — and puts `stale · R` on the
 // footer when it has moved. It does not re-read, because this store's common
 // writer is an agent and a surface that reorders itself under a reader
 // mid-thought is the thing this package exists to avoid (qy3de.14).
@@ -51,7 +51,7 @@
 // reload and refresh are different motions and the difference is navigational,
 // not about reading. reload is what a scope change does: it clears the follow
 // stack, because the row set underneath it changed. refresh is what a write
-// and r do: the stack stands, the filter stands, the cursor rides its tracked
+// and R do: the stack stands, the filter stands, the cursor rides its tracked
 // id, and the right pane is REDRAWN rather than reopened — same page, same
 // scroll position.
 //
@@ -71,6 +71,15 @@
 // the keymap sees one — so a guard would be a branch whose control could never
 // go red, which is precisely the defect AGENTS.md names. The reachability is
 // asserted by a test instead.
+//
+// `r` is NEITHER motion: g7b23's ready-only toggle reads nothing at all. It is
+// a narrowing, beside `/` — the predicate is blockedBy == 0 over rows the pane
+// already holds — so it goes through applyFilter, drops the follow stack the
+// way a filter keystroke does, and survives C and a because every reload
+// re-derives the visible set through that one function. It is deliberately not
+// core.Ready, which forces status={open} and so cannot see the in_progress
+// issue you are working on (drops://8bbam); keeping the predicate local is
+// what leaves the row set as list's contract under it.
 //
 // # Following
 //

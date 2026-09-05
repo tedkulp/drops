@@ -220,6 +220,123 @@ func TestTheEmptyStateTellsAnEmptyProjectFromABadFilter(t *testing.T) {
 	}
 }
 
+func TestReadyComposesWithTheFilterAndSurvivesAAndC(t *testing.T) {
+	// The whole reason `r` is a local predicate and not a store scope: it
+	// stacks with `/`, `a` and `C` the way matching already does, and a
+	// reload cannot drop it.
+	fixture := newFixture(t)
+	free := fixture.issue("cutover the store", 2)
+	blocked := fixture.issue("cutover the blocked one", 2)
+	blocker := fixture.issue("the blocker", 2)
+	fixture.blocks(blocked.ID, blocker.ID)
+	elsewhere := fixture.issueIn(fixture.other, "cutover elsewhere", 2)
+	done := fixture.issue("cutover finished", 2)
+	fixture.setStatus(done.ID, model.StatusClosed)
+
+	pane := fixture.model(80, 24)
+	press(t, pane, "r")
+	pane.filter = "cutover"
+	if err := pane.applyFilter(); err != nil {
+		t.Fatalf("apply filter: %v", err)
+	}
+	if got := ids(pane.rows); len(got) != 1 || got[0] != free.ID {
+		t.Fatalf("row set under `r` and /cutover = %v, want just %s", got, free.ID)
+	}
+
+	press(t, pane, "a")
+	if !pane.readyOnly {
+		t.Fatalf("`r` did not survive `a`; a reload must not drop a local narrowing")
+	}
+	if !hasID(pane.rows, elsewhere.ID) || hasID(pane.rows, blocked.ID) {
+		t.Fatalf("row set after `a` = %v, want the other project's match and still no blocked row",
+			ids(pane.rows))
+	}
+
+	press(t, pane, "C")
+	if !hasID(pane.rows, done.ID) {
+		t.Fatalf("row set after `C` = %v, want the closed match included", ids(pane.rows))
+	}
+	if hasID(pane.rows, blocked.ID) {
+		t.Fatalf("row set after `C` = %v, want `r` still hiding the blocked row", ids(pane.rows))
+	}
+}
+
+func TestReadyNarrowingSurvivesARefresh(t *testing.T) {
+	// reload is not the only way rows are re-derived: `R` and every write go
+	// through refresh, which builds m.rows on its own. Both paths have to ask
+	// the same question, or an agent writing a blocked issue puts it on a
+	// pane the reader has told to hide exactly that.
+	fixture := newFixture(t)
+	fixture.issue("Something you can pick up", 2)
+	pane := fixture.model(80, 24)
+	press(t, pane, "r")
+
+	blocked := fixture.issue("Written by somebody else", 2)
+	blocker := fixture.issue("And its blocker", 2)
+	fixture.blocks(blocked.ID, blocker.ID)
+
+	press(t, pane, "R")
+
+	if !hasID(pane.rows, blocker.ID) {
+		t.Fatalf("row set after `R` = %v, want the new unblocked issue read in", ids(pane.rows))
+	}
+	if hasID(pane.rows, blocked.ID) {
+		t.Fatalf("row set after `R` = %v, want %s still hidden — `r` is still on",
+			ids(pane.rows), blocked.ID)
+	}
+}
+
+func TestTheFooterDisclosesReadyAsAWord(t *testing.T) {
+	// qy3de.5's rule: modes read as WORDS, because `r` means nothing to
+	// somebody who did not press it. Beside `closed`, `wrap` and `zoom
+	// detail`, and with the count going `M of N` while it narrows.
+	fixture := newFixture(t)
+	fixture.issue("Something you can pick up", 2)
+	blocked := fixture.issue("Something you cannot", 2)
+	blocker := fixture.issue("The blocker", 2)
+	fixture.blocks(blocked.ID, blocker.ID)
+
+	pane := fixture.model(80, 24)
+	if strings.Contains(pane.footer(pane.geo()), "ready") {
+		t.Fatalf("footer = %q, want no mode word before `r`", pane.footer(pane.geo()))
+	}
+
+	press(t, pane, "r")
+
+	if footer := pane.footer(pane.geo()); !strings.Contains(footer, "drops · 2 of 3 · ready") {
+		t.Fatalf("footer = %q, want the narrowed count and the mode as a word", footer)
+	}
+}
+
+func TestRHidesTheBlockedRowsAndPressingItAgainBringsThemBack(t *testing.T) {
+	fixture := newFixture(t)
+	free := fixture.issue("Something you can pick up", 2)
+	blocked := fixture.issue("Something you cannot", 2)
+	blocker := fixture.issue("The blocker", 2)
+	fixture.blocks(blocked.ID, blocker.ID)
+
+	pane := fixture.model(80, 24)
+	if len(pane.rows) != 3 {
+		t.Fatalf("row set at rest = %v, want all three", ids(pane.rows))
+	}
+
+	press(t, pane, "r")
+
+	if hasID(pane.rows, blocked.ID) {
+		t.Fatalf("row set under `r` = %v, want %s gone — it has an open blocker", ids(pane.rows), blocked.ID)
+	}
+	if !hasID(pane.rows, free.ID) || !hasID(pane.rows, blocker.ID) {
+		t.Fatalf("row set under `r` = %v, want the two rows with no open blocker", ids(pane.rows))
+	}
+
+	press(t, pane, "r")
+
+	if !hasID(pane.rows, blocked.ID) {
+		t.Fatalf("row set after `r` again = %v, want %s back — the key is a toggle",
+			ids(pane.rows), blocked.ID)
+	}
+}
+
 func hasID(rows []row, id model.ID) bool {
 	for _, candidate := range rows {
 		if candidate.id == id {

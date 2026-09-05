@@ -66,11 +66,17 @@ type Model struct {
 	author string
 
 	all    []row // the loaded set, in the CLI's order, never re-sorted
-	rows   []row // what the filter leaves
+	rows   []row // what the local narrowing leaves
 	scope  scope
 	filter string
 	typing bool // the `/` prompt is open
-	cursor cursor
+	// readyOnly is g7b23's `r`: hide the rows with an open blocker, leaving
+	// what you can actually pick up. It is not part of scope, and that is
+	// the distinction worth keeping — scope is what the STORE is asked for,
+	// and this is a predicate over rows already loaded, so it costs no read
+	// and cannot reach core.Ready's status defect (drops://8bbam).
+	readyOnly bool
+	cursor    cursor
 
 	detail     viewport.Model
 	detailID   model.ID
@@ -239,10 +245,26 @@ func (m *Model) poll() {
 	}
 }
 
+// visible is the loaded set narrowed by everything LOCAL to the pane: `r`'s
+// unblocked predicate and `/`'s substring. Both preserve the store's order, so
+// composing them cannot reorder anything, and neither reads the store — which
+// is why `r` is a narrowing and not a scope change.
+//
+// One function rather than the expression written twice, because applyFilter
+// and refresh both need it and they must never disagree about what is on
+// screen.
+func (m *Model) visible() []row {
+	rows := m.all
+	if m.readyOnly {
+		rows = ready(rows)
+	}
+	return matching(rows, m.filter)
+}
+
 // applyFilter narrows the loaded set and restores the cursor onto it.
 func (m *Model) applyFilter() error {
 	m.clearFollow()
-	m.rows = matching(m.all, m.filter)
+	m.rows = m.visible()
 	m.cursor.restore(m.rows)
 	return m.showDetail(m.cursor.id)
 }
@@ -277,7 +299,7 @@ func (m *Model) refresh() error {
 		return err
 	}
 	m.all = rows
-	m.rows = matching(m.all, m.filter)
+	m.rows = m.visible()
 	m.cursor.restore(m.rows)
 	if len(m.stack) == 0 {
 		return m.showTarget(m.cursor.id)
@@ -714,6 +736,13 @@ func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 		m.scope.allProjects = !m.scope.allProjects
 		m.fail(m.reload())
 	case "r":
+		// A NARROWING, beside `/`, and not a scope change: it reads nothing,
+		// so it goes through applyFilter rather than reload. The follow stack
+		// falls with it for the same reason `/` drops it — the row set under
+		// it changed.
+		m.readyOnly = !m.readyOnly
+		m.fail(m.applyFilter())
+	case "R":
 		// UNCONDITIONAL, stale or not (qy3de.14 §Q6). An override that
 		// silently declines is the thing you press twice, and making it
 		// conditional puts a branch on state the reader cannot see — the
@@ -967,6 +996,9 @@ func (m *Model) footer(geo geometry) string {
 	if m.filter != "" || m.typing {
 		parts = append(parts, "/"+m.filter)
 	}
+	if m.readyOnly {
+		parts = append(parts, "ready")
+	}
 	if m.scope.includeClosed {
 		parts = append(parts, "closed")
 	}
@@ -985,7 +1017,7 @@ func (m *Model) footer(geo geometry) string {
 	// the next keypress, where this must survive `j`: it is a state of the
 	// store, cleared only by the refresh that reads past it.
 	if m.stale() {
-		parts = append(parts, "stale · r")
+		parts = append(parts, "stale · R")
 	}
 	left := strings.Join(parts, " · ")
 	if m.notice != "" {
@@ -1046,8 +1078,9 @@ func helpText() string {
 		"  Esc                 go back one layer — this help, the whole relation",
 		"                      trail, the filter, the zoom — and never quit",
 		"  C a                 include closed · span every project",
-		"  r                   re-read the store (the footer says `stale` when",
-		"                      someone else has written since you last did)",
+		"  r                   ready only: hide the rows with an open blocker",
+		"  R                   re-read the store (the footer says `stale · R`",
+		"                      when someone else has written since you last did)",
 		"",
 		"  f                   follow a relation: pick one, Enter takes it",
 		"  Backspace           back one relation (Esc drops the whole trail)",

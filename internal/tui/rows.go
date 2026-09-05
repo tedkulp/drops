@@ -77,6 +77,28 @@ func matching(rows []row, needle string) []row {
 	return kept
 }
 
+// ready keeps the rows with no open blocker, in order. It never re-sorts,
+// for the same reason matching does not: the order is the CLI's, achieved by
+// leaving the store's alone.
+//
+// It is deliberately NOT core.Ready, and g7b23 exists because that is the
+// trap. core.Ready sets filter.Statuses = {open} unconditionally and so cannot
+// see an in_progress issue at all (drops://8bbam), which is precisely the row
+// set qy3de.4 rejected for this pane: it would structurally hide the issue you
+// are working on. This is a local predicate over rows the pane already has —
+// blockedBy, annotated once per refresh from the store-wide
+// core.OpenBlockers — so the row set stays `list`'s contract, no key can reach
+// 8bbam, and it composes with `/`, `C` and `a` the way matching already does.
+func ready(rows []row) []row {
+	kept := make([]row, 0, len(rows))
+	for _, candidate := range rows {
+		if candidate.blockedBy == 0 {
+			kept = append(kept, candidate)
+		}
+	}
+	return kept
+}
+
 // cursor is the left pane's selection. It tracks an issue ID, not a row index,
 // so a reload that reorders or removes rows cannot move the selection under
 // the reader. position is the fallback, not the identity.
@@ -165,9 +187,11 @@ func (measured rowLayout) lead(candidate row) string {
 // 80 columns with the project column on, the pane is 38 wide and the lead is
 // 31, so a 13-column " blocked by N" leaves NEGATIVE room and all 13 rows
 // render with no title at all. A rule that drops the long form under pressure
-// was rejected for a different reason: qy3de.4 denied `ready` a key BECAUSE
+// was rejected for a different reason: qy3de.4 denied a ready-only key BECAUSE
 // the row already carries this, and a marker that disappears when the pane is
-// crowded cannot carry that argument.
+// crowded cannot carry that argument. g7b23 has since given that key out on a
+// real-use observation, which does not weaken the argument here: the marker is
+// what tells you the rows `r` would hide are there at all.
 func marker(candidate row) string {
 	if candidate.blockedBy == 0 {
 		return ""

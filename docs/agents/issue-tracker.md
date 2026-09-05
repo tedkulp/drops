@@ -506,7 +506,8 @@ carries the **full untruncated id**, one glance away.
 | `Esc` | go back one layer. It never quits |
 | `C` | include closed issues |
 | `a` | span every project, and add the project column |
-| `r` | re-read the store |
+| `r` | ready only: hide the rows with an open blocker |
+| `R` | re-read the store |
 | `f` | pick a relation of the right pane's issue and follow it |
 | `Backspace` | back one relation; `Esc` drops the whole trail |
 | `x` | write to the right pane's issue: close, reopen, comment, priority, claim, release |
@@ -521,6 +522,19 @@ The filter **survives `a` and `C`**, because "filter, then widen the scope to
 see if it exists elsewhere" is the motion `a` exists for. `drops search` is a
 different thing and has no key: it reaches descriptions and comment bodies and
 returns rows outside the current scope.
+
+**`r` hides the blocked rows**, leaving what you can actually pick up, and the
+footer says `ready` while it is on. It stacks with `/`, `a` and `C` and
+survives all three, because it is a predicate over the rows already loaded —
+`blockedBy == 0`, the same count the ` [N]` marker prints — and not a different
+question asked of the store.
+
+So it is **not** `drops ready`, on purpose, and the difference is the point:
+`ready` forces `status = open` and therefore cannot see an `in_progress` issue
+at all ([drops://8bbam](drops://8bbam)), so a key wired to it would hide the
+issue you are working on. The pane's row set stays `list`'s contract under `r`;
+what leaves is the blocked rows and nothing else. A deferred issue, which
+`drops ready` also omits, stays.
 
 **`Esc` is the universal go-back key, and it pops exactly one layer a press**,
 in this order:
@@ -573,7 +587,7 @@ is what stops a clipped table row reading as a whole row. `w` is the other
 answer where alignment does not matter.
 
 The footer is the disclosure line: scope, count, then active modes **as words**
-(`closed`, `wrap`, `zoom detail`, `stale`, and the filter). The count reads
+(`ready`, `closed`, `wrap`, `zoom detail`, `stale`, and the filter). The count reads
 `M of N` while something is narrowing and a bare `N issues` otherwise — `C` is
 a 6.3x row jump in a project this size, and that has to be visible.
 
@@ -585,12 +599,13 @@ primary-key row, measured at **4.2µs** against the 1025-issue corpus, where a
 whole re-read is 5–10ms; the poll is 1/1300th of the refresh it decides not to
 make.
 
-What it does with the answer is put `stale` on the footer. It does **not**
-reload: this store's common writer is an agent, and a pane that reordered
-itself under you mid-thought is the thing the navigator exists to avoid. `r`
-is what applies it — unconditionally, whether or not the marker is up, because
-an override that silently declines is the key you press twice. `r` is a
-re-read and not a navigation, so the follow stack survives it.
+What it does with the answer is put `stale · R` on the footer, naming the key
+that clears it. It does **not** reload: this store's common writer is an agent,
+and a pane that reordered itself under you mid-thought is the thing the
+navigator exists to avoid. `R` is what applies it — unconditionally, whether or
+not the marker is up, because an override that silently declines is the key you
+press twice. `R` is a re-read and not a navigation, so the follow stack
+survives it.
 
 A refresh keeps everything you were doing: the cursor rides its tracked id
 wherever the row moved, the filter and the follow stack stand, and **the detail

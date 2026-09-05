@@ -93,6 +93,12 @@ func TestStaleMarkerIsAFooterPartAndSurvivesAKeypress(t *testing.T) {
 	if !strings.Contains(footer, "stale") {
 		t.Fatalf("footer = %q, want the stale marker", footer)
 	}
+	// It names the key that clears it, so the marker and the keymap cannot
+	// drift apart: g7b23 moved refresh off `r` and this is what would have
+	// left the footer telling a reader to press the narrowing key.
+	if !strings.Contains(footer, "stale · R") {
+		t.Fatalf("footer = %q, want the marker to name the refresh key", footer)
+	}
 	// Beside the mode words, not instead of them: m.notice replaces this
 	// whole left side, which would hide qy3de.4's disclosure line.
 	if !strings.Contains(footer, "drops") {
@@ -127,7 +133,7 @@ func TestRefreshClearsTheStaleMarker(t *testing.T) {
 		t.Fatalf("pane is not stale after another writer wrote")
 	}
 
-	press(t, pane, "r")
+	press(t, pane, "R")
 
 	// Cleared by the refresh that read past it, and by nothing else.
 	if pane.stale() {
@@ -155,7 +161,7 @@ func TestRefreshRereadsWhenNothingIsStale(t *testing.T) {
 		t.Fatalf("pane should not know about the write yet")
 	}
 
-	press(t, pane, "r")
+	press(t, pane, "R")
 
 	if len(pane.rows) != 2 {
 		t.Fatalf("rows = %d, want `r` to have re-read regardless of the marker", len(pane.rows))
@@ -176,7 +182,7 @@ func TestRefreshKeepsTheFollowStack(t *testing.T) {
 			pane.stack, followed, pane.cursor.id)
 	}
 
-	press(t, pane, "r")
+	press(t, pane, "R")
 
 	// `r` is refresh and not reload: re-reading the store is not a
 	// navigation, and reload clears the stack because moving the cursor is.
@@ -204,7 +210,7 @@ func TestRedrawKeepsTheReadersPosition(t *testing.T) {
 		if _, err := fixture.core.AddComment(t.Context(), issue.ID, "somebody", "written from another terminal"); err != nil {
 			t.Fatalf("add comment: %v", err)
 		}
-		press(t, pane, "r")
+		press(t, pane, "R")
 
 		if !strings.Contains(pane.pageText, "written from another terminal") {
 			t.Fatalf("the page did not change, so this test cannot fail for its clause")
@@ -303,7 +309,7 @@ func TestRetargetingStartsAtTheTop(t *testing.T) {
 
 		scrollDetail(t, pane)
 		fixture.close(read.ID, "closed from another terminal")
-		press(t, pane, "r")
+		press(t, pane, "R")
 
 		if pane.detailID != next.ID {
 			t.Fatalf("detail = %s after the refresh, want %s — it did not retarget, so this cannot fail for its clause",
@@ -331,10 +337,40 @@ func TestRedrawFollowsACommentOnThePageBeingRead(t *testing.T) {
 		t.Fatalf("add comment: %v", err)
 	}
 
-	press(t, pane, "r")
+	press(t, pane, "R")
 
 	if !strings.Contains(pane.pageText, "a comment from another terminal") {
 		t.Fatalf("page did not pick up the new comment:\n%s", pane.pageText)
+	}
+}
+
+func TestAModalCannotReachTheReadyNarrowing(t *testing.T) {
+	// §Q7's argument, applied to g7b23's key: a modal captures every key, so
+	// the guard is satisfied by construction and this is the assertion that
+	// says so. A narrowing reached from inside a picker would re-cut the row
+	// set under a reader who is looking at a relation list.
+	fixture := newFixture(t)
+	parent := fixture.issue("The parent", 2)
+	fixture.child(parent.ID, "The child", 2)
+	blocked := fixture.issue("Blocked, and hidden by `r`", 2)
+	blocker := fixture.issue("The blocker", 2)
+	fixture.blocks(blocked.ID, blocker.ID)
+	pane := fixture.model(80, 24)
+
+	press(t, pane, "f")
+	if pane.modal == nil {
+		t.Fatalf("the picker did not open; this fixture proves nothing")
+	}
+	before := len(pane.rows)
+
+	press(t, pane, "r")
+
+	if pane.modal == nil {
+		t.Fatalf("`r` closed the picker")
+	}
+	if pane.readyOnly || len(pane.rows) != before {
+		t.Fatalf("rows = %d (readyOnly %v), want `r` inside a modal to narrow nothing",
+			len(pane.rows), pane.readyOnly)
 	}
 }
 
@@ -353,21 +389,21 @@ func TestModalAndPromptCannotReachARefresh(t *testing.T) {
 	}
 	fixture.issue("Written by somebody else", 2)
 	before := len(pane.rows)
-	press(t, pane, "r")
+	press(t, pane, "R")
 	if pane.modal == nil {
-		t.Fatalf("`r` closed the picker")
+		t.Fatalf("`R` closed the picker")
 	}
 	if len(pane.rows) != before {
-		t.Fatalf("rows = %d, want `r` inside a modal to reach no refresh", len(pane.rows))
+		t.Fatalf("rows = %d, want `R` inside a modal to reach no refresh", len(pane.rows))
 	}
 	pressNamed(t, pane, tea.KeyEsc)
 
 	// And the `/` prompt swallows it into the filter, which is why a filter
-	// may contain an `r` without re-reading the store.
+	// may contain an `R` without re-reading the store.
 	press(t, pane, "/")
-	press(t, pane, "r")
-	if pane.filter != "r" {
-		t.Fatalf("filter = %q, want `r` to have been typed into it", pane.filter)
+	press(t, pane, "R")
+	if pane.filter != "R" {
+		t.Fatalf("filter = %q, want `R` to have been typed into it", pane.filter)
 	}
 	if len(pane.rows) == before {
 		t.Fatalf("the filter did not narrow, so this test cannot fail for its clause")

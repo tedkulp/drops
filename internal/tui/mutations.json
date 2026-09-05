@@ -1,5 +1,5 @@
 {
-  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14; esc's layer ordering by m3z5y. tc2x5 re-cut the redraw/retarget pair onto the two facts the pane can read — which issue is on screen, and the width it was rendered into — instead of the intent the caller passed, and split them three ways so each clause has a mutant the other two tests stay green for.",
+  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14; esc's layer ordering by m3z5y. tc2x5 re-cut the redraw/retarget pair onto the two facts the pane can read — which issue is on screen, and the width it was rendered into — instead of the intent the caller passed, and split them three ways so each clause has a mutant the other two tests stay green for. g7b23 added `r`, the ready-only narrowing, and moved refresh to `R`: its controls sit on the predicate itself, on both directions of the toggle, and on each of the two paths that re-derive the visible row set — applyFilter and refresh — because a golden frame would pass whichever rows those returned.",
   "controls": [
     {
       "control": "the-cursor-tracks-an-id",
@@ -80,6 +80,46 @@
       "test": "TestCIncludesClosedAndAWidensToEveryProject",
       "old": "\tif s.includeClosed {\n\t\treturn append(live, model.StatusClosed)\n\t}",
       "new": "\tif false {\n\t\treturn append(live, model.StatusClosed)\n\t}"
+    },
+    {
+      "control": "the-ready-predicate-is-an-open-blocker-count",
+      "clause": "`r` keeps the rows with no OPEN blocker and nothing else — a local predicate over blockedBy, not core.Ready, which forces status={open} and so cannot see an in_progress issue at all (g7b23, drops://8bbam)",
+      "file": "internal/tui/rows.go",
+      "test": "TestReadyKeepsOnlyTheRowsWithNoOpenBlocker",
+      "old": "\t\tif candidate.blockedBy == 0 {\n\t\t\tkept = append(kept, candidate)\n\t\t}",
+      "new": "\t\tif candidate.blockedBy != 0 {\n\t\t\tkept = append(kept, candidate)\n\t\t}"
+    },
+    {
+      "control": "r-turns-the-ready-narrowing-on",
+      "clause": "`r` hides the blocked rows (g7b23)",
+      "file": "internal/tui/tui.go",
+      "test": "TestRHidesTheBlockedRowsAndPressingItAgainBringsThemBack",
+      "old": "\t\tm.readyOnly = !m.readyOnly",
+      "new": "\t\tm.readyOnly = false"
+    },
+    {
+      "control": "r-turns-the-ready-narrowing-back-off",
+      "clause": "`r` is a TOGGLE: pressing it again brings the blocked rows back (g7b23)",
+      "file": "internal/tui/tui.go",
+      "test": "TestRHidesTheBlockedRowsAndPressingItAgainBringsThemBack",
+      "old": "\t\tm.readyOnly = !m.readyOnly",
+      "new": "\t\tm.readyOnly = true"
+    },
+    {
+      "control": "the-ready-narrowing-composes-with-the-filter-and-survives-a-reload",
+      "clause": "`r` stacks with `/` and survives `a` and `C`, because applyFilter re-derives the visible set through the one function that applies both (g7b23)",
+      "file": "internal/tui/tui.go",
+      "test": "TestReadyComposesWithTheFilterAndSurvivesAAndC",
+      "old": "\tm.clearFollow()\n\tm.rows = m.visible()",
+      "new": "\tm.clearFollow()\n\tm.rows = matching(m.all, m.filter)"
+    },
+    {
+      "control": "the-ready-narrowing-survives-a-refresh",
+      "clause": "`R` and every write go through refresh, which re-derives the visible set through the same function, so a blocked issue written by somebody else does not appear on a pane told to hide exactly that (g7b23)",
+      "file": "internal/tui/tui.go",
+      "test": "TestReadyNarrowingSurvivesARefresh",
+      "old": "\tm.all = rows\n\tm.rows = m.visible()\n\tm.cursor.restore(m.rows)",
+      "new": "\tm.all = rows\n\tm.rows = matching(m.all, m.filter)\n\tm.cursor.restore(m.rows)"
     },
     {
       "control": "the-detail-pane-renders-at-the-pane-width",
@@ -310,8 +350,8 @@
       "clause": "The re-read after a write RESTORES the cursor onto its tracked id rather than holding an index, so a priority change — which re-orders the list, since `ORDER BY issues.priority` is the store's first key — carries the cursor to the row's new position instead of selecting someone else (qy3de.7 §9)",
       "file": "internal/tui/tui.go",
       "test": "TestAPriorityWriteCarriesTheCursorToTheRowsNewPosition",
-      "old": "\tm.rows = matching(m.all, m.filter)\n\tm.cursor.restore(m.rows)\n\tif len(m.stack) == 0 {",
-      "new": "\tm.rows = matching(m.all, m.filter)\n\tm.cursor.move(m.rows, m.cursor.position)\n\tif len(m.stack) == 0 {"
+      "old": "\tm.rows = m.visible()\n\tm.cursor.restore(m.rows)\n\tif len(m.stack) == 0 {",
+      "new": "\tm.rows = m.visible()\n\tm.cursor.move(m.rows, m.cursor.position)\n\tif len(m.stack) == 0 {"
     },
     {
       "control": "the-message-line-costs-a-pane-row-not-the-footer",
@@ -378,15 +418,15 @@
       "new": "\tm.observed = seq"
     },
     {
-      "control": "r-refreshes-unconditionally",
-      "clause": "`r` re-reads whether or not the pane believes itself stale. An override that silently declines is the key you press twice, and a conditional one puts a branch on state the reader cannot see — the argument qy3de.6 used to drop the one-relation shortcut (qy3de.14 §Q6)",
+      "control": "R-refreshes-unconditionally",
+      "clause": "`R` re-reads whether or not the pane believes itself stale. An override that silently declines is the key you press twice, and a conditional one puts a branch on state the reader cannot see — the argument qy3de.6 used to drop the one-relation shortcut (qy3de.14 §Q6)",
       "file": "internal/tui/tui.go",
       "test": "TestRefreshRereadsWhenNothingIsStale",
-      "old": "\tcase \"r\":\n\t\t// UNCONDITIONAL",
-      "new": "\tcase \"r\":\n\t\tif !m.stale() {\n\t\t\treturn nil\n\t\t}\n\t\t// UNCONDITIONAL"
+      "old": "\tcase \"R\":\n\t\t// UNCONDITIONAL",
+      "new": "\tcase \"R\":\n\t\tif !m.stale() {\n\t\t\treturn nil\n\t\t}\n\t\t// UNCONDITIONAL"
     },
     {
-      "control": "r-is-a-refresh-and-not-a-reload",
+      "control": "R-is-a-refresh-and-not-a-reload",
       "clause": "`r` keeps the follow stack, because re-reading the store is not a navigation. reload clears it — that is what moving the cursor does — so spending reload here would drop a reader out of a followed page every time they checked for changes (qy3de.14 §Q6)",
       "file": "internal/tui/tui.go",
       "test": "TestRefreshKeepsTheFollowStack",
@@ -427,11 +467,19 @@
     },
     {
       "control": "a-modal-reaches-no-refresh",
-      "clause": "§Q7's guard, written as a test rather than as code: a refresh is unreachable from inside a modal because modalKey's switch has no `r`, and this is what would catch a future key that gave it one. The suppression this ticket considered building would have been a branch whose control could never go red (qy3de.14 §Q7)",
+      "clause": "§Q7's guard, written as a test rather than as code: a refresh is unreachable from inside a modal because modalKey's switch has no `R`, and this is what would catch a future key that gave it one. The suppression this ticket considered building would have been a branch whose control could never go red (qy3de.14 §Q7)",
       "file": "internal/tui/tui.go",
       "test": "TestModalAndPromptCannotReachARefresh",
       "old": "\tcase \"ctrl+c\":\n\t\treturn tea.Quit\n\tcase \"esc\":\n\t\tm.closeModal()",
-      "new": "\tcase \"ctrl+c\":\n\t\treturn tea.Quit\n\tcase \"r\":\n\t\tm.fail(m.refresh())\n\tcase \"esc\":\n\t\tm.closeModal()"
+      "new": "\tcase \"ctrl+c\":\n\t\treturn tea.Quit\n\tcase \"R\":\n\t\tm.fail(m.refresh())\n\tcase \"esc\":\n\t\tm.closeModal()"
+    },
+    {
+      "control": "a-modal-reaches-no-narrowing",
+      "clause": "§Q7's guard applied to g7b23's second key: `r` is unreachable from inside a modal because modalKey's switch has no `r` either, so a picker cannot re-cut the row set under the reader looking at it",
+      "file": "internal/tui/tui.go",
+      "test": "TestAModalCannotReachTheReadyNarrowing",
+      "old": "\tcase \"ctrl+c\":\n\t\treturn tea.Quit\n\tcase \"esc\":\n\t\tm.closeModal()",
+      "new": "\tcase \"ctrl+c\":\n\t\treturn tea.Quit\n\tcase \"r\":\n\t\tm.readyOnly = !m.readyOnly\n\t\tm.fail(m.applyFilter())\n\tcase \"esc\":\n\t\tm.closeModal()"
     },
     {
       "control": "esc-closes-the-help-screen",

@@ -208,3 +208,20 @@ func ids(rows []row) []model.ID {
 	}
 	return out
 }
+
+func TestReadyKeepsOnlyTheRowsWithNoOpenBlocker(t *testing.T) {
+	// Deliberately NOT core.Ready's row set: core.Ready forces
+	// statuses={open} and so cannot see an in_progress issue at all
+	// (drops://8bbam), which is why the in_progress row here has to survive.
+	// The predicate is the count the row already carries, nothing else.
+	rows := []row{
+		{id: "alpha", status: model.StatusOpen, blockedBy: 0},
+		{id: "bravo", status: model.StatusOpen, blockedBy: 2},
+		{id: "charlie", status: model.StatusInProgress, blockedBy: 0},
+	}
+
+	kept := ready(rows)
+	if got := ids(kept); len(got) != 2 || got[0] != "alpha" || got[1] != "charlie" {
+		t.Fatalf("ready kept %v, want alpha and charlie — the predicate is blockedBy == 0", got)
+	}
+}
