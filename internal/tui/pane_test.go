@@ -259,6 +259,24 @@ func TestTheEmptyStateTellsAnEmptyProjectFromABadFilter(t *testing.T) {
 	}
 }
 
+func TestReadyOnlyEmptyStateNamesTheNarrowingAndHowToLeaveIt(t *testing.T) {
+	fixture := newFixture(t)
+	first := fixture.issue("Blocked by the second", 2)
+	second := fixture.issue("Blocked by the first", 2)
+	fixture.blocks(first.ID, second.ID)
+	fixture.blocks(second.ID, first.ID)
+
+	pane := fixture.model(80, 24)
+	press(t, pane, "r")
+
+	if len(pane.rows) != 0 {
+		t.Fatalf("ready-only row set = %v, want every blocked issue hidden", ids(pane.rows))
+	}
+	if frame := pane.frame(); !strings.Contains(frame, "No ready issues · r to show blocked") {
+		t.Fatalf("frame = %q, want the empty state to name `r`'s narrowing and reversal", frame)
+	}
+}
+
 func TestReadyComposesWithTheFilterAndSurvivesAAndC(t *testing.T) {
 	// The whole reason `r` is a local predicate and not a store scope: it
 	// stacks with `/`, `a` and `C` the way matching already does, and a

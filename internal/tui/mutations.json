@@ -122,6 +122,14 @@
       "new": "\tm.all = rows\n\tm.rows = matching(m.all, m.filter)\n\tm.cursor.restore(m.rows)"
     },
     {
+      "control": "ready-only-empty-state-names-the-narrowing",
+      "clause": "`r` leaving no visible rows says `No ready issues · r to show blocked`, so a fully blocked project is not misreported as empty (d3kty)",
+      "file": "internal/tui/tui.go",
+      "test": "TestReadyOnlyEmptyStateNamesTheNarrowingAndHowToLeaveIt",
+      "old": "\tif m.readyOnly {\n\t\treturn \"No ready issues · r to show blocked\"\n\t}",
+      "new": "\tif false {\n\t\treturn \"No ready issues · r to show blocked\"\n\t}"
+    },
+    {
       "control": "an-overflowing-footer-closes-its-dim-style",
       "clause": "An overflowing footer truncates its plain text before applying the dim style, so the emitted SGR reset survives and the footer cannot leak colour past the frame (edgud)",
       "file": "internal/tui/tui.go",

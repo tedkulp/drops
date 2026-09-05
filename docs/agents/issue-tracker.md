@@ -593,6 +593,9 @@ footer says `ready` while it is on. It stacks with `/`, `a` and `C` and
 survives all three, because it is a predicate over the rows already loaded —
 `blockedBy == 0`, the same count the ` [N]` marker prints — and not a different
 question asked of the store.
+If that hides every row, the empty pane says
+`No ready issues · r to show blocked` instead of reporting the scope as having
+no open issues.
 
 So it is **not** `drops ready`, on purpose. Re-asking the store would throw
 away whatever the pane's own modes had put on screen: the closed rows `C`

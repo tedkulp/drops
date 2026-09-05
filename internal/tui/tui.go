@@ -1003,11 +1003,14 @@ func (m *Model) listTitle() string {
 // this is where it is recovered.
 func (m *Model) detailTitle() string { return string(m.detailID) }
 
-// emptyState distinguishes the two empty panes. Collapsing them makes an empty
-// project look like a bad filter.
+// emptyState names the narrowing that emptied the pane. Collapsing the cases
+// makes an empty project look like a bad filter or a fully blocked project.
 func (m *Model) emptyState() string {
 	if m.filter != "" {
 		return "No rows match " + m.filter
+	}
+	if m.readyOnly {
+		return "No ready issues · r to show blocked"
 	}
 	if m.scope.allProjects {
 		return "No open issues"
