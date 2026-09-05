@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/tedkulp/drops/internal/core"
+	"github.com/tedkulp/drops/internal/model"
 	"github.com/tedkulp/drops/internal/render"
 	"github.com/tedkulp/drops/internal/resolve"
 )
@@ -134,7 +135,11 @@ func newProjectListCmd(app *App) *cobra.Command {
 			}
 			projects = kept
 			if app.json {
-				return render.EmitMany(app.out, projects)
+				rows, err := app.projectRouting(projects)
+				if err != nil {
+					return err
+				}
+				return render.EmitMany(app.out, rows)
 			}
 			for _, p := range projects {
 				fmt.Fprintln(app.out, p.Slug)
@@ -144,6 +149,30 @@ func newProjectListCmd(app *App) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&archivedFlag, "archived", false, "include archived projects")
 	return cmd
+}
+
+// projectRouting reads the routing rows for a set of projects. Only --json
+// asks for them: the text form is one line per project, which is the whole
+// reason the lists are a machine surface.
+//
+// The locators are a read per project rather than one store-wide read, because
+// the store-wide one returns tombstoned rows for export and this surface wants
+// the live ones the ladder actually matches. A store holds projects in the
+// tens, so the round trips are cheaper than a second definition of "live".
+func (a *App) projectRouting(projects []model.Project) ([]projectRoutingJSON, error) {
+	bindings, err := a.core.WorkspaceBindings(a.ctx)
+	if err != nil {
+		return nil, err
+	}
+	locators := map[model.ProjectKey][]model.RepositoryLocator{}
+	for _, project := range projects {
+		found, err := a.core.ProjectLocators(a.ctx, project.Key)
+		if err != nil {
+			return nil, err
+		}
+		locators[project.Key] = found
+	}
+	return assembleProjects(projects, bindings, locators), nil
 }
 
 func newProjectRenameCmd(app *App) *cobra.Command {

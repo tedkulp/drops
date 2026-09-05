@@ -323,34 +323,55 @@ func (a *App) ensureReplica() error {
 	return nil
 }
 
-// resolve runs the pure resolver over everything it needs, already
-// canonicalized: the working directory, the repository facts for it, and the
-// store's projects, bindings and relevant locators.
-func (a *App) resolve(intent resolve.Intent) (resolve.Result, error) {
+// routing is one resolution and the inputs it was decided from. Every caller
+// but one wants the answer alone; `config show` reports the evidence too — the
+// Git root and origin the ladder compared, and the rung that answered — which
+// is the difference between "no project resolves here" and a diagnosis.
+type routing struct {
+	Request resolve.Request
+	Result  resolve.Result
+}
+
+// gitFacts describes the repository containing the working directory, from the
+// canonical form of that directory. It is the one place Git is asked, so the
+// resolver and the verb that reports its evidence cannot disagree about what
+// this directory is.
+func (a *App) gitFacts() (string, gitx.Facts, error) {
 	cwd, err := canonicalPath(a.cwd)
 	if err != nil {
-		return resolve.Result{}, err
+		return "", gitx.Facts{}, err
 	}
 	facts, err := (gitx.Client{}).Inspect(a.ctx, cwd)
 	if err != nil {
-		return resolve.Result{}, err
+		return "", gitx.Facts{}, err
+	}
+	return cwd, facts, nil
+}
+
+// resolve runs the pure resolver over everything it needs, already
+// canonicalized: the working directory, the repository facts for it, and the
+// store's projects, bindings and relevant locators.
+func (a *App) resolve(intent resolve.Intent) (routing, error) {
+	cwd, facts, err := a.gitFacts()
+	if err != nil {
+		return routing{}, err
 	}
 	projects, err := a.core.Projects(a.ctx)
 	if err != nil {
-		return resolve.Result{}, err
+		return routing{}, err
 	}
 	bindings, err := a.core.WorkspaceBindings(a.ctx)
 	if err != nil {
-		return resolve.Result{}, err
+		return routing{}, err
 	}
 	locators := []model.RepositoryLocator(nil)
 	if value := resolve.NormalizeLocator(facts.RemoteURL); value != "" {
 		locators, err = a.core.ProjectsByLocator(a.ctx, value)
 		if err != nil {
-			return resolve.Result{}, err
+			return routing{}, err
 		}
 	}
-	return resolve.Resolve(resolve.Request{
+	request := resolve.Request{
 		Cwd:         cwd,
 		ProjectFlag: a.projectFlag,
 		EnvProject:  os.Getenv("DROPS_PROJECT"),
@@ -359,40 +380,50 @@ func (a *App) resolve(intent resolve.Intent) (resolve.Result, error) {
 		Projects:    projects,
 		Bindings:    bindings,
 		Locators:    locators,
-	})
+	}
+	result, err := resolve.Resolve(request)
+	return routing{Request: request, Result: result}, err
 }
 
 // scopedProject resolves the ambient project and, for writes, enacts any
 // proposal the resolver produced: registering an unbound repository, learning
 // a workspace binding, or falling back to inbox. Reads never create or bind.
 func (a *App) scopedProject(forWrite bool) (model.Project, bool, error) {
+	p, found, _, err := a.scopedProjectRouting(forWrite)
+	return p, found, err
+}
+
+// scopedProjectRouting is scopedProject plus the resolution behind it, for the
+// one verb whose job is to explain the answer rather than act on it.
+func (a *App) scopedProjectRouting(forWrite bool) (model.Project, bool, routing, error) {
 	if a.inbox {
 		p, err := a.core.Project(a.ctx, model.InboxProjectKey)
-		return p, err == nil, err
+		return p, err == nil, routing{}, err
 	}
 	intent := resolve.Read
 	if forWrite {
 		intent = resolve.Write
 	}
-	res, err := a.resolve(intent)
+	routed, err := a.resolve(intent)
 	if err != nil {
-		return model.Project{}, false, err
+		return model.Project{}, false, routed, err
 	}
+	res := routed.Result
 	switch res.Outcome {
 	case resolve.Found:
 		if forWrite && res.Register.BindingPath != "" {
 			if err := a.core.BindWorkspace(a.ctx, model.WorkspaceBinding{Path: res.Register.BindingPath, ProjectKey: res.Project}); err != nil {
-				return model.Project{}, false, err
+				return model.Project{}, false, routed, err
 			}
 		}
 		p, err := a.core.Project(a.ctx, res.Project)
-		return p, err == nil, err
+		return p, err == nil, routed, err
 	case resolve.Unregistered:
 		if !forWrite {
 			if !a.quiet {
 				fmt.Fprintln(a.err, "drops: no project resolves here; pass -P <slug> to scope explicitly")
 			}
-			return model.Project{}, false, nil
+			return model.Project{}, false, routed, nil
 		}
 		if res.Register.CreateProject {
 			p, err := a.core.RegisterProject(a.ctx, core.Registration{
@@ -400,13 +431,13 @@ func (a *App) scopedProject(forWrite bool) (model.Project, bool, error) {
 				Locator:     res.Register.Locator,
 				BindingPath: res.Register.BindingPath,
 			})
-			return p, err == nil, err
+			return p, err == nil, routed, err
 		}
-		return model.Project{}, false, nil
+		return model.Project{}, false, routed, nil
 	case resolve.Ambiguous:
-		return model.Project{}, false, ambiguityError(res.Ambiguity)
+		return model.Project{}, false, routed, ambiguityError(res.Ambiguity)
 	default:
-		return model.Project{}, false, fmt.Errorf("resolve: unexpected outcome %d", res.Outcome)
+		return model.Project{}, false, routed, fmt.Errorf("resolve: unexpected outcome %d", res.Outcome)
 	}
 }
 

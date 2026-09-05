@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -76,8 +77,13 @@ func TestConfigShowNamesTheStoreAndTheResolvedProject(t *testing.T) {
 	}
 	// Sorted key=value lines, so the text form is stable to diff.
 	lines := strings.Split(scoped, "\n")
-	if len(lines) != 2 || lines[0] >= lines[1] {
+	if !sort.StringsAreSorted(lines) {
 		t.Fatalf("config show is not sorted key=value lines: %#v", lines)
+	}
+	for _, line := range lines {
+		if !strings.Contains(line, "=") {
+			t.Fatalf("config show printed a line that is not key=value: %q", line)
+		}
 	}
 
 	asJSON := decodeOne[map[string]string](t, mustRun(t, db, cwd, "config", "show", "-P", "beacon", "--json"))
@@ -388,4 +394,153 @@ func TestBuildInfoFromReadsTheToolchainsSettings(t *testing.T) {
 	if bare := buildInfoFrom(nil); bare.Revision != "" || bare.Modified {
 		t.Errorf("no settings produced %+v", bare)
 	}
+}
+
+// TestConfigShowNamesTheRungAndTheEvidenceItMatched: the other half of the
+// routing read path (2phzt). `project list --json` says what the store holds;
+// this says what THIS directory was compared against and which rung answered.
+//
+// The incident it comes from: `drops list` in a checkout answered "no project
+// resolves here" while the project was plainly in `project list`, and nothing
+// in the CLI could say why. The normalized origin is the fact a reader cannot
+// reproduce with plain git — `git remote get-url origin` prints the raw URL,
+// and rung 4 matches the normalized form.
+func TestConfigShowNamesTheRungAndTheEvidenceItMatched(t *testing.T) {
+	db, outside := newStore(t)
+	repo := newRepoWithOrigin(t, "git@github.com:tedkulp/beacon.git")
+	root, err := canonicalPath(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Nothing routes here yet. That is exactly when the evidence is worth
+	// having, so it is reported without a project to report it against.
+	settings := configShowJSON(t, db, repo)
+	if settings["git.root"] != root {
+		t.Errorf("git.root = %q, want %q", settings["git.root"], root)
+	}
+	if settings["git.origin"] != "github.com/tedkulp/beacon" {
+		t.Errorf("git.origin = %q, want the normalized locator rung 4 matches", settings["git.origin"])
+	}
+	for _, absent := range []string{"project.slug", "project.rule"} {
+		if _, ok := settings[absent]; ok {
+			t.Errorf("%s is present where nothing resolves: %#v", absent, settings)
+		}
+	}
+
+	// Outside a repository there is no such evidence, and the keys go
+	// absent rather than reporting an empty string as a Git root.
+	settings = configShowJSON(t, db, outside)
+	for _, absent := range []string{"git.root", "git.origin"} {
+		if _, ok := settings[absent]; ok {
+			t.Errorf("%s is present outside a repository: %#v", absent, settings)
+		}
+	}
+
+	// Rung 4: the origin is claimed by a project's locator.
+	mustRun(t, db, repo, "project", "add", "--slug", "beacon", "--remote", "git@github.com:tedkulp/beacon.git")
+	settings = configShowJSON(t, db, repo)
+	if settings["project.slug"] != "beacon" || settings["project.rule"] != "repository-locator" {
+		t.Errorf("a locator match reported %#v, want beacon by repository-locator", settings)
+	}
+
+	// Rung 3 outranks it: a binding on this checkout's Git root.
+	mustRun(t, db, repo, "project", "add", "--slug", "bound", "--repo-path", repo)
+	settings = configShowJSON(t, db, repo)
+	if settings["project.slug"] != "bound" || settings["project.rule"] != "workspace-binding" {
+		t.Errorf("a bound checkout reported %#v, want bound by workspace-binding", settings)
+	}
+
+	// Rung 1 answers without the directory at all, and still says so.
+	settings = configShowJSON(t, db, repo, "-P", "beacon")
+	if settings["project.slug"] != "beacon" || settings["project.rule"] != "project-flag" {
+		t.Errorf("-P reported %#v, want beacon by project-flag", settings)
+	}
+
+	// The text form carries the same pairs, sorted, one per line.
+	lines := strings.Split(mustRun(t, db, repo, "config", "show"), "\n")
+	if len(lines) != len(configShowJSON(t, db, repo)) {
+		t.Fatalf("config show printed %d lines for %d settings: %#v", len(lines), len(settings), lines)
+	}
+	if !sort.StringsAreSorted(lines) {
+		t.Errorf("config show is not sorted: %#v", lines)
+	}
+	if !strings.Contains(mustRun(t, db, repo, "config", "show"), "project.rule=workspace-binding") {
+		t.Errorf("the text form does not name the rung: %#v", lines)
+	}
+}
+
+// TestConfigShowReportsTheEvidenceEvenWhenItRefuses: two projects claiming one
+// origin is the failure this verb exists to explain, and it used to be the one
+// failure it could not — the refusal came back from the resolver and the
+// evidence never printed, which sent the reader to sqlite3 for exactly the
+// facts config show had already gathered (2phzt).
+//
+// The refusal is still the exit code. The evidence goes to stdout first.
+func TestConfigShowReportsTheEvidenceEvenWhenItRefuses(t *testing.T) {
+	db, _ := newStore(t)
+	repo := newRepoWithOrigin(t, "git@github.com:tedkulp/contested.git")
+	mustRun(t, db, repo, "project", "add", "--slug", "one", "--remote", "git@github.com:tedkulp/contested.git")
+	mustRun(t, db, repo, "project", "add", "--slug", "two", "--remote", "https://github.com/tedkulp/contested.git")
+
+	out, _, err := RunForTest([]string{"config", "show"}, db, repo)
+	if code := ExitCodeFor(err); code != 5 {
+		t.Fatalf("an ambiguous origin exit = %d, want 5 (stdout %q, error %v)", code, out, err)
+	}
+	if !strings.Contains(err.Error(), "claimed by 2 projects") {
+		t.Errorf("the refusal does not name the collision: %v", err)
+	}
+	if !strings.Contains(out, "git.origin=github.com/tedkulp/contested") {
+		t.Errorf("the contested origin is not on stdout: %q", out)
+	}
+	if strings.Contains(out, "project.slug=") {
+		t.Errorf("config show named a project it refused to choose: %q", out)
+	}
+}
+
+// TestConfigShowSeparatesTheDirectoryFromTheScope: --inbox names a project
+// without consulting the ladder. The rung goes absent because none answered;
+// the Git facts are facts about the directory either way, and reporting them
+// as absent would say "not in a repository" of a checkout.
+func TestConfigShowSeparatesTheDirectoryFromTheScope(t *testing.T) {
+	db, _ := newStore(t)
+	repo := newRepoWithOrigin(t, "git@github.com:tedkulp/beacon.git")
+	root, err := canonicalPath(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := configShowJSON(t, db, repo, "--inbox")
+	if settings["project.slug"] != "inbox" {
+		t.Errorf("--inbox resolved to %q, want inbox", settings["project.slug"])
+	}
+	if _, ok := settings["project.rule"]; ok {
+		t.Errorf("--inbox reported a rung, but no rung ran: %#v", settings)
+	}
+	if settings["git.root"] != root || settings["git.origin"] != "github.com/tedkulp/beacon" {
+		t.Errorf("--inbox lost the directory's own facts: %#v", settings)
+	}
+}
+
+// configShowJSON runs config show --json from one directory.
+func configShowJSON(t *testing.T, db, cwd string, args ...string) map[string]string {
+	t.Helper()
+	return decodeOne[map[string]string](t,
+		mustRun(t, db, cwd, append([]string{"config", "show", "--json"}, args...)...))
+}
+
+// newRepoWithOrigin is a real repository with one origin, because the facts
+// under test are the ones drops reads out of Git rather than out of its store.
+func newRepoWithOrigin(t *testing.T, origin string) string {
+	t.Helper()
+	repo := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"remote", "add", "origin", origin},
+	} {
+		out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v (%s)", args, err, out)
+		}
+	}
+	return repo
 }

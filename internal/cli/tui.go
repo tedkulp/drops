@@ -74,10 +74,11 @@ func (a *App) requireProject() (model.Project, error) {
 	if a.inbox {
 		return a.core.Project(a.ctx, model.InboxProjectKey)
 	}
-	resolved, err := a.resolve(resolve.Read)
+	routed, err := a.resolve(resolve.Read)
 	if err != nil {
 		return model.Project{}, err
 	}
+	resolved := routed.Result
 	switch resolved.Outcome {
 	case resolve.Found:
 		return a.core.Project(a.ctx, resolved.Project)

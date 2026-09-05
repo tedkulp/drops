@@ -614,8 +614,8 @@
       "clause": "config show is a reading verb, so --json owes a bare object rather than key=value lines (dw32p.31)",
       "file": "internal/cli/config.go",
       "test": "TestConfigShowNamesTheStoreAndTheResolvedProject",
-      "old": "\t\t\tif app.json {",
-      "new": "\t\t\tif false {"
+      "old": "\tif app.json {",
+      "new": "\tif false {"
     },
     {
       "control": "a-project-add-binds-its-repository-path",
@@ -841,6 +841,62 @@
       "test": "TestTUIRefusesToStartWhereNoProjectResolves",
       "old": "\t\t\t\"%w: no project resolves here; pass -P <slug> to scope explicitly\", model.ErrInvalid)",
       "new": "\t\t\t\"%w: no project resolves here; pass -P <slug> to scope explicitly\", model.ErrNotFound)"
+    },
+    {
+      "control": "project-list-groups-bindings-by-project",
+      "clause": "`project list --json` carries each project's OWN workspace bindings: the store-wide list is grouped by project key, so a binding names the project it routes to rather than appearing under all of them (2phzt)",
+      "file": "internal/cli/view.go",
+      "test": "TestProjectListCarriesBindingsAndLocators",
+      "old": "\t\t\tWorkspaceBindings:  bound[project.Key],",
+      "new": "\t\t\tWorkspaceBindings:  bindings,"
+    },
+    {
+      "control": "project-list-carries-locators",
+      "clause": "`project list --json` carries each project's repository locators, the rung-4 evidence that was write-only from the CLI's point of view (2phzt)",
+      "file": "internal/cli/view.go",
+      "test": "TestProjectListCarriesBindingsAndLocators",
+      "old": "\t\t\tRepositoryLocators: locators[project.Key],",
+      "new": "\t\t\tRepositoryLocators: nil,"
+    },
+    {
+      "control": "config-show-reports-the-rung",
+      "clause": "`config show` names the resolution rung that answered, so \"why did it answer that way\" has an answer that does not require reading the ladder against the store by hand (2phzt)",
+      "file": "internal/cli/config.go",
+      "test": "TestConfigShowNamesTheRungAndTheEvidenceItMatched",
+      "old": "\tif name := rule.String(); name != \"\" {",
+      "new": "\tif name := \"\"; name != \"\" {"
+    },
+    {
+      "control": "config-show-reports-the-git-root",
+      "clause": "`config show` reports the Git root rung 3 compared against its bindings, which is the half of the routing question the store cannot answer \u2014 the macOS incident was a binding holding the other machine's path (2phzt)",
+      "file": "internal/cli/config.go",
+      "test": "TestConfigShowNamesTheRungAndTheEvidenceItMatched",
+      "old": "\tif facts.InRepository {",
+      "new": "\tif false {"
+    },
+    {
+      "control": "config-show-normalizes-the-origin",
+      "clause": "`config show`'s git.origin is the NORMALIZED locator rung 4 matches, not the raw remote URL a reader could already get from git (2phzt)",
+      "file": "internal/cli/config.go",
+      "test": "TestConfigShowNamesTheRungAndTheEvidenceItMatched",
+      "old": "\tif origin := resolve.NormalizeLocator(facts.RemoteURL); origin != \"\" {",
+      "new": "\tif origin := facts.RemoteURL; resolve.NormalizeLocator(origin) != \"\" {"
+    },
+    {
+      "control": "config-show-reports-before-it-refuses",
+      "clause": "`config show` prints its evidence to stdout even when the resolution refuses, so an origin two projects claim \u2014 the question the verb exists to answer \u2014 is diagnosable rather than a bare exit 5 (2phzt)",
+      "file": "internal/cli/config.go",
+      "test": "TestConfigShowReportsTheEvidenceEvenWhenItRefuses",
+      "old": "\t\t\tif err := emitConfig(app, settings); err != nil {\n\t\t\t\treturn err\n\t\t\t}",
+      "new": "\t\t\tif resolveErr == nil {\n\t\t\t\tif err := emitConfig(app, settings); err != nil {\n\t\t\t\t\treturn err\n\t\t\t\t}\n\t\t\t}"
+    },
+    {
+      "control": "config-show-separates-the-directory-from-the-scope",
+      "clause": "The Git facts `config show` reports describe the directory, not the scope: --inbox names a project without consulting the ladder, and reporting no git.root would say \"not in a repository\" of a checkout (2phzt)",
+      "file": "internal/cli/config.go",
+      "test": "TestConfigShowSeparatesTheDirectoryFromTheScope",
+      "old": "\t\t\tif app.inbox {",
+      "new": "\t\t\tif false {"
     }
   ]
 }

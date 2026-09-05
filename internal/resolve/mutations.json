@@ -16,6 +16,15 @@
       "test": "TestAmbiguousLocatorNamesEveryClaimant",
       "old": "case len(claimants) > 1:",
       "new": "case false:"
+    },
+    {
+      "control": "rung-names-are-the-ladders-own",
+      "clause": "A reported rung is named for the rule that produced it, so `config show`'s project.rule can be found in the documented ladder without a translation table (2phzt)",
+      "file": "internal/resolve/resolve.go",
+      "package": "./internal/cli",
+      "test": "TestConfigShowNamesTheRungAndTheEvidenceItMatched",
+      "old": "\tcase RuleWorkspaceBinding:\n\t\treturn \"workspace-binding\"",
+      "new": "\tcase RuleWorkspaceBinding:\n\t\treturn \"workspace-prefix\""
     }
   ]
 }

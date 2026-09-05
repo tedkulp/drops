@@ -182,3 +182,104 @@ func TestProjectArchiveHidesItFromListAndRefusesNewIssues(t *testing.T) {
 		}
 	}
 }
+
+// TestProjectListCarriesBindingsAndLocators: the two tables the resolution
+// ladder consults were write-only from the CLI's point of view — `project add`
+// wrote them, `Resolve` read them, and no verb printed them, so an agent asked
+// why a directory does not route had no move that did not involve opening
+// SQLite by hand (2phzt).
+//
+// It also pins which of the two travels. A repository locator is a replicated
+// record and carries the revision that says so; a workspace binding is
+// machine-local and carries none. They sit in one object with different
+// lifetimes, and that difference has to be readable from the output.
+func TestProjectListCarriesBindingsAndLocators(t *testing.T) {
+	db, cwd := newStore(t)
+	alpha, beta := t.TempDir(), t.TempDir()
+	mustRun(t, db, cwd, "project", "add", "--slug", "alpha",
+		"--repo-path", alpha, "--remote", "git@github.com:tedkulp/alpha.git")
+	mustRun(t, db, cwd, "project", "add", "--slug", "beta",
+		"--repo-path", beta, "--remote", "https://github.com/tedkulp/beta.git")
+
+	listed := map[string]map[string]any{}
+	for _, p := range decodeMany[map[string]any](t, mustRun(t, db, cwd, "project", "list", "--json")) {
+		slug, _ := p["slug"].(string)
+		listed[slug] = p
+	}
+
+	// Each project carries its own routing rows and only its own: the
+	// grouping is what makes the output an answer rather than a dump.
+	for slug, dir := range map[string]string{"alpha": alpha, "beta": beta} {
+		project, ok := listed[slug]
+		if !ok {
+			t.Fatalf("project list --json does not list %s: %#v", slug, listed)
+		}
+		bindings := routingRows(t, project, "workspace_bindings")
+		if len(bindings) != 1 {
+			t.Fatalf("%s has %d workspace bindings, want exactly its own: %#v", slug, len(bindings), bindings)
+		}
+		want, err := canonicalPath(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bindings[0]["path"] != want {
+			t.Errorf("%s is bound to %v, want %q", slug, bindings[0]["path"], want)
+		}
+		if bindings[0]["project_key"] != project["project_key"] {
+			t.Errorf("%s carries a binding to another project: %#v", slug, bindings[0])
+		}
+		locators := routingRows(t, project, "repository_locators")
+		if len(locators) != 1 {
+			t.Fatalf("%s has %d repository locators, want exactly its own: %#v", slug, len(locators), locators)
+		}
+		if got := locators[0]["locator"]; got != "github.com/tedkulp/"+slug {
+			t.Errorf("%s's locator = %v, want the normalized origin", slug, got)
+		}
+
+		// The lifetimes are legible from the rows themselves: the
+		// replicated record carries a revision, the local one does not.
+		if _, ok := locators[0]["revision"]; !ok {
+			t.Errorf("%s's locator carries no revision, so nothing says it replicates: %#v", slug, locators[0])
+		}
+		if _, ok := bindings[0]["revision"]; ok {
+			t.Errorf("%s's binding carries a revision, which would claim it travels: %#v", slug, bindings[0])
+		}
+	}
+
+	// A project with neither still answers both keys, as an empty list
+	// rather than an absent one, so a parser's `.workspace_bindings[]` is
+	// safe on every project.
+	for _, key := range []string{"workspace_bindings", "repository_locators"} {
+		rows, ok := listed["inbox"][key]
+		if !ok {
+			t.Fatalf("inbox is missing %q; the key must never go absent", key)
+		}
+		if list, isList := rows.([]any); !isList || len(list) != 0 {
+			t.Errorf("inbox's %s = %#v, want []", key, rows)
+		}
+	}
+}
+
+// routingRows reads one project's list of routing rows out of the --json
+// object, failing rather than skipping when the key is absent or the wrong
+// shape: an absent key must never read as "this project has none".
+func routingRows(t *testing.T, project map[string]any, key string) []map[string]any {
+	t.Helper()
+	raw, ok := project[key]
+	if !ok {
+		t.Fatalf("project list --json has no %q key: %#v", key, project)
+	}
+	list, ok := raw.([]any)
+	if !ok {
+		t.Fatalf("%s = %#v, want a list", key, raw)
+	}
+	rows := make([]map[string]any, 0, len(list))
+	for _, row := range list {
+		object, ok := row.(map[string]any)
+		if !ok {
+			t.Fatalf("%s holds %#v, want objects", key, row)
+		}
+		rows = append(rows, object)
+	}
+	return rows
+}

@@ -46,6 +46,30 @@ const (
 	RuleInboxFallback
 )
 
+// String names the rung for a report. The names are the ladder's own, so a
+// reader who has `config show`'s answer in front of them can find the rule it
+// came from in docs/agents/issue-tracker.md without a translation table.
+//
+// RuleNone is the empty string rather than a name, because a rung that did not
+// answer is a fact the caller reports by omitting the field.
+func (rule Rule) String() string {
+	switch rule {
+	case RuleProjectFlag:
+		return "project-flag"
+	case RuleEnvProject:
+		return "env-project"
+	case RuleWorkspaceBinding:
+		return "workspace-binding"
+	case RuleRepositoryLocator:
+		return "repository-locator"
+	case RuleWorkspacePrefix:
+		return "workspace-prefix"
+	case RuleInboxFallback:
+		return "inbox-fallback"
+	}
+	return ""
+}
+
 // AmbiguityKind says which evidence named more than one answer.
 type AmbiguityKind int
 

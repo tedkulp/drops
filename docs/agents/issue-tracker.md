@@ -40,6 +40,7 @@ relation, and the whole comment thread.
 | read the notes | `drops memories [query]`, `drops memory show <id>` |
 | projects | `drops project list`, `project add --slug`, `project rename`, `project archive --force` |
 | where am I | `drops config show` |
+| why did it route there | `drops config show` for this directory, `drops project list --json` for the store |
 | is the store sound | `drops doctor` |
 | talk to the other machine | `drops sync` |
 | which binary is this | `drops version` |
@@ -131,10 +132,62 @@ stay exactly where they are and stay readable: `-P` still scopes to it, and
 an archived one is still a project. The two reserved projects cannot be archived.
 `--force` is required from a non-interactive session.
 
-`drops config show` prints the resolved project and store path, and is the
-quickest way to find out why a command answered the way it did. It prints
-sorted `key=value` lines, or with `--json` one object of the same pairs;
-`project.slug` is absent, in both forms, when nothing resolves.
+### Why did it answer that way
+
+Two verbs read back what the ladder decided from, and between them they cover
+both sides of it: what this directory looks like, and what the store holds.
+
+`drops config show` answers for **the current directory**. It prints sorted
+`key=value` lines, or with `--json` one object of the same pairs:
+
+| key | what it says |
+|---|---|
+| `store.path` | the database this invocation opened |
+| `project.slug` | the project that resolved |
+| `project.rule` | the rung that answered: `project-flag`, `env-project`, `workspace-binding`, `repository-locator`, `workspace-prefix`, `inbox-fallback` |
+| `git.root` | the Git root rung 3 compares against the bindings |
+| `git.origin` | this checkout's origin **normalized**, which is the form rung 4 matches |
+
+Every key but `store.path` goes **absent** rather than empty when there is
+nothing to say — outside a repository there is no `git.root`, and where nothing
+resolves there is no `project.slug` and no `project.rule`. `git.origin` is worth
+one caution: `git remote get-url origin` prints the raw URL and the ladder never
+compares that, so this is the one fact here you cannot reproduce by hand.
+
+Two details make it usable as a diagnostic rather than only as a report:
+
+- **The `git.*` keys describe the directory, not the scope.** `--inbox` and
+  `-P` name a project without the directory having answered, and the Git facts
+  are reported either way. Under `--inbox` no rung runs, so `project.rule` is
+  the key that goes absent.
+- **It prints what it has before it refuses.** Where two projects claim one
+  origin, `config show` writes its `key=value` lines (or its object) to
+  **stdout** and *then* exits **5** with the collision on stderr. That case is
+  the reason the verb exists, so a bare refusal would be the one question it
+  could not answer.
+
+`drops project list --json` answers for **the store**. Each project carries the
+two tables the ladder consults, and neither key ever goes absent — a project
+with none answers `[]`:
+
+```
+.workspace_bindings[]   { "path", "project_key" }
+.repository_locators[]  { "project_key", "locator", "tombstoned", "revision" }
+```
+
+**Only one of the two travels.** A repository locator is a replicated record: it
+carries a `revision`, it moves in a `sync`, and every machine agrees on it. A
+workspace binding is **machine-local** — one machine's absolute path, no
+revision, in no snapshot — so a binding you can see here is not one the other
+machine has. The presence of `revision` on a row is what says which is which.
+Bindings hang off the project they name, so a binding to an archived project is
+only visible under `project list --archived`.
+
+The two together are what a routing question needs. A directory that does not
+route, on a store where the project is plainly listed, is normally a binding
+holding **the other machine's path** with no locator to catch the miss at rung 4
+— `config show` gives you this machine's Git root and origin, `project list
+--json` gives you what they were compared against.
 
 ## How a long body gets in
 
@@ -471,7 +524,10 @@ Two shapes to know before you write a parser against it:
 An issue's project appears as **`project_key`**, an opaque immutable key, not as
 a slug. Slugs are renameable metadata and keys are what sync agrees on across
 machines, so the key is what travels in JSON. `drops project list --json` maps
-key to slug; the text renderer prints the slug for a human.
+key to slug; the text renderer prints the slug for a human. That JSON also
+carries each project's `workspace_bindings` and `repository_locators` — the
+routing data, described under [Why did it answer that
+way](#why-did-it-answer-that-way).
 
 ## The navigator: `drops tui`
 

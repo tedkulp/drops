@@ -104,6 +104,25 @@ using.
 - **`drops claim` and `drops release`** make wayfinder ownership explicit:
   claiming refuses to overwrite another session, while releasing writes a null
   assignee that returns the issue to the frontier.
+- **The routing data has a read path.** `drops project list --json` now carries
+  each project's `workspace_bindings` and `repository_locators` — the two
+  tables rungs 3 and 4 of the resolution ladder consult, which `project add`
+  wrote and only `Resolve` ever read. Neither key goes absent; a project with
+  none answers `[]`. Only one of the two travels, and the rows say which: a
+  repository locator is replicated and carries a `revision`, a workspace
+  binding is machine-local and carries none.
+- **`drops config show` says what it compared and which rung answered.**
+  Alongside `store.path` and `project.slug` it now prints `project.rule` (the
+  rung: `project-flag`, `env-project`, `workspace-binding`,
+  `repository-locator`, `workspace-prefix`, `inbox-fallback`), `git.root`, and
+  `git.origin` — the origin **normalized**, which is the form rung 4 matches
+  and the one fact here a reader cannot get from `git` by hand. Each key is
+  absent rather than empty when there is nothing to say. Diagnosing a directory
+  that would not route previously meant opening the store in `sqlite3`. The
+  `git.*` keys describe the directory rather than the scope, so `--inbox` and
+  `-P` still report them; and where two projects claim one origin the evidence
+  goes to stdout **before** the exit 5, since that collision is the case the
+  verb exists to explain.
 
 ### Changed
 
