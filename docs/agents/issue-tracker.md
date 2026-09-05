@@ -634,10 +634,6 @@ cursor on the next one, so `x`-close walks the list; changing priority
 re-orders the list and the cursor rides its row to the new position. Writing to
 a **followed** issue leaves the left pane untouched.
 
-There is **no polling**: the pane reads its rows when it starts, again on `C`
-and `a`, and again after a write of its own. A change made from another
-terminal is not picked up until then.
-
 ## Sync: the second machine
 
 `drops sync` is one cycle — pull, import, export, push — against a Git-backed
