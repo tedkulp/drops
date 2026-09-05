@@ -29,12 +29,26 @@ using.
 - **Following a relation from the navigator.** `f` opens a picker over the
   right pane's issue — grouped under a page's own headings, in a page's order —
   and `Enter` retargets the right pane onto the one you choose **without the
-  list cursor moving**; `Backspace` walks back down the trail, and moving the
-  list cursor clears it. The picker lists **all three dependency types**, where
-  a page renders `blocks` alone, so a `discovered-from` edge is readable in
-  drops for the first time. Its id column is auto-sized and uncapped, unlike the
+  list cursor moving**; `Backspace` walks back down the trail one level at a
+  time, `Esc` drops all of it at once, and moving the list cursor clears it.
+  The picker lists **all three dependency types**, where a page renders
+  `blocks` alone, so a `discovered-from` edge is readable in drops for the
+  first time. Its id column is auto-sized and uncapped, unlike the
   left pane's, because a picker's rows are siblings whose dotted ids share a
   prefix.
+- **`Esc` is the navigator's universal go-back key.** It pops exactly one layer
+  a press, in this order: an open picker, the `/` prompt, the help screen, the
+  **whole** follow trail, the filter, and `enter`-zoom. With nothing live it
+  does nothing, and at no depth does it quit — a mistyped `/` must not drop you
+  out of a full-screen program. Dropping the whole trail is what `Esc` adds
+  that nothing else could: `j` cleared the trail before this, but only by
+  moving the list cursor, so there was no way back to the cursor's own issue
+  that left the cursor on it — against the founding claim of the navigator.
+  `Backspace` stays as the one-level motion. The help screen now **captures
+  every key while it is up**, which is what makes that ordering total: nothing
+  acts invisibly behind a screen that replaces the whole frame, and in
+  particular `x` can no longer open a picker under the help that would then
+  swallow the `Esc` meant to close it.
 - **Writing from the navigator.** `x` opens one modal on whatever the right
   pane is showing — the followed issue when you are away from the cursor, the
   cursor's own otherwise — offering **close, reopen, comment, priority, claim

@@ -503,24 +503,42 @@ carries the **full untruncated id**, one glance away.
 |---|---|
 | `j` `k` `↓` `↑` `g` `G` `^d` `^u` | move the list cursor; the detail pane follows |
 | `/` | filter the loaded rows: a case-insensitive literal substring over id and title |
-| `Esc` | clear the filter. It never quits |
+| `Esc` | go back one layer. It never quits |
 | `C` | include closed issues |
 | `a` | span every project, and add the project column |
 | `r` | re-read the store |
 | `f` | pick a relation of the right pane's issue and follow it |
-| `Backspace` | back one relation |
+| `Backspace` | back one relation; `Esc` drops the whole trail |
 | `x` | write to the right pane's issue: close, reopen, comment, priority, claim, release |
 | `J` `K` `space` `b` | scroll the detail pane vertically |
 | `h` `l` `←` `→` `0` `$` | scroll it horizontally, eight columns a step |
 | `w` | soft-wrap the detail pane instead of clipping |
 | `enter` | drop the two columns for the issue text alone, and back |
-| `?` | the keymap |
+| `?` | the keymap. It captures every key while it is up; `?` or `Esc` closes it |
 | `q` `Ctrl-C` | quit |
 
 The filter **survives `a` and `C`**, because "filter, then widen the scope to
 see if it exists elsewhere" is the motion `a` exists for. `drops search` is a
 different thing and has no key: it reaches descriptions and comment bodies and
 returns rows outside the current scope.
+
+**`Esc` is the universal go-back key, and it pops exactly one layer a press**,
+in this order:
+
+1. an open picker — cancel it;
+2. the `/` prompt while you are still typing — cancel the typing and the filter;
+3. the help screen — close it. The help **captures every key while it is up**,
+   so nothing acts invisibly behind it: without that, `x` opened a picker under
+   the help and that picker then swallowed the `Esc` meant to close it;
+4. the follow trail — drop **all** of it at once, back to the cursor's own
+   issue, without the cursor moving;
+5. the filter — clear it;
+6. `enter`-zoom — leave it.
+
+With nothing live it does nothing. **It never quits**, at any depth: overloading
+it to exit means a mistyped `/` drops you out of a full-screen program. One
+layer a press rather than all of them, because a key that discarded the filter,
+the trail and the zoom together on one stray press is not a go-back key.
 
 **`f` follows a relation without moving the list cursor**, which is the whole
 reason this verb exists. It opens a picker over the right pane's issue in place
@@ -540,9 +558,11 @@ issue's sixteen children identically.
 
 Following leaves the row set on purpose — `C` governs the left pane only, and
 half of all relation targets are closed. While you are away from the cursor's
-own issue the right pane carries a `← <where you came from> ·<depth>` line, and
-`Backspace` walks back down it. **Moving the list cursor clears the trail**,
-which is why nothing else needs to.
+own issue the right pane carries a `← <where you came from> ·<depth>` line.
+**`Backspace` walks back down it one level at a time; `Esc` drops the whole
+trail in one press.** Moving the list cursor clears it too, but only by moving
+the cursor — which is why `Esc` earns its place: it is the only way back to the
+cursor's own issue that leaves the cursor on it.
 
 **Horizontal scrolling is load-bearing, not a nicety.** A page truncates
 nothing, including the table rows and fenced blocks it deliberately does not

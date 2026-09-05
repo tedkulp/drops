@@ -370,6 +370,50 @@ func (m *Model) clearFollow() {
 // you exactly where you were reading.
 func (m *Model) closeModal() { m.modal, m.choices, m.verbs, m.target = nil, nil, nil, "" }
 
+// escape is `esc`, the universal go-back key (m3z5y). It pops ONE layer per
+// press, and it NEVER quits: overloading it to exit means a mistyped `/` drops
+// you out of a full-screen program (settled in qy3de.4 and unchanged here).
+//
+// The whole of m3z5y is this ordering, so it is one ordered block rather than
+// a condition spread over the layers it competes with. Most transient first:
+//
+//	a modal · the `/` prompt · the help · the follow stack · the filter · zoom
+//
+// The first two never reach here — a modal captures every key while it is open
+// and the `/` prompt swallows them — which is what kept `esc` unambiguous
+// before this and still does. What is left is the four below.
+//
+// One layer per press, not all of them, because a single mistyped `esc` that
+// discarded the filter AND the trail AND the zoom is not a go-back key. The
+// follow stack is the one layer popped WHOLE, and that is the reversal m3z5y
+// records against qy3de.6 §7: that ticket dropped `esc clears the stack` on the
+// argument that `j` already does it, and the hole is that `j` clears it by
+// calling selectRow, which MOVES THE CURSOR. So there was no key that returned
+// the right pane to the cursor's own issue without leaving it — against the
+// founding claim of the whole navigator. `backspace` stays as the fine-grained
+// motion, one level a press; `esc` is the coarse one.
+//
+// Zoom is last, and being last is what makes a sixth meaning safe to add: it
+// can only fire on a press that had nothing else to pop.
+func (m *Model) escape() {
+	switch {
+	case m.help:
+		m.help = false
+	case len(m.stack) > 0:
+		// Not selectRow: the cursor does not move, so the pane is
+		// retargeted at the id the cursor already holds.
+		m.clearFollow()
+		m.fail(m.showDetail(m.cursor.id))
+	case m.filter != "":
+		m.filter = ""
+		m.fail(m.applyFilter())
+	case m.zoomed:
+		m.zoomed = false
+		m.resize()
+		m.fail(m.showDetail(m.detailID))
+	}
+}
+
 // geo is the frame's arithmetic for the current mode. The message line's cost
 // is taken off the height HERE, once, so every caller — the viewport's own
 // resize, the picker's scroll window, ^d's half page — measures the same frame.
@@ -573,6 +617,28 @@ func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 
+	// The help screen replaces the WHOLE frame, so it captures every key.
+	// Anything else would act invisibly behind it, and one of those actions
+	// broke `esc` outright: `x` opened an Actions modal under the help, and
+	// the modal — which captures input — then swallowed the `esc` meant to
+	// close the help, so the key did nothing a reader could see and the next
+	// `enter` ran a write off a screen that never showed the picker (m3z5y).
+	//
+	// Capturing here is also what makes the ordering below total: a modal
+	// cannot be open under the help, because `?` cannot be pressed inside one.
+	// `esc` still goes through escape(), so the ordering has ONE home.
+	if m.help {
+		switch key {
+		case "q", "ctrl+c":
+			return tea.Quit
+		case "?":
+			m.help = false
+		case "esc":
+			m.escape()
+		}
+		return nil
+	}
+
 	// A modal captures input while it is open, which is what keeps `esc`
 	// unambiguous: cancelling the picker is not a fourth meaning in qy3de.4's
 	// ordering, because nothing else can be reached from here.
@@ -617,12 +683,7 @@ func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 	case "/":
 		m.typing = true
 	case "esc":
-		// esc clears the filter and NEVER quits: overloading it to exit
-		// means a mistyped `/` drops you out of a full-screen program.
-		if m.filter != "" {
-			m.filter = ""
-			m.fail(m.applyFilter())
-		}
+		m.escape()
 	case "C":
 		m.scope.includeClosed = !m.scope.includeClosed
 		m.fail(m.reload())
@@ -958,13 +1019,15 @@ func helpText() string {
 		headStyle.Render("drops tui"),
 		"",
 		"  j k ↓ ↑ g G ^d ^u   move the list cursor (retargets the detail pane)",
-		"  / Esc               filter on id and title · clear the filter",
+		"  /                   filter on id and title",
+		"  Esc                 go back one layer — this help, the whole relation",
+		"                      trail, the filter, the zoom — and never quit",
 		"  C a                 include closed · span every project",
 		"  r                   re-read the store (the footer says `stale` when",
 		"                      someone else has written since you last did)",
 		"",
 		"  f                   follow a relation: pick one, Enter takes it",
-		"  Backspace           back one relation (moving the cursor clears the trail)",
+		"  Backspace           back one relation (Esc drops the whole trail)",
 		"",
 		"  x                   write to the issue on the right: close, reopen,",
 		"                      comment, priority, claim, release",
@@ -974,6 +1037,6 @@ func helpText() string {
 		"  w                   soft-wrap the detail pane instead of clipping",
 		"  enter               the issue text alone, and back",
 		"",
-		"  ? q                 this help · quit",
+		"  ? Esc q             close this help · quit",
 	}, "\n")
 }

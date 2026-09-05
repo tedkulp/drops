@@ -1,5 +1,5 @@
 {
-  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14.",
+  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14; esc's layer ordering by m3z5y.",
   "controls": [
     {
       "control": "the-cursor-tracks-an-id",
@@ -424,6 +424,70 @@
       "test": "TestModalAndPromptCannotReachARefresh",
       "old": "\tcase \"ctrl+c\":\n\t\treturn tea.Quit\n\tcase \"esc\":\n\t\tm.closeModal()",
       "new": "\tcase \"ctrl+c\":\n\t\treturn tea.Quit\n\tcase \"r\":\n\t\tm.fail(m.refresh())\n\tcase \"esc\":\n\t\tm.closeModal()"
+    },
+    {
+      "control": "esc-closes-the-help-screen",
+      "clause": "`esc` closes the help screen (m3z5y: the first of the layers escape() orders)",
+      "file": "internal/tui/tui.go",
+      "test": "TestEscClosesTheHelpScreen",
+      "old": "\tcase m.help:\n\t\tm.help = false",
+      "new": "\tcase false:\n\t\tm.help = false"
+    },
+    {
+      "control": "esc-takes-the-help-before-the-follow-stack",
+      "clause": "`esc` pops ONE layer, and the help screen is taken before the follow stack, so an esc under the help leaves the trail standing (m3z5y)",
+      "file": "internal/tui/tui.go",
+      "test": "TestEscTakesTheHelpScreenBeforeTheFollowStack",
+      "old": "\tcase m.help:",
+      "new": "\tcase m.help && len(m.stack) == 0:"
+    },
+    {
+      "control": "esc-clears-the-whole-follow-stack",
+      "clause": "`esc` clears the WHOLE follow stack in one press, where `backspace` pops one level (m3z5y, reversing qy3de.6 §7)",
+      "file": "internal/tui/tui.go",
+      "test": "TestEscClearsTheWholeFollowStackWithoutMovingTheCursor",
+      "old": "\t\tm.clearFollow()\n\t\tm.fail(m.showDetail(m.cursor.id))",
+      "new": "\t\tm.fail(m.popFollow())"
+    },
+    {
+      "control": "esc-retargets-the-pane-at-the-cursors-own-issue",
+      "clause": "Clearing the stack with `esc` retargets the right pane at the id the LIST CURSOR holds, without moving the cursor — the founding claim `j` could not satisfy because selectRow moves it (m3z5y)",
+      "file": "internal/tui/tui.go",
+      "test": "TestEscClearsTheWholeFollowStackWithoutMovingTheCursor",
+      "old": "\t\tm.fail(m.showDetail(m.cursor.id))",
+      "new": "\t\tm.fail(m.showDetail(m.detailID))"
+    },
+    {
+      "control": "esc-takes-the-follow-stack-before-the-filter",
+      "clause": "`esc` takes the follow stack before the filter, so returning to the cursor's issue does not also discard what narrowed the list (m3z5y)",
+      "file": "internal/tui/tui.go",
+      "test": "TestEscTakesTheFollowStackBeforeTheFilter",
+      "old": "\tcase len(m.stack) > 0:",
+      "new": "\tcase len(m.stack) > 0 && m.filter == \"\":"
+    },
+    {
+      "control": "esc-takes-the-filter-before-the-zoom",
+      "clause": "Zoom is the LAST layer `esc` pops, which is what makes a sixth meaning safe: it fires only on a press that had nothing else to take (m3z5y)",
+      "file": "internal/tui/tui.go",
+      "test": "TestEscUnzoomsOnlyWhenNothingElseIsLive",
+      "old": "\tcase m.filter != \"\":",
+      "new": "\tcase m.filter != \"\" && !m.zoomed:"
+    },
+    {
+      "control": "esc-unzooms",
+      "clause": "`esc` unzooms once nothing else is live (m3z5y, the one open sub-question the ticket left: answered yes)",
+      "file": "internal/tui/tui.go",
+      "test": "TestEscUnzoomsOnlyWhenNothingElseIsLive",
+      "old": "\tcase m.zoomed:\n\t\tm.zoomed = false",
+      "new": "\tcase m.zoomed:\n\t\tm.zoomed = true"
+    },
+    {
+      "control": "the-help-screen-captures-every-key",
+      "clause": "The help screen captures every key while it is up, so nothing acts invisibly behind it — in particular `x` cannot open a modal that would then swallow the `esc` meant to close the help (m3z5y)",
+      "file": "internal/tui/tui.go",
+      "test": "TestTheHelpScreenCapturesTheKeysBehindIt",
+      "old": "\tif m.help {\n\t\tswitch key {",
+      "new": "\tif false {\n\t\tswitch key {"
     }
   ]
 }
