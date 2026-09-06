@@ -32,7 +32,7 @@ func newRememberCmd(app *App) *cobra.Command {
 			"Every memory belongs to one project. Writes use the ordinary project\n" +
 			"resolution; an unresolved directory files under `inbox`, and --global\n" +
 			"assigns the reserved `global` project.",
-		Args: captureArgs(1),
+		Args: exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err

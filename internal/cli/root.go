@@ -126,53 +126,6 @@ func exactArgs(n int) cobra.PositionalArgs {
 	}
 }
 
-// dashLike reports whether r is a glyph a caller could have typed, or had
-// substituted for them, where the ASCII "-" that starts a flag belongs. It is
-// Unicode's dash punctuation — which the ASCII hyphen itself is a member of,
-// along with the en and em dashes a smart-dash substitution produces — plus
-// U+2212 MINUS SIGN, which is mathematical rather than punctuation and is the
-// other glyph an editor swaps a hyphen for.
-func dashLike(r rune) bool {
-	return unicode.Is(unicode.Pd, r) || r == '\u2212'
-}
-
-// captureArgs is exactArgs(n) for the capture verbs, with one refusal in front
-// of the arity check: a positional whose first character is dash-like.
-//
-// Cobra's parser knows only the ASCII "-", so `drops create —-help` — the two
-// hyphens arriving as an em dash — is an ordinary positional, and create filed
-// it as a title at exit 0 with nothing to tell the caller their help request
-// had become a ticket (39rf5). The refusal is over the whole class rather than
-// over that one string: nothing about `help` is special there, and the same
-// substitution turns --json, -d and -p into titles just as silently. It is
-// also the cheaper rule to document — a title never begins with a dash — than
-// a list of manglings that would go stale.
-//
-// The dash check runs BEFORE the arity check because a second positional is
-// how a mangled flag arrives after a real title, and "accepts 1 arg(s),
-// received 2" is the least useful thing to say to somebody whose editor ate
-// their hyphens.
-//
-// "--" is the escape, and it needs no new flag: everything after it is a
-// positional the caller asked for literally, so `drops create -- "—-help"`
-// still files that title.
-func captureArgs(n int) cobra.PositionalArgs {
-	return func(cmd *cobra.Command, args []string) error {
-		literal := cmd.ArgsLenAtDash()
-		for i, arg := range args {
-			if literal >= 0 && i >= literal {
-				break
-			}
-			if r, _ := utf8.DecodeRuneInString(arg); dashLike(r) {
-				return invalidArgs(
-					"%q begins with a dash, so it reads as a mangled flag rather than a title; write the flag with an ASCII \"-\", or put the argument after \"--\" to take it literally",
-					arg)
-			}
-		}
-		return exactArgs(n)(cmd, args)
-	}
-}
-
 // minimumArgs is the same wrapping over a minimum-arity check.
 func minimumArgs(n int) cobra.PositionalArgs {
 	return func(_ *cobra.Command, args []string) error {
@@ -230,6 +183,101 @@ func maximumArgs(n int) cobra.PositionalArgs {
 		}
 		return nil
 	}
+}
+
+// dashLike reports whether r is a glyph a caller could have typed, or had
+// substituted for them, where the ASCII "-" that starts a flag belongs. It is
+// Unicode's dash punctuation — which the ASCII hyphen itself is a member of,
+// along with the en and em dashes a smart-dash substitution produces — plus
+// U+2212 MINUS SIGN, which is mathematical rather than punctuation and is the
+// other glyph an editor swaps a hyphen for.
+func dashLike(r rune) bool {
+	return unicode.Is(unicode.Pd, r) || r == '\u2212'
+}
+
+// refuseMangledFlag is the check every command in the tree wears in front of
+// its own: a positional whose first character is dash-like is refused, naming
+// the dash.
+//
+// Cobra's parser knows only the ASCII "-", so `drops list ——all-projects` —
+// the two hyphens arriving as em dashes, from a smart-dash substitution or a
+// paste out of a document or chat — is an ordinary positional. That landed two
+// ways, both wrong (39rf5, vy56d): a verb taking none reported an argument
+// count, naming the wrong thing entirely, and a verb taking one swallowed the
+// mangled flag as data at exit 0, which is `drops search ——all-projects`
+// answering with a plausible result set for a search nobody asked for.
+//
+// The refusal is the whole tree's rather than a list of verbs because the rule
+// was never a judgment about what text is plausible: pflag already refuses a
+// positional whose first character is an ASCII "-" before Args runs at all —
+// `drops comment add <id> "- a bullet"` is "unknown shorthand flag: ' '" — so
+// refusing the mangled spellings everywhere makes them behave like the
+// spelling they were meant to be, and takes nothing away that was reachable.
+//
+// "--" is the escape, and it needs no new flag: everything after it is a
+// positional the caller asked for literally, so `drops create -- "—-help"`
+// still files that title and `drops search -- "——all"` searches for it.
+func refuseMangledFlag(cmd *cobra.Command, args []string) error {
+	literal := cmd.ArgsLenAtDash()
+	for i, arg := range args {
+		if literal >= 0 && i >= literal {
+			break
+		}
+		if r, _ := utf8.DecodeRuneInString(arg); dashLike(r) {
+			return invalidArgs(
+				"%q begins with a dash, so it reads as a mangled flag rather than an argument; write the flag with an ASCII \"-\", or put the argument after \"--\" to take it literally",
+				arg)
+		}
+	}
+	return nil
+}
+
+// positionalArgs puts refuseMangledFlag in front of one command's own Args.
+//
+// The dash check runs FIRST because every other answer names the wrong thing:
+// "accepts no args, received 1" for a scanning verb, "accepts 1 arg(s),
+// received 2" for a mangled flag after a real title, "unknown command" for a
+// group. None of them mentions the hyphens the caller's editor ate.
+//
+// A nil Args means ArbitraryArgs to cobra, and it means the same here: the
+// wrapper adds the refusal without tightening what the command accepts.
+func positionalArgs(own cobra.PositionalArgs) cobra.PositionalArgs {
+	if own == nil {
+		own = cobra.ArbitraryArgs
+	}
+	return func(cmd *cobra.Command, args []string) error {
+		if err := refuseMangledFlag(cmd, args); err != nil {
+			return err
+		}
+		return own(cmd, args)
+	}
+}
+
+// refuseMangledFlagsEverywhere wraps every command in the tree, root and the
+// groups included, so the refusal is a property of the tree rather than a list
+// of verbs somebody has to remember to extend. A command added later is
+// covered on arrival, whatever Args it declares — which is the difference
+// between this and 39rf5's opt-in wrapper on three capture verbs.
+//
+// help and cobra's two completion entry points are left alone. None is drops'
+// contract: cobra owns their argument handling, and a completion request for a
+// half-typed "--all" is a request for candidates, not an invocation to refuse.
+// Cobra registers all three during Execute, after this walk has run, so the
+// guard is insurance against a future cobra rather than the thing sparing them
+// today — which is why the test for it builds its own tree.
+func refuseMangledFlagsEverywhere(root *cobra.Command) {
+	var walk func(*cobra.Command)
+	walk = func(cmd *cobra.Command) {
+		switch cmd.Name() {
+		case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+			return
+		}
+		cmd.Args = positionalArgs(cmd.Args)
+		for _, sub := range cmd.Commands() {
+			walk(sub)
+		}
+	}
+	walk(root)
 }
 
 // defer. Cleanup is the only place that closes the store, and it runs
@@ -326,6 +374,10 @@ func NewRootCmd(opts Options) (*cobra.Command, func()) {
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newCompletionCmd())
 	root.AddCommand(newConfigCmd(app, &dbPath))
+
+	// Last, so it reaches every command registered above: the mangled-flag
+	// refusal is the tree's, not a wrapper each Args site has to opt into.
+	refuseMangledFlagsEverywhere(root)
 
 	return root, cleanup
 }

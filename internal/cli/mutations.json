@@ -995,10 +995,10 @@
       "new": "\t\t\t\treturn nil"
     },
     {
-      "control": "mangled-dash-title-refused",
-      "clause": "A capture verb refuses a positional whose first character is dash punctuation, so a smart-dash `create \u2014-help` is a refusal rather than a filed ticket (39rf5)",
+      "control": "a-dash-led-positional-is-refused",
+      "clause": "A positional whose first character is dash punctuation is refused, so a smart-dash `create \u2014-help` or `list \u2014\u2014all-projects` is a refusal naming the dash (39rf5, vy56d)",
       "file": "internal/cli/root.go",
-      "test": "TestCaptureVerbsRefuseAMangledFlagAsATitle",
+      "test": "TestEveryVerbRefusesAMangledFlagAsAPositional",
       "old": "\treturn unicode.Is(unicode.Pd, r) || r == '\\u2212'",
       "new": "\treturn unicode.Is(unicode.Sm, r) || r == '\\u2212'"
     },
@@ -1011,28 +1011,52 @@
       "new": "\treturn unicode.Is(unicode.Pd, r) || false"
     },
     {
-      "control": "dash-dash-files-a-title-literally",
-      "clause": "Everything after `--` is a positional the caller asked for literally, so `create -- \u2014-help` still files that title (39rf5)",
+      "control": "dash-dash-takes-an-argument-literally",
+      "clause": "Everything after `--` is a positional the caller asked for literally, so `create -- \u2014-help` still files that title and `search -- \u2014\u2014all` searches for it (39rf5, vy56d)",
       "file": "internal/cli/root.go",
-      "test": "TestCaptureVerbsRefuseAMangledFlagAsATitle",
-      "old": "\t\t\tif literal >= 0 && i >= literal {\n\t\t\t\tbreak\n\t\t\t}",
-      "new": "\t\t\tif literal >= 0 && i > literal {\n\t\t\t\tbreak\n\t\t\t}"
+      "test": "TestEveryVerbRefusesAMangledFlagAsAPositional",
+      "old": "\t\tif literal >= 0 && i >= literal {\n\t\t\tbreak\n\t\t}",
+      "new": "\t\tif literal >= 0 && i > literal {\n\t\t\tbreak\n\t\t}"
     },
     {
-      "control": "quick-capture-shares-the-refusal",
-      "clause": "The refusal belongs to every capture verb, so `q` takes it as well as `create` (39rf5)",
-      "file": "internal/cli/issue.go",
-      "test": "TestCaptureVerbsRefuseAMangledFlagAsATitle",
-      "old": "\t\tArgs:  captureArgs(1),",
-      "new": "\t\tArgs:  exactArgs(1),"
+      "control": "every-verb-shares-the-dash-refusal",
+      "clause": "The mangled-flag refusal is the whole tree's, not a list of verbs: every command is wrapped, so `list \u2014\u2014all-projects` names the dash instead of reporting an argument count and `search \u2014\u2014all-projects` refuses instead of searching for the text (vy56d)",
+      "file": "internal/cli/root.go",
+      "test": "TestEveryVerbRefusesAMangledFlagAsAPositional",
+      "old": "\t\tcmd.Args = positionalArgs(cmd.Args)",
+      "new": "\t\t_ = positionalArgs(cmd.Args)"
     },
     {
-      "control": "remember-shares-the-refusal",
-      "clause": "`remember` is a capture verb too — one positional, a minted top-level record, an id at exit 0 — so the refusal reaches the memory table and not only the issue table (39rf5)",
-      "file": "internal/cli/memory.go",
-      "test": "TestCaptureVerbsRefuseAMangledFlagAsATitle",
-      "old": "\t\tArgs: captureArgs(1),",
-      "new": "\t\tArgs: exactArgs(1),"
+      "control": "the-dash-refusal-precedes-the-arity-check",
+      "clause": "The dash check runs before the command's own Args, because an argument count, an unknown-command line and a not-found id all name the wrong thing (39rf5, vy56d)",
+      "file": "internal/cli/root.go",
+      "test": "TestEveryVerbRefusesAMangledFlagAsAPositional",
+      "old": "\t\tif err := refuseMangledFlag(cmd, args); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn own(cmd, args)",
+      "new": "\t\tif err := own(cmd, args); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn refuseMangledFlag(cmd, args)"
+    },
+    {
+      "control": "the-dash-refusal-reaches-a-nested-verb",
+      "clause": "The wrap descends the tree, so a verb under a group \u2014 `comment add`, `dep rm` \u2014 is covered as well as root's own children (vy56d)",
+      "file": "internal/cli/root.go",
+      "test": "TestTheDashRefusalWrapsTheWholeTreeItIsGiven",
+      "old": "\t\tfor _, sub := range cmd.Commands() {\n\t\t\twalk(sub)",
+      "new": "\t\tfor _, sub := range cmd.Commands()[:0] {\n\t\t\twalk(sub)"
+    },
+    {
+      "control": "cobras-own-commands-keep-their-args",
+      "clause": "help and cobra's two completion entry points are left unwrapped: cobra owns their arguments, and completing a half-typed `--all` is a request for candidates rather than an invocation to refuse (vy56d)",
+      "file": "internal/cli/root.go",
+      "test": "TestTheDashRefusalWrapsTheWholeTreeItIsGiven",
+      "old": "\t\tswitch cmd.Name() {\n\t\tcase \"help\", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:\n\t\t\treturn\n\t\t}",
+      "new": "\t\tswitch cmd.Name() {\n\t\tcase \"never-a-command-name\":\n\t\t\treturn\n\t\t}"
+    },
+    {
+      "control": "a-command-with-no-arity-check-still-refuses-a-dash",
+      "clause": "A nil Args means ArbitraryArgs, and the wrapper adds the refusal to it rather than handing the command back unchecked (vy56d)",
+      "file": "internal/cli/root.go",
+      "test": "TestTheDashRefusalWrapsTheWholeTreeItIsGiven",
+      "old": "\tif own == nil {\n\t\town = cobra.ArbitraryArgs\n\t}",
+      "new": "\tif own == nil {\n\t\treturn cobra.ArbitraryArgs\n\t}"
     }
   ]
 }

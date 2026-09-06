@@ -68,49 +68,59 @@ lists the far end once either way. `blocks` and `discovered-from` mean a
 different thing at each end, so their reciprocal spelling is a second edge —
 `A blocks B` with `B blocks A` is the cycle `dep cycles` exists to find.
 
-### A capture title never begins with a dash
+### A positional never begins with a dash
 
-The capture verbs — `create`, `q` and `remember`, the three that mint a
-top-level record from one positional and print its id — **refuse an argument
-whose first character is a dash**: the ASCII `-`, any of Unicode's dashes, or
-the mathematical minus sign. Exit 2, having written nothing.
+**Every verb refuses a positional whose first character is a dash** — the ASCII
+`-`, any of Unicode's dashes, or the mathematical minus sign. Exit 2, having
+written nothing.
 
-This is not pedantry about punctuation. Cobra's parser knows only the ASCII
-`-`, so when the two hyphens of a long flag arrive as an em dash — a smart-dash
+This is not pedantry about punctuation. Cobra's parser knows only the ASCII `-`,
+so when the two hyphens of a long flag arrive as em dashes — a smart-dash
 substitution, or a paste out of a document or chat — the token is an ordinary
-positional and the capture verb used to file it as a title at exit 0, with
-nothing to tell the caller their help request had become a ticket. `28xs7` in
-this store is that artifact: a task titled `—-help`, opened and closed a minute
-apart. Nothing about `help` is special there, which is why the refusal covers
-the class rather than the one string: the same substitution turns `--json`,
-`-d` and `-p` into titles just as silently.
+positional. That used to land two ways, both wrong:
 
-Only the first character is looked at, so a title that *contains* a dash is
-prose and files normally. The check runs before the argument count, so a
-mangled flag after a real title — `drops create "a title" —-json` — is reported
-as the dash rather than as `accepts 1 arg(s), received 2`, which is the least
-useful thing to say to somebody whose editor ate their hyphens.
+```sh
+drops list ——all-projects     # "accepts no args, received 1", and no scope applied
+drops search ——all-projects   # searched for the literal text, at exit 0
+```
+
+The first names an argument count for what was really a mangled flag. The second
+is the worse one: a plausible result set at exit 0, with nothing to say that the
+flag you typed was silently text. `28xs7` in this store is the same substitution
+reaching `create` — a task titled `—-help`, opened and closed a minute apart.
+
+The rule is the whole tree's rather than a list of verbs, because it was never a
+judgment about which text is plausible. pflag already refuses a positional
+beginning with an ASCII `-` before any verb sees it — `drops comment add <id>
+"- a bullet"` is `unknown shorthand flag: ' '` — so refusing the mangled
+spellings everywhere makes them behave like the spelling they were meant to be,
+and takes away nothing that was reachable.
+
+Only the first character is looked at, so an argument that *contains* a dash is
+prose: such a title files, and such a search term searches. The check runs before
+the argument count, the unknown-command line and the id lookup, so `drops create
+"a title" —-json`, `drops dep ——json` and `drops show ——all-projects` all name
+the dash rather than an argument count, a mistyped verb, or an issue that was
+never missing.
 
 **`--` is the escape**, and it needed no new flag: everything after it is a
 positional you asked for literally.
 
 ```sh
-drops create -- "—-help"        # files a title of "—-help"
+drops create -- "—-help"                        # files a title of "—-help"
 drops q -- "-1 is off by one"
-drops remember -- "—dashes lead this note"
+drops search -- "——all-projects"                # searches for that text
+drops comment add <id> --author me -- "—-json"  # files that body
 ```
 
-A real help flag is untouched, because cobra answers it before any positional
-is validated: `drops create --help`, `drops create -h`, `drops help create` and
-`drops create "a title" --help` all print the help and exit 0.
+A real help flag is untouched, because cobra answers it before any positional is
+validated: `drops create --help`, `drops list -h`, `drops help create` and
+`drops create "a title" --help` all print the help and exit 0. Shell completion
+is untouched too — `help` and the completion machinery are cobra's own, and a
+half-typed `--all` is a request for candidates rather than an invocation.
 
-This is the capture verbs' rule alone, and the line is drawn where a mangled
-flag can be a *whole* successful invocation. `comment add`'s body and `close
---reason` take prose, where a leading dash is ordinary, and both need an id
-that has to resolve first; `-d` and `--title` are flag values, already typed.
-`remember` is on the refusing side despite also taking a body, because
-`drops remember —-help` needs nothing else to mint an orphan record — the same
-artifact as `28xs7`, in the memory table.
+Flag *values* are not positionals: a leading dash in `--reason`, `-d` or
+`--title` is text, and always was.
 
 ## Ids
 
@@ -175,6 +185,12 @@ name would silently collect every later write from that directory.
 `--all-projects` spans every project instead of resolving one. `--inbox` scopes
 to the reserved inbox. `--db <path>` or `$DROPS_DB` names a different store,
 which is how development runs against a scratch database.
+
+**`--all-projects` has no short form, deliberately** (vy56d). It is a persistent
+root flag, and cobra merges those into every subcommand's flag set by name while
+pflag rejects a *shorthand* collision — so a `-A` here does not lose a race with
+`create`'s and `update`'s `--assignee`, it panics both verbs outright on every
+invocation. Type it in full, and note that `-a` is `--all`, a different question.
 
 **Archiving retires a project from new work; it does not hide its history.**
 `drops project archive <slug> --force` drops it from `project list` (`--archived`

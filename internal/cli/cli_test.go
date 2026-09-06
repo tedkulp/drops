@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/tedkulp/drops/internal/model"
 	"github.com/tedkulp/drops/internal/render"
 	"github.com/tedkulp/drops/internal/store"
@@ -380,4 +382,173 @@ func decodeMany[T any](t *testing.T, out string) []T {
 		t.Fatalf("not a JSON array: %v (%q)", err, out)
 	}
 	return values
+}
+
+// TestEveryVerbRefusesAMangledFlagAsAPositional is vy56d, the rest of the tree
+// 39rf5 deliberately stopped short of. Cobra's parser knows only the ASCII
+// "-", so a long flag whose two hyphens arrived as em dashes is an ordinary
+// positional — and outside the capture verbs that landed two ways, both wrong:
+//
+//	$ drops list ——all-projects
+//	drops: invalid input: accepts no args, received 1     # the wrong thing named
+//
+//	$ drops search --inbox "——all-projects"
+//	○ 5fqk5 P2 task  —-help                               # searched for the text
+//	exit=0                                                # at exit 0
+//
+// The refusal is now the whole tree's, not a list of verbs, because the rule
+// was never a judgment about text: pflag already refuses a positional whose
+// first character is an ASCII "-" before Args ever runs (`drops comment add
+// <id> "- a bullet"` is "unknown shorthand flag: ' '"), so refusing the
+// mangled spellings everywhere makes them behave like the spelling they were
+// meant to be. "--" stays the escape it already was.
+func TestEveryVerbRefusesAMangledFlagAsAPositional(t *testing.T) {
+	db, cwd := newStore(t)
+
+	// The reported case. Two em dashes where "--" belongs.
+	const reported = "——all-projects"
+
+	// Every command in the tree, root and the groups included: the census
+	// walks the same paths that answer for a boundary test, so a verb added
+	// later is covered on arrival rather than when somebody remembers it.
+	for _, path := range commandPaths(t) {
+		args := append(strings.Fields(path)[1:], reported)
+		out, _, err := RunForTest(args, db, cwd)
+		if code := ExitCodeFor(err); code != 2 {
+			t.Errorf("%v exit = %d, want 2 (stdout %q)", args, code, out)
+		} else if !strings.Contains(err.Error(), reported) {
+			t.Errorf("%v refusal = %q, want it to quote the mangled argument", args, err)
+		}
+	}
+
+	// The reported invocation, spelled out: what the caller is told is that
+	// their flag was mangled, never an argument count. The count is the answer
+	// to a question nobody asked — the scope they typed was never applied.
+	if _, _, err := RunForTest([]string{"list", reported}, db, cwd); err == nil ||
+		strings.Contains(err.Error(), "received 1") {
+		t.Errorf("list %s = %v, want the dash named rather than an argument count", reported, err)
+	}
+
+	// The worse half. A verb that takes a positional swallowed the mangled
+	// flag as data at exit 0, with nothing to say anything had gone wrong.
+	issue := mustRun(t, db, cwd, "q", "--inbox", "a real issue")
+	for _, args := range [][]string{
+		{"search", "--inbox", reported},
+		{"comment", "add", issue, reported, "--author", "test"},
+		{"show", reported},
+		{"close", issue, "--reason", "not this one", reported},
+		{"label", "add", issue, reported},
+		{"dep", "add", issue, reported},
+		{"move", reported, "--to", "elsewhere"},
+		{"remember", "--global", reported},
+	} {
+		out, _, err := RunForTest(args, db, cwd)
+		if code := ExitCodeFor(err); code != 2 {
+			t.Errorf("%v exit = %d, want 2 (stdout %q)", args, code, out)
+		} else if !strings.Contains(err.Error(), reported) {
+			t.Errorf("%v refusal = %q, want it to quote the mangled argument", args, err)
+		}
+	}
+
+	// None of those wrote anything: no comment on the thread, no label, no
+	// second issue, no memory, and the issue is still open.
+	if thread := mustRun(t, db, cwd, "comment", "list", issue, "--json"); thread != "[]" {
+		t.Errorf("a refused comment add filed a body: %s", thread)
+	}
+	if labels := mustRun(t, db, cwd, "label", "list", issue, "--json"); labels != "[]" {
+		t.Errorf("a refused label add stored a label: %s", labels)
+	}
+	if n := storedCount(t, db, cwd); n != 1 {
+		t.Errorf("stored issues = %d, want only the one this test filed", n)
+	}
+	if rows := decodeMany[map[string]any](t, mustRun(t, db, cwd, "memories", "--json")); len(rows) != 0 {
+		t.Errorf("a refused remember wrote %d memories, want 0", len(rows))
+	}
+	if shown := decodeOne[map[string]any](t, mustRun(t, db, cwd, "show", issue, "--json")); shown["status"] != "open" {
+		t.Errorf("a refused close changed the status to %v", shown["status"])
+	}
+
+	// "--" is the escape everywhere it was the escape for a title, which is
+	// what keeps the refusal from taking anything away: text that really does
+	// begin with a dash is still sayable, and still stored verbatim.
+	if out := mustRun(t, db, cwd, "search", "--inbox", "--", reported); out != "" {
+		t.Errorf("search -- %s = %q, want the literal search to find nothing", reported, out)
+	}
+	mustRun(t, db, cwd, "comment", "add", issue, "--author", "test", "--", reported)
+	thread := decodeMany[map[string]any](t, mustRun(t, db, cwd, "comment", "list", issue, "--json"))
+	if len(thread) != 1 || thread[0]["body"] != reported {
+		t.Errorf("comment add -- %s stored %#v, want the body verbatim", reported, thread)
+	}
+
+	// A dash that is not leading is prose, and search reads prose.
+	prose := mustRun(t, db, cwd, "q", "--inbox", "a title with an em——dash inside")
+	if found := mustRun(t, db, cwd, "search", "--inbox", "em——dash"); !strings.Contains(found, prose) {
+		t.Errorf("search for a non-leading dash = %q, want the issue it is in", found)
+	}
+
+	// The real flag is untouched, on a group as much as on a verb: cobra
+	// answers --help before any positional is validated, so the refusal can
+	// never shadow the thing it points at.
+	for _, args := range [][]string{{"list", "--help"}, {"dep", "--help"}, {"comment", "add", "-h"}} {
+		out, errOut, code := run(t, db, cwd, args...)
+		if code != 0 || !strings.Contains(out, "Usage:") {
+			t.Errorf("%v exit = %d, stdout %q, stderr %q; want 0 and the help", args, code, out, errOut)
+		}
+	}
+
+	// And the ASCII spelling behaves the same where it reaches Args at all: a
+	// lone "-" is the one dash pflag hands through as a positional.
+	if _, _, err := RunForTest([]string{"list", "-"}, db, cwd); ExitCodeFor(err) != 2 {
+		t.Errorf(`list - exit = %d, want 2`, ExitCodeFor(err))
+	}
+}
+
+// TestTheDashRefusalWrapsTheWholeTreeItIsGiven is the wrapper itself, over a
+// tree small enough to state every rule about: it reaches a command at any
+// depth, it keeps cobra's meaning for a nil Args, and it leaves cobra's own
+// two commands alone.
+//
+// The real tree answers the behavioural question — every verb refuses a
+// mangled flag — in TestEveryVerbRefusesAMangledFlagAsAPositional. What it
+// cannot answer is the two rules no drops command exercises: nothing in the
+// tree leaves Args nil, and cobra adds `help` and `__complete` during Execute,
+// after NewRootCmd has walked the tree, so the skip is a guard against a
+// future cobra rather than something today's tree can show.
+func TestTheDashRefusalWrapsTheWholeTreeItIsGiven(t *testing.T) {
+	const mangled = "——all-projects"
+
+	// A nil Args, which cobra reads as ArbitraryArgs, and a nested leaf: the
+	// refusal has to reach past root's own children.
+	root := &cobra.Command{Use: "root", Args: cobra.ArbitraryArgs}
+	group := &cobra.Command{Use: "group", Args: cobra.ArbitraryArgs}
+	leaf := &cobra.Command{Use: "leaf"}
+	group.AddCommand(leaf)
+
+	// Cobra's own three — help and BOTH completion entry points. A completion
+	// request for a half-typed "--all" is a request for candidates, not an
+	// invocation to refuse, and __completeNoDesc is the same request from a
+	// shell that takes no descriptions.
+	help := &cobra.Command{Use: "help", Args: cobra.ArbitraryArgs}
+	complete := &cobra.Command{Use: cobra.ShellCompRequestCmd, Args: cobra.ArbitraryArgs}
+	bare := &cobra.Command{Use: cobra.ShellCompNoDescRequestCmd, Args: cobra.ArbitraryArgs}
+	root.AddCommand(group, help, complete, bare)
+
+	refuseMangledFlagsEverywhere(root)
+
+	for _, cmd := range []*cobra.Command{root, group, leaf} {
+		if err := cmd.Args(cmd, []string{mangled}); err == nil {
+			t.Errorf("%q accepted a mangled flag", cmd.CommandPath())
+		}
+		if err := cmd.Args(cmd, []string{"one", "two"}); err != nil {
+			t.Errorf("%q refused ordinary positionals: %v", cmd.CommandPath(), err)
+		}
+	}
+	for _, cmd := range []*cobra.Command{help, complete, bare} {
+		if err := cmd.Args(cmd, []string{mangled}); err != nil {
+			t.Errorf("%q is cobra's, and was wrapped anyway: %v", cmd.Name(), err)
+		}
+		if err := cmd.Args(cmd, []string{"list", "--all"}); err != nil {
+			t.Errorf("%q refused a flag being completed: %v", cmd.Name(), err)
+		}
+	}
 }

@@ -206,17 +206,29 @@ using.
   each far end once. `blocks` and `discovered-from` are unchanged: their
   reciprocal spelling is a second edge, and `A blocks B` with `B blocks A`
   stays the cycle `dep cycles` reports.
-- **A mangled `--help` is no longer filed as a title.** `create`, `q` and
-  `remember` refuse a positional argument whose first character is a dash — ASCII, any Unicode
-  dash, or the minus sign — at exit 2, writing nothing. Cobra's parser knows
-  only the ASCII `-`, so `drops create —-help` with the hyphens smart-dashed
-  was an ordinary positional and became a ticket at exit 0. The refusal covers
-  the class rather than that one string, because the same substitution turns
-  `--json`, `-d` and `-p` into titles just as silently, and it runs before the
-  argument count so a mangled flag after a real title names the dash rather
-  than the count. `--` is the escape and needed no new flag:
-  `drops create -- "—-help"` files that title. A real `--help` is untouched;
-  cobra answers it before any positional is validated.
+- **A mangled flag is no longer taken as an argument, on any verb.** Every
+  command refuses a positional whose first character is a dash — ASCII, any
+  Unicode dash, or the minus sign — at exit 2, writing nothing. Cobra's parser
+  knows only the ASCII `-`, so a long flag whose two hyphens arrived
+  smart-dashed was an ordinary positional, and it landed two ways: a verb
+  taking none reported an argument count (`drops list ——all-projects` was
+  "accepts no args, received 1", with the scope never applied), and a verb
+  taking one swallowed it as data at exit 0 — `drops search ——all-projects`
+  answered with a plausible result set for a search nobody asked for, and
+  `drops create —-help` became a ticket. The rule is the whole tree's rather
+  than a list of verbs because pflag already refuses the ASCII spelling before
+  any verb sees it, so this only makes the mangled spellings behave the same;
+  it runs before the argument count, the unknown-command line and the id
+  lookup, so what a caller is told is that their hyphens were eaten. `--` is
+  the escape and needed no new flag: `drops create -- "—-help"` files that
+  title and `drops search -- "——all"` searches for it. A real `--help` and
+  shell completion are both untouched.
+- **`--all-projects` stays long-only, and now says why.** The same ticket
+  asked for `-A`; it is `--assignee` on `create` and `update`, and because
+  cobra merges a persistent flag into every subcommand by name while pflag
+  rejects a shorthand collision, a `-A` here does not lose a race — it panics
+  both verbs outright on every invocation. `docs/agents/issue-tracker.md`
+  records that, and that `-a` is `--all`, a different question.
 
 - **`show` no longer drops `related` and `discovered-from` dependencies.**
   Text pages name discovery provenance as `Discovered from` / `Discovered` and

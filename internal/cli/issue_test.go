@@ -427,11 +427,13 @@ func TestReopenClearsTheCloseReason(t *testing.T) {
 // title at exit 0. This store holds 28xs7, a task titled "—-help", from exactly
 // that.
 //
-// The refusal is over the whole class rather than over the one reported string:
-// nothing about `help` is special, and the same substitution turns --json, -d
-// and -p into titles just as silently. It belongs to every capture verb, not
-// just the reported one — `q` and `remember` each mint a top-level record from
-// a single positional at exit 0, which is the artifact this is about.
+// vy56d made the refusal the whole tree's, and
+// TestEveryVerbRefusesAMangledFlagAsAPositional is where that claim lives now.
+// What stays here is what only the capture verbs can show: the breadth of the
+// mangling itself — en dash, HYPHEN, FULLWIDTH HYPHEN-MINUS, MINUS SIGN, and a
+// short flag as well as a long one — measured against the two record types a
+// single positional mints, so a refusal that let one glyph through would be
+// visible as a filed issue or an orphan memory rather than as an exit code.
 func TestCaptureVerbsRefuseAMangledFlagAsATitle(t *testing.T) {
 	db, cwd := newStore(t)
 
