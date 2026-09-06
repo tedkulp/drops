@@ -11,6 +11,8 @@ using.
 
 ## [Unreleased]
 
+## 0.2.0 — 2026-09-06
+
 ### Added
 
 - **`drops tui`**, a full-screen two-pane issue navigator: the current
