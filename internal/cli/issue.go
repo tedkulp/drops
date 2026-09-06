@@ -203,14 +203,27 @@ func newUpdateCmd(app *App) *cobra.Command {
 		status                                  string
 	)
 	cmd := &cobra.Command{
-		Use:               "update <id>",
-		Short:             "Update an issue; only the flags you pass are changed",
+		Use:   "update <id>",
+		Short: "Update an issue; only the flags you pass are changed",
+		Long: "Update an issue. Only the flags you pass are changed: an unpassed\n" +
+			"flag is not an instruction to write its zero value.\n\n" +
+			"At least one field flag is required. An update naming no field is\n" +
+			"refused rather than reported as a write that never happened.",
 		Args:              exactArgs(1),
 		ValidArgsFunction: completeIssueIDs(app, 1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
 			}
+			// An update that names no field is a misuse, refused before
+			// anything is read. The id lookup is a side effect of applying an
+			// edit, so an empty edit used to skip it and report "updated <id>"
+			// for an issue that need not even exist (tqarn).
+			if !anyChanged(cmd, "title", "description", "status", "type", "assignee", "priority") {
+				return invalidArgs("no field to update; pass at least one of " +
+					"--title, -d, -p, -t, --status or -A")
+			}
+
 			id := model.ID(args[0])
 			f := cmd.Flags()
 

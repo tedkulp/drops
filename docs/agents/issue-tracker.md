@@ -48,6 +48,15 @@ relation, and the whole comment thread.
 Issue types: `task`, `bug`, `feature`, `epic`, `chore`, `research`, `decision`.
 Priority is 0 (critical) to 4 (backlog), default 2.
 
+**`update` changes only the flags you pass, and refuses to be passed none.** An
+unpassed flag is not an instruction to write its zero value, so `update <id> -p 1`
+leaves the title alone. `update <id>` with *no* field flag is a misuse: exit 2
+naming that no field was given, printing nothing. It used to print `updated <id>`
+and exit 0 having written nothing — for an id that need not even exist, because
+the id lookup was a side effect of applying an edit and an empty edit skipped it
+(tqarn). The refusal comes before the lookup, so an empty `update` is 2 whether
+or not the id exists; name a field and a missing id is 4, as everywhere else.
+
 **`ready` and `blocked` partition `list`.** Both take their candidates from the
 same live set `list` shows — `open` **and** `in_progress` — and split it on one
 question: does this issue have an unfinished blocker? So every live issue is in

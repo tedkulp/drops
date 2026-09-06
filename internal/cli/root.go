@@ -185,6 +185,19 @@ func maximumArgs(n int) cobra.PositionalArgs {
 	}
 }
 
+// anyChanged reports whether the caller passed any of the named flags. It is
+// how a verb whose whole work is carried by its flags tells a real invocation
+// from an empty one. It takes the command rather than its flag set so that
+// nothing here imports pflag directly for a type cobra already hands out.
+func anyChanged(cmd *cobra.Command, names ...string) bool {
+	for _, name := range names {
+		if cmd.Flags().Changed(name) {
+			return true
+		}
+	}
+	return false
+}
+
 // dashLike reports whether r is a glyph a caller could have typed, or had
 // substituted for them, where the ASCII "-" that starts a flag belongs. It is
 // Unicode's dash punctuation — which the ASCII hyphen itself is a member of,

@@ -285,6 +285,54 @@ func TestUpdateChangesOnlyTheFlagsYouPass(t *testing.T) {
 	}
 }
 
+// TestUpdateWithNoFieldFlagIsRefused pins the other half of that contract: an
+// invocation that names no field at all is a misuse, not a write. It used to
+// report "updated <id>" and exit 0 having touched nothing — for an id that does
+// not exist as readily as for one that does, because the lookup was a side
+// effect of applying an edit and an empty edit skipped it (tqarn).
+func TestUpdateWithNoFieldFlagIsRefused(t *testing.T) {
+	db, cwd := newStore(t)
+	id := mustRun(t, db, cwd, "q", "--inbox", "untouched")
+	before := mustRun(t, db, cwd, "show", id, "--json")
+
+	for _, args := range [][]string{
+		{"update", id},
+		{"update", id, "--json"},
+		{"update", "zzzzz"},
+	} {
+		out, _, err := RunForTest(args, db, cwd)
+		if code := ExitCodeFor(err); code != 2 {
+			t.Fatalf("%v exit = %d, want 2 (called it wrong)", args, code)
+		}
+		if !strings.Contains(err.Error(), "no field to update") {
+			t.Fatalf("%v error = %v, want it to say no field was given", args, err)
+		}
+		if out != "" {
+			t.Fatalf("%v stdout = %q, want nothing: a refused update reports no write", args, out)
+		}
+	}
+	if after := mustRun(t, db, cwd, "show", id, "--json"); after != before {
+		t.Fatalf("refused update changed the issue:\n before %s\n after  %s", before, after)
+	}
+
+	// Every one of the six flags is a field, so any one of them alone is a
+	// real update. A guard that recognised only some of them would turn a
+	// working invocation into a refusal.
+	for _, flag := range [][]string{
+		{"--title", "renamed"},
+		{"-d", "a body"},
+		{"-p", "1"},
+		{"-t", "bug"},
+		{"--status", "in_progress"},
+		{"-A", "alice"},
+	} {
+		args := append([]string{"update", id}, flag...)
+		if got := mustRun(t, db, cwd, args...); got != "updated "+id {
+			t.Fatalf("%v output = %q, want the update reported", args, got)
+		}
+	}
+}
+
 // TestClaimAssignsOnlyAnUnclaimedIssue pins claim as the safe wayfinder
 // acquisition: it assigns a free ticket and refuses to overwrite another
 // session's claim.

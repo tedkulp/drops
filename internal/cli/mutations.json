@@ -162,6 +162,22 @@
       "new": "\t\t\tif true {\n\t\t\t\tedit.Priority = &priority\n\t\t\t}"
     },
     {
+      "control": "an-update-with-no-field-is-refused",
+      "clause": "An update naming no field is refused at exit 2 rather than reporting a write that never happened, for a live id and a missing one alike (tqarn)",
+      "file": "internal/cli/issue.go",
+      "test": "TestUpdateWithNoFieldFlagIsRefused",
+      "old": "\t\t\tif !anyChanged(cmd, \"title\", \"description\", \"status\", \"type\", \"assignee\", \"priority\") {",
+      "new": "\t\t\tif false {"
+    },
+    {
+      "control": "every-update-flag-counts-as-a-field",
+      "clause": "Each of update's six field flags alone is a real update, so the emptiness guard scans all of them and not just the first (tqarn)",
+      "file": "internal/cli/root.go",
+      "test": "TestUpdateWithNoFieldFlagIsRefused",
+      "old": "\tfor _, name := range names {",
+      "new": "\tfor _, name := range names[:1] {"
+    },
+    {
       "control": "an-empty-assignee-remains-exact",
       "clause": "update -A writes the exact string it receives, while release alone writes NULL (vud8k)",
       "file": "internal/cli/issue.go",

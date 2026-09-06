@@ -182,6 +182,15 @@ using.
 
 ### Fixed
 
+- **`drops update <id>` with no field flag is refused rather than reported as a
+  write.** It printed `updated <id>` and exited 0 having written nothing, and
+  did so for an id that does not exist as readily as for one that does: the id
+  lookup was a side effect of applying an edit, so an edit with nothing in it
+  skipped it. An agent that builds an `update` invocation and finds every flag
+  empty was told the write landed. It is now a misuse — exit 2, naming that no
+  field was given — refused before the lookup, so the code is 2 whether or not
+  the id exists; name a field and a missing id is 4 as everywhere else. Under
+  `--json` it no longer emits a zero-valued issue.
 - **`create --parent <TAB>` completes ids once a title is typed.** It completed
   nothing, and worked only with no title present, which is the reverse of the
   order anyone types. A flag's completion function had been given a guard
