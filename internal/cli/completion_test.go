@@ -146,3 +146,49 @@ func assertCompletionSet(t *testing.T, db, cwd string, args []string, want ...st
 		}
 	}
 }
+
+// TestIDFlagCompletionIgnoresATypedTitle is 99c27: `create --parent <TAB>` is
+// typed after the title, not before it, so a flag completion that consults the
+// command's positional arity offers nothing in the order anyone actually types.
+// Cobra hands a flag completion the positionals too, and they mean nothing to
+// it.
+func TestIDFlagCompletionIgnoresATypedTitle(t *testing.T) {
+	db, cwd := newStore(t)
+	first := mustRun(t, db, cwd, "create", "issue A", "--inbox")
+	second := mustRun(t, db, cwd, "create", "issue B", "--inbox")
+
+	assertCompletionSet(t, db, cwd,
+		[]string{"__complete", "create", "--inbox", "--parent", ""},
+		first+"\tissue A", second+"\tissue B",
+	)
+	assertCompletionSet(t, db, cwd,
+		[]string{"__complete", "create", "--inbox", "my title", "--parent", ""},
+		first+"\tissue A", second+"\tissue B",
+	)
+	assertCompletionSet(t, db, cwd,
+		[]string{"__complete", "list", "--inbox", "--parent", ""},
+		first+"\tissue A", second+"\tissue B",
+	)
+}
+
+// TestPositionalIDCompletionStopsAfterTheLastIDPosition is the duty the arity
+// guard actually has, kept while 99c27 took it off the flag path: `comment add
+// <id> <body>` completes ids for the id and nothing for the body, and the ids
+// a command has already accepted are not offered a second time.
+func TestPositionalIDCompletionStopsAfterTheLastIDPosition(t *testing.T) {
+	db, cwd := newStore(t)
+	first := mustRun(t, db, cwd, "create", "issue A", "--inbox")
+	second := mustRun(t, db, cwd, "create", "issue B", "--inbox")
+
+	assertCompletionSet(t, db, cwd,
+		[]string{"__complete", "comment", "add", "--inbox", ""},
+		first+"\tissue A", second+"\tissue B",
+	)
+	assertCompletionSet(t, db, cwd,
+		[]string{"__complete", "comment", "add", "--inbox", first, ""},
+	)
+	assertCompletionSet(t, db, cwd,
+		[]string{"__complete", "dep", "add", "--inbox", first, ""},
+		second+"\tissue B",
+	)
+}

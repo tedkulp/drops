@@ -31,53 +31,97 @@ func newCompletionCmd() *cobra.Command {
 	}
 }
 
-func completeIssueIDs(app *App, maxArgs int) cobra.CompletionFunc {
-	return completeIssueIDsWith(app, maxArgs, func(filter *core.IssueFilter) error {
+// positionalCompletion and flagCompletion are one cobra function type in two
+// roles that disagree about what `args` means, which is what let 99c27 hide in
+// plain sight. For a ValidArgsFunction, `args` is the positionals cobra has
+// already accepted, and consulting them is the whole point. For a flag's
+// completion function cobra passes the command's positionals too, where they
+// say nothing about the value being typed.
+//
+// The flag role is a struct rather than a second defined func type because
+// cobra.CompletionFunc is an *alias* for the bare func type. Two func types
+// would leave both roles assignable to a plain cobra.CompletionFunc and so to
+// each other, and the next helper written the natural way would reintroduce
+// the bug silently. Wrapping makes the roles mutually unassignable: nothing
+// reaches registerDynamicFlagCompletion without being built as a flag
+// completion, and a flag completion cannot be set as a ValidArgsFunction.
+type positionalCompletion cobra.CompletionFunc
+
+type flagCompletion struct {
+	complete cobra.CompletionFunc
+}
+
+func completeIssueIDs(app *App, maxArgs int) positionalCompletion {
+	return completeIssueIDsWith(app, maxArgs, liveStatusFilter(app))
+}
+
+// liveStatusFilter is the id-completion default, shared by both roles: open
+// and in_progress, list's contract, widened only by -a.
+func liveStatusFilter(app *App) func(*core.IssueFilter) error {
+	return func(filter *core.IssueFilter) error {
 		return applyStatuses(filter, nil, app.includeClosed)
-	})
+	}
 }
 
 // completeClosedIssueIDs is reopen's complement: a reopen operates on a closed
 // issue, so a live-only default would list nothing it can act on.
-func completeClosedIssueIDs(app *App, maxArgs int) cobra.CompletionFunc {
+func completeClosedIssueIDs(app *App, maxArgs int) positionalCompletion {
 	return completeIssueIDsWith(app, maxArgs, func(filter *core.IssueFilter) error {
 		filter.Statuses = []model.Status{model.StatusClosed}
 		return nil
 	})
 }
 
-func completeIssueIDsWith(app *App, maxArgs int, configure func(*core.IssueFilter) error) cobra.CompletionFunc {
+// completeIssueIDsWith is the positional role, and both uses of `args` are
+// deliberate: the arity guard stops offering ids past the last id-shaped
+// position, so `comment add <id> <body>` completes nothing for the body, and
+// the ids already accepted are not offered a second time.
+func completeIssueIDsWith(app *App, maxArgs int, configure func(*core.IssueFilter) error) positionalCompletion {
 	return func(_ *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
 		if maxArgs >= 0 && len(args) >= maxArgs {
 			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		filter, ok, err := scopedIssueFilter(app, 0)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
-		if !ok {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		if err := configure(&filter); err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
-		issues, err := app.core.Issues(app.ctx, filter)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
 		}
 		used := make(map[string]bool, len(args))
 		for _, arg := range args {
 			used[arg] = true
 		}
-		completions := make([]cobra.Completion, 0, len(issues))
-		for _, issue := range issues {
-			id := string(issue.ID)
-			if !used[id] && strings.HasPrefix(id, toComplete) {
-				completions = append(completions, cobra.CompletionWithDesc(id, completionDescription(issue.Title)))
-			}
-		}
-		return completions, cobra.ShellCompDirectiveNoFileComp
+		return issueIDCompletions(app, configure, used, toComplete)
 	}
+}
+
+// completeIssueIDsForFlag is the flag role: it consults neither the count nor
+// the contents of the positionals, so `create "a title" --parent <TAB>` offers
+// the same ids as `create --parent <TAB>`. That is the order anyone types.
+func completeIssueIDsForFlag(app *App) flagCompletion {
+	return flagCompletion{complete: func(_ *cobra.Command, _ []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+		return issueIDCompletions(app, liveStatusFilter(app), nil, toComplete)
+	}}
+}
+
+func issueIDCompletions(app *App, configure func(*core.IssueFilter) error, used map[string]bool,
+	toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+	filter, ok, err := scopedIssueFilter(app, 0)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	if !ok {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	if err := configure(&filter); err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	issues, err := app.core.Issues(app.ctx, filter)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	completions := make([]cobra.Completion, 0, len(issues))
+	for _, issue := range issues {
+		id := string(issue.ID)
+		if !used[id] && strings.HasPrefix(id, toComplete) {
+			completions = append(completions, cobra.CompletionWithDesc(id, completionDescription(issue.Title)))
+		}
+	}
+	return completions, cobra.ShellCompDirectiveNoFileComp
 }
 
 func completionDescription(value string) string {
@@ -121,8 +165,8 @@ func registerPriorityCompletion(cmd *cobra.Command) {
 	registerFixedFlagCompletion(cmd, "priority", "0", "1", "2", "3", "4")
 }
 
-func completeProjectSlugs(app *App, includeArchived bool) cobra.CompletionFunc {
-	return func(_ *cobra.Command, _ []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+func completeProjectSlugs(app *App, includeArchived bool) flagCompletion {
+	return flagCompletion{complete: func(_ *cobra.Command, _ []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
 		projects, err := app.core.Projects(app.ctx)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
@@ -134,11 +178,11 @@ func completeProjectSlugs(app *App, includeArchived bool) cobra.CompletionFunc {
 			}
 		}
 		return completions, cobra.ShellCompDirectiveNoFileComp
-	}
+	}}
 }
 
-func completeLabels(app *App) cobra.CompletionFunc {
-	return func(_ *cobra.Command, _ []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+func completeLabels(app *App) flagCompletion {
+	return flagCompletion{complete: func(_ *cobra.Command, _ []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
 		counts, err := app.labelCounts()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
@@ -151,11 +195,11 @@ func completeLabels(app *App) cobra.CompletionFunc {
 		}
 		sort.Strings(completions)
 		return completions, cobra.ShellCompDirectiveNoFileComp
-	}
+	}}
 }
 
-func registerDynamicFlagCompletion(cmd *cobra.Command, flag string, completion cobra.CompletionFunc) {
-	if err := cmd.RegisterFlagCompletionFunc(flag, completion); err != nil {
+func registerDynamicFlagCompletion(cmd *cobra.Command, flag string, completion flagCompletion) {
+	if err := cmd.RegisterFlagCompletionFunc(flag, completion.complete); err != nil {
 		panic(err)
 	}
 }

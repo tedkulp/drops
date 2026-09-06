@@ -903,8 +903,8 @@
       "clause": "An id completion is only useful as a picker: the id carries its title as the description, so a tab press reads like a menu rather than a string of random ids (zwuh8)",
       "file": "internal/cli/completion.go",
       "test": "TestIssueCompletionIsAProjectScopedLivePicker",
-      "old": "\t\t\t\tcompletions = append(completions, cobra.CompletionWithDesc(id, completionDescription(issue.Title)))",
-      "new": "\t\t\t\tcompletions = append(completions, id)"
+      "old": "\t\t\tcompletions = append(completions, cobra.CompletionWithDesc(id, completionDescription(issue.Title)))",
+      "new": "\t\t\tcompletions = append(completions, id)"
     },
     {
       "control": "issue-completion-defaults-to-live",
@@ -921,6 +921,30 @@
       "test": "TestIssueCompletionIsAProjectScopedLivePicker",
       "old": "\t\treturn applyStatuses(filter, nil, app.includeClosed)",
       "new": "\t\treturn applyStatuses(filter, nil, false)"
+    },
+    {
+      "control": "id-flag-completion-ignores-positionals",
+      "clause": "A flag's id completion consults neither the count nor the contents of the command's positionals, so `create \"a title\" --parent <TAB>` offers the same ids as `create --parent <TAB>` (99c27)",
+      "file": "internal/cli/completion.go",
+      "test": "TestIDFlagCompletionIgnoresATypedTitle",
+      "old": "\treturn flagCompletion{complete: func(_ *cobra.Command, _ []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {\n\t\treturn issueIDCompletions(app, liveStatusFilter(app), nil, toComplete)",
+      "new": "\treturn flagCompletion{complete: func(_ *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {\n\t\tif len(args) > 0 {\n\t\t\treturn nil, cobra.ShellCompDirectiveNoFileComp\n\t\t}\n\t\treturn issueIDCompletions(app, liveStatusFilter(app), nil, toComplete)"
+    },
+    {
+      "control": "positional-id-completion-stops-past-the-last-id",
+      "clause": "A positional id completion stops at the last id-shaped position, so `comment add <id> <body>` completes nothing for the body \u2014 the guard's real duty, preserved when 99c27 took it off the flag path (zwuh8)",
+      "file": "internal/cli/completion.go",
+      "test": "TestPositionalIDCompletionStopsAfterTheLastIDPosition",
+      "old": "\t\tif maxArgs >= 0 && len(args) >= maxArgs {",
+      "new": "\t\tif false {"
+    },
+    {
+      "control": "positional-id-completion-dedups-accepted-ids",
+      "clause": "A positional id completion does not offer an id the command has already accepted, so `dep add <id> <TAB>` never proposes the issue as its own blocker \u2014 preserved when 99c27 split the two roles (zwuh8)",
+      "file": "internal/cli/completion.go",
+      "test": "TestPositionalIDCompletionStopsAfterTheLastIDPosition",
+      "old": "\t\tif !used[id] && strings.HasPrefix(id, toComplete) {",
+      "new": "\t\tif strings.HasPrefix(id, toComplete) {"
     },
     {
       "control": "reopen-completes-closed",

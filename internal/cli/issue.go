@@ -98,7 +98,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	registerIssueTypeCompletion(cmd)
 	registerPriorityCompletion(cmd)
 	registerDynamicFlagCompletion(cmd, "label", completeLabels(app))
-	registerDynamicFlagCompletion(cmd, "parent", completeIssueIDs(app, 1))
+	registerDynamicFlagCompletion(cmd, "parent", completeIssueIDsForFlag(app))
 	return cmd
 }
 

@@ -330,6 +330,12 @@ the same completion: `show`, `update`, `close`, `reopen`, `claim`, `release`,
 `comment add`, `comment list`, `dep add/rm/tree`, `label add/rm/list`, `move`,
 plus the `--parent` flags.
 
+**A `--parent` completes ids whatever else is already typed.** `create "a title"
+--parent <TAB>` offers the same ids as `create --parent <TAB>`, which is the
+half that matters: the title comes first in the order anyone types. A positional
+id position, by contrast, stops completing once it is filled, so `comment add
+<id> <body>` offers nothing for the body.
+
 **The other dynamic values follow their verbs.** `-P/--project` completes every
 slug, archived included, because `-P` still scopes to an archived project.
 `move --to` completes only live slugs, because an archived project refuses new

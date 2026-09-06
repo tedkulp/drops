@@ -223,7 +223,7 @@ func newListCmd(app *App) *cobra.Command {
 		"only direct children of this issue id (a further \".\" in the tail is a grandchild, excluded)")
 	registerDynamicFlagCompletion(cmd, "label", completeLabels(app))
 	registerDynamicFlagCompletion(cmd, "label-any", completeLabels(app))
-	registerDynamicFlagCompletion(cmd, "parent", completeIssueIDs(app, 1))
+	registerDynamicFlagCompletion(cmd, "parent", completeIssueIDsForFlag(app))
 	return cmd
 }
 

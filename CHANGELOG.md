@@ -182,6 +182,18 @@ using.
 
 ### Fixed
 
+- **`create --parent <TAB>` completes ids once a title is typed.** It completed
+  nothing, and worked only with no title present, which is the reverse of the
+  order anyone types. A flag's completion function had been given a guard
+  written for a positional one: cobra hands a flag completion the command's
+  positional arguments too, so a typed title read as "the id position is
+  already filled" and suppressed the whole list. The two roles now have
+  mutually unassignable types — the flag role a wrapper, because cobra's
+  completion type is an alias for the bare func type and two func types would
+  each still satisfy the other's role — so a completion written for one role
+  cannot be registered as the other. The positional guard keeps its real duty:
+  `comment add <id> <body>` still offers nothing for the body, and `dep add
+  <id> <TAB>` still never proposes the issue as its own blocker.
 - **A reciprocal `related` edge no longer renders and serializes twice.**
   `related` is documented as undirected, but the two stored directions were
   concatenated rather than merged, so an issue related from both ends listed
