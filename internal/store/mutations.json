@@ -1,5 +1,5 @@
 {
-  "note": "Live controls for internal/store, the SQLite adapter. Most of this package is round-trip: a record written and read back, which AGENTS.md says needs no control. These are the branches a wrong query still answers through. Seeded by qy3de.9.",
+  "note": "Live controls for internal/store, the SQLite adapter. Most of this package is round-trip: a record written and read back, which AGENTS.md says needs no control. These are the branches a wrong query still answers through. Seeded by qy3de.9; the schema-version refusals added by dw32p.35, when the v6 conversion was deleted and the refusal became the whole of the v6 story.",
   "controls": [
     {
       "control": "a-batch-read-refuses-an-id-naming-no-issue",
@@ -16,6 +16,22 @@
       "test": "TestIssuesByIDReadsEveryNamedIssueInOneQuery",
       "old": "\trows, err := read.ex.QueryContext(ctx, issueSelect+` WHERE issues.id IN `+placeholders, args...)",
       "new": "\trows, err := read.ex.QueryContext(ctx, issueSelect+` WHERE issues.tombstoned = 0 AND issues.id IN `+placeholders, args...)"
+    },
+    {
+      "control": "only-the-current-schema-version-opens",
+      "clause": "Nothing converts an older store any more, so a database reporting a schema version other than 7 is refused rather than opened (dw32p.35)",
+      "file": "internal/store/open.go",
+      "test": "TestOpenRefusesADatabaseWithAnotherSchemaVersion",
+      "old": "\tcase version == SchemaVersion:\n\t\treturn nil",
+      "new": "\tcase version == SchemaVersion || version == 6:\n\t\treturn nil"
+    },
+    {
+      "control": "a-versioned-database-is-refused-by-its-version",
+      "clause": "The version guard is what refuses a v6 store, not the populated-but-unversioned guard behind it, which answers ErrUnsupportedSchema for the same file and would hide the guard's removal (dw32p.35)",
+      "file": "internal/store/open.go",
+      "test": "TestOpenRefusesADatabaseWithAnotherSchemaVersion",
+      "old": "\tcase version != 0:\n\t\treturn fmt.Errorf(",
+      "new": "\tcase version != 0 && version != 6:\n\t\treturn fmt.Errorf("
     }
   ]
 }

@@ -164,6 +164,22 @@ using.
   per row. `drops ready` and `drops blocked` pass no status set and are
   byte-identical, verified over the 1025-issue corpus.
 
+### Removed
+
+- **`just cutover` and the whole v6-to-v7 conversion.** Both machines have
+  converted, and the map always said the legacy data gets exactly one bite, so
+  there is no second run to hold the code for — `tools/cutover` (960 prod lines,
+  641 test, 35 mutation controls), `internal/store`'s `Rewrite` and its
+  `Legacy*`/`MemoryPlan` surface (1075 lines, 541 test, and the v6 schema
+  fixture), `store.LegacySchemaVersion`, and the inert `dropscutover` build tag.
+  A v6 store that turns up after this is a restore-from-backup problem, and the
+  recipe is in git history where a restore would find it.
+- **`memory.MigrateBody`**, with the `headerNamesKind` helper and the two
+  regexps only it used. Folding a dropped kind column into searchable prose was
+  a conversion-time inference and the conversion was its only caller.
+  `DeriveTitle`, `StripHeader` and `NormalizeProvenance` stay — `core` uses all
+  three.
+
 ### Fixed
 
 - **`show` no longer drops `related` and `discovered-from` dependencies.**

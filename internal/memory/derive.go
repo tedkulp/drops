@@ -33,13 +33,6 @@ var sentenceBoundary = regexp.MustCompile(`[^\s.]\.\s+["'(A-Z]`)
 // metadata line written by the older generation of memory beads.
 var machineHeader = regexp.MustCompile(`^@[a-z]+=`)
 
-// headerField reads the @key=value pairs of a machine header line.
-var headerField = regexp.MustCompile(`@([a-z]+)=([^\s]+)`)
-
-// kindPrefix matches a leading "gotcha: " / "root-cause: " style marker, which
-// is how memory prose records its kind.
-var kindPrefix = regexp.MustCompile(`^([a-z][a-z-]*):\s`)
-
 // DeriveTitle produces a memory's title from its body. The source title is
 // never consulted: the legacy title was a blind truncation of the body, so it
 // holds no information the body does not.
@@ -107,43 +100,6 @@ func truncateWords(s string, n int) string {
 		cut = cut[:sp]
 	}
 	return strings.TrimRight(cut, " \t\n.,;:")
-}
-
-// MigrateBody returns the searchable body for a legacy memory whose kind column
-// is being dropped. The body is preserved verbatim — its kind prose is already
-// ordinary searchable content — and the kind is folded in as a leading
-// "<kind>: " marker only when the body does not already carry it.
-func MigrateBody(body, kind string) string {
-	if kind == "" {
-		return body
-	}
-	if m := kindPrefix.FindStringSubmatch(StripHeader(body)); m != nil && m[1] == kind {
-		return body
-	}
-	if headerNamesKind(body, kind) {
-		return body
-	}
-	return kind + ": " + body
-}
-
-// headerNamesKind reports whether the leading machine header's @type names the
-// kind, so a kind recorded only in the header (an @type=semantic:correction
-// marker with no prose prefix) is not folded in a second time.
-func headerNamesKind(body, kind string) bool {
-	text := strings.TrimSpace(body)
-	if !machineHeader.MatchString(text) {
-		return false
-	}
-	line := text
-	if nl := strings.IndexByte(text, '\n'); nl >= 0 {
-		line = text[:nl]
-	}
-	for _, m := range headerField.FindAllStringSubmatch(line, -1) {
-		if m[1] == "type" && strings.TrimPrefix(m[2], "semantic:") == kind {
-			return true
-		}
-	}
-	return false
 }
 
 // NormalizeProvenance turns optional free-text provenance into its stored form:

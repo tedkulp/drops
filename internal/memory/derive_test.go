@@ -146,62 +146,6 @@ func TestStripHeader(t *testing.T) {
 	}
 }
 
-// TestMigrateBody pins that a dropped kind column does not lose the kind as
-// searchable text: the body is preserved verbatim when it already carries the
-// kind, and the kind is folded in only when it does not.
-func TestMigrateBody(t *testing.T) {
-	tests := []struct {
-		name string
-		body string
-		kind string
-		want string
-	}{
-		{
-			name: "no kind changes nothing",
-			body: "plain prose. No marker.",
-			kind: "",
-			want: "plain prose. No marker.",
-		},
-		{
-			name: "leading kind prefix is already present",
-			body: "gotcha: A computed caches its result. Really.",
-			kind: "gotcha",
-			want: "gotcha: A computed caches its result. Really.",
-		},
-		{
-			name: "header naming the kind is already present",
-			body: "@type=semantic:correction @created=2026-08-14\n[superseded by a later note]",
-			kind: "correction",
-			want: "@type=semantic:correction @created=2026-08-14\n[superseded by a later note]",
-		},
-		{
-			name: "unmarked body folds the kind in",
-			body: "A plain note without any marker.",
-			kind: "decision",
-			want: "decision: A plain note without any marker.",
-		},
-		{
-			name: "body prefix disagrees with the column, header agrees",
-			body: "@type=semantic:lesson @created=2026-08-14\ngotcha: The note text.",
-			kind: "lesson",
-			want: "@type=semantic:lesson @created=2026-08-14\ngotcha: The note text.",
-		},
-		{
-			name: "body prefix disagrees and there is no header",
-			body: "gotcha: The note text.",
-			kind: "lesson",
-			want: "lesson: gotcha: The note text.",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := MigrateBody(tt.body, tt.kind); got != tt.want {
-				t.Errorf("MigrateBody(%q, %q) = %q, want %q", tt.body, tt.kind, got, tt.want)
-			}
-		})
-	}
-}
-
 // TestNormalizeProvenance pins the optional field's stored form: blank input is
 // nil so the JSON field is omitted, and non-blank input is trimmed.
 func TestNormalizeProvenance(t *testing.T) {

@@ -9,11 +9,11 @@
 # It cannot silently disarm the way a repository path could: nothing gitignored
 # or uncreated is involved, and drops is UNIX-only already (flock).
 #
-# This is now the ONLY thing standing between a test and the real store.
+# This is the ONLY thing standing between a test and the real store.
 # internal/store's guard was deleted at cutover (dw32p.28), because the binary
-# this repository builds is the one that owns ~/.drops/drops.db. Before that,
-# `go test -tags dropscutover` with DROPS_DB unset was observed opening the real
-# store itself, stopping only at a v6 schema check that no longer exists.
+# this repository builds is the one that owns ~/.drops/drops.db. That guard was
+# once a second line: a build without it, run with DROPS_DB unset, was observed
+# opening the real store itself. Nothing refuses that path any more.
 #
 # Exported by `test` alone. `build` and `install` produce a binary; what store
 # that binary later opens is not the justfile's business.
@@ -190,9 +190,9 @@ mutate *ARGS:
 # that says `v0.1.0-14-gabc1234` tells you how stale it is, and staleness you can
 # see costs minutes rather than an afternoon.
 #
-# It refuses a SYMLINK, inverting the old check. After cutover the path is a
-# regular file this recipe owns; a symlink there means something else has taken
-# over managing it, and this recipe is not entitled to guess.
+# It refuses a SYMLINK, inverting the old check. The path is a regular file this
+# recipe owns; a symlink there means something else has taken over managing it,
+# and this recipe is not entitled to guess.
 #
 # Gated on `test-all` because this binary is the live issue tracker: installing a
 # red build breaks the tool you would use to record that it is broken.
@@ -206,24 +206,3 @@ install: test-all build
     fi
     @install -m 755 drops ~/.local/bin/drops
     @echo "installed: $(~/.local/bin/drops version)"
-
-# The one-time v6-to-v7 conversion, run once per machine. dw32p.28.
-#
-# Both machines clone this repository and convert their own ~/.drops/drops.db,
-# so nothing here names one store's row counts: tools/cutover censuses whatever
-# it is pointed at and hands that census to store.Rewrite as Expect, which rolls
-# the transaction back rather than committing a conversion that disagrees.
-#
-#   just cutover --dry-run     rehearse on a throwaway copy, writing nothing
-#   just cutover               convert for real, after backing up and proving it
-#
-# The -tags dropscutover build tag is inert now: it selected the one build
-# internal/store would let near ~/.drops/drops.db, and that guard was deleted at
-# cutover. It stays because the tag names no file, so the recipe is the same
-# command on a machine that has not converted yet.
-#
-# DROPS_DB is deliberately NOT exported here: this is the one command whose job
-# is to open the real store.
-cutover *ARGS:
-    @go build -tags dropscutover -o .scratch/bin/cutover ./tools/cutover
-    @.scratch/bin/cutover "$@"

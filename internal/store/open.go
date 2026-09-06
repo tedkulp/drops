@@ -16,11 +16,10 @@ import (
 
 // SchemaVersion is the only schema this build reads or writes. A fresh store is
 // created at this version directly; migrations 1 through 6 are not carried
-// forward, and an exact legacy v6 store is converted by Rewrite instead.
+// forward, and no older shape is converted — both machines have converted, so
+// the one-time v6 conversion is gone and a v6 store is refused like any other
+// foreign database.
 const SchemaVersion = 7
-
-// LegacySchemaVersion is the one older shape Rewrite accepts.
-const LegacySchemaVersion = 6
 
 //go:embed schema/v7.sql
 var schemaDDL string
@@ -137,8 +136,9 @@ func Open(ctx context.Context, path string) (*Store, error) {
 }
 
 // bootstrap creates the schema in an empty database and otherwise refuses
-// anything that is not already v7. A legacy v6 store is converted only through
-// the explicit Rewrite operation, never as a side effect of opening it.
+// anything that is not already v7. Nothing converts an older store: a v6
+// database that turns up now is a restore-from-backup problem, and answering it
+// with a silent open would be worse than refusing it.
 func (store *Store) bootstrap(ctx context.Context) error {
 	version, err := store.userVersion(ctx)
 	if err != nil {

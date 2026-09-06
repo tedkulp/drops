@@ -913,8 +913,8 @@ So a session does not mistake them for its own error:
   `--label-any` flags, which work correctly, or fetch the issue with
   `show --json` when you need its labels.
 - **`list --parent <id>` misses migrated children.** It matches on the id
-  (`<parent>.N`) and ignores the `parent-child` records, of which cutover writes
-  549; it is also scoped to the current project, so a child that was moved
+  (`<parent>.N`) and ignores the `parent-child` records, of which the v6
+  conversion wrote 549; it is also scoped to the current project, so a child that was moved
   elsewhere is invisible. `drops show <id> --json | jq -r '.children[].id'` takes
   the union of both and is the reliable answer.
 - **A scanning verb exits 0 with an advisory on stderr when the cwd resolves to

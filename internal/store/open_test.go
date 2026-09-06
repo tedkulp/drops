@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tedkulp/drops/internal/store"
@@ -82,6 +83,15 @@ func TestOpenReusesAnExistingStore(t *testing.T) {
 	}
 }
 
+// TestOpenRefusesADatabaseWithAnotherSchemaVersion is the surviving half of the
+// v6 story. The one-time conversion is gone, so a v6 database that turns up now
+// is a restore-from-backup problem and the only right answer is a refusal.
+//
+// It asserts the MESSAGE, not just the sentinel, and that is the point. A v6
+// store carries tables, so the populated-but-unversioned guard below returns
+// ErrUnsupportedSchema for it too: an errors.Is assertion alone cannot tell the
+// version guard from the guard that catches it a step later, and stays green
+// with the version guard removed.
 func TestOpenRefusesADatabaseWithAnotherSchemaVersion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "legacy.db")
 	seedRaw(t, path, "CREATE TABLE issues (id TEXT PRIMARY KEY); PRAGMA user_version = 6;")
@@ -89,6 +99,9 @@ func TestOpenRefusesADatabaseWithAnotherSchemaVersion(t *testing.T) {
 	_, err := store.Open(t.Context(), path)
 	if !errors.Is(err, store.ErrUnsupportedSchema) {
 		t.Fatalf("open v6 store: err = %v, want ErrUnsupportedSchema", err)
+	}
+	if want := "reports schema version 6, want 7"; !strings.Contains(err.Error(), want) {
+		t.Errorf("open v6 store: err = %q, want it to contain %q", err, want)
 	}
 }
 

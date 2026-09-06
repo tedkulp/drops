@@ -296,7 +296,7 @@ func TestListLabelFiltersDemandAllAndAny(t *testing.T) {
 // TestListDeferredComparesAgainstNow is the clause the flag's help spells out:
 // deferred INTO THE FUTURE, not merely non-null. Nothing writes deferred_until
 // — the data is preserved from the old store — so the fixture writes it the way
-// cutover leaves it.
+// the one-time v6 conversion left it.
 func TestListDeferredComparesAgainstNow(t *testing.T) {
 	db, cwd := newStore(t)
 	future := mustRun(t, db, cwd, "q", "--inbox", "deferred into the future")

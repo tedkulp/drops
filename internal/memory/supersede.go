@@ -8,8 +8,8 @@ import (
 
 // Link is the minimum supersession state ValidateSupersession needs: one
 // memory's identity, project, and successor. It is smaller than model.Memory
-// so the validator stays pure and testable from literals, and so the cutover
-// and import can pass a partial view before records are settled.
+// so the validator stays pure and testable from literals, and so an import can
+// pass a partial view before records are settled.
 type Link struct {
 	ID           model.ID
 	Project      model.ProjectKey
