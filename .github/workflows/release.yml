@@ -1,0 +1,60 @@
+# Pushing a `v*` tag publishes a release: linux and darwin archives for amd64
+# and arm64, checksums, deb and rpm packages, and an updated Homebrew cask in
+# tedkulp/homebrew-tap.
+#
+# fetch-depth: 0 is load-bearing twice over. GoReleaser needs the tag history
+# to build a changelog, and the Go toolchain needs a real repository to embed
+# vcs.revision and vcs.modified into the binary — which is where `drops
+# version` reads the commit from, since nothing stamps it by hand.
+#
+# One secret has to exist on this repository: HOMEBREW_TOKEN, a token with push
+# access to tedkulp/homebrew-tap, read by .goreleaser.yaml's cask block. Without
+# it the job fails at its LAST step, after the GitHub Release is already
+# published — the confusing failure, because most of the release worked.
+#
+# `contents: write` is the whole permission set, deliberately. The tree this was
+# adapted from also grants packages: write and id-token: write; nothing here
+# publishes to a package registry and nothing signs with OIDC, so both would be
+# authority this job never exercises.
+#
+# The release itself deliberately uses the workflow's own GITHUB_TOKEN rather
+# than a second personal token spelled TAP_GITHUB_TOKEN, which is what the tree
+# this was adapted from does. GitHub mints that token for every run and the
+# `contents: write` permission above is all it needs to create a release and
+# upload assets, so the half of this job that publishes drops cannot fail for a
+# secret somebody forgot to create. Only the tap push, which reaches into
+# another repository, needs a credential of its own.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # create the release and upload its assets
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}

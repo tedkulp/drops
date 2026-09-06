@@ -17,6 +17,13 @@ directory.
 `just test-all`: `go vet` and a gofmt check, then `go test ./... -race`. A green
 `go test` is not a green build.
 
+CI runs this **recipe**, not a copy of it. `.github/workflows/ci.yml` installs
+`just` and calls `just test-all`, because a workflow that wrote the steps out
+would be a second gate free to drift from this one — and a hand-rolled `go test`
+step would drop the `DROPS_DB` tripwire below without saying so. `release_test.go`
+holds the workflow to the recipe. A second CI job runs `goreleaser check`, so a
+broken `.goreleaser.yaml` is found on a push rather than on a tag.
+
 The gofmt check formats what **git** counts as part of this tree — tracked files
 plus untracked ones git would offer to add — and not everything under `.`. So an
 unformatted `.go` file left in the gitignored `/.scratch/` does not fail the gate,

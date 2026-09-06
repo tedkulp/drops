@@ -1,6 +1,12 @@
 # Build output.
 /drops
 
+# GoReleaser's output. Ignored rather than merely uncommitted: Go's vcs.modified
+# comes from `git status --porcelain`, which counts untracked files, so a dist/
+# git could offer to add would stamp every released binary as built from a dirty
+# tree. `drops version` reports that flag.
+/dist/
+
 # Development stores. The real store stays outside this repository.
 /.scratch/
 *.db

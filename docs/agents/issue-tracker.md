@@ -962,7 +962,7 @@ build made outside the recipe still answers truthfully:
 
 | Line | Built by |
 |---|---|
-| `drops v0.1.0 (e4a8f4b, built …)` | `just build` or `just install` |
+| `drops v0.1.0 (e4a8f4b, built …)` | `just build`, `just install`, or a release build (a downloaded archive, a `.deb`/`.rpm`, the Homebrew cask) |
 | `drops devel (e4a8f4b)` | `go build` — the commit is embedded by the toolchain, no date is stamped |
 | `drops devel` | a build with no repository behind it |
 
@@ -970,7 +970,10 @@ The commit and `modified` are not stamped: Go embeds `vcs.revision` and
 `vcs.modified` in every binary it builds from a repository, so they cannot drift
 from the source they came from. Only the version and the build date are passed in
 by the recipe, the build date because Go records the *commit's* time and never the
-build's.
+build's. A release stamps the same two, spelled the same way — `.goreleaser.yaml`
+writes the tag's leading `v` back on, because goreleaser strips it and `just
+build` does not — so a binary from a tag and one from a checkout report their
+provenance identically.
 
 `version` never opens the store, so it answers when the database is the thing
 that is broken.

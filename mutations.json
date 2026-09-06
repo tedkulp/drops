@@ -1,0 +1,89 @@
+{
+  "note": "Live controls for the repository root: the darwin cross-vet's neighbours, the release configuration and the CI workflows. What is mutated here is a config file rather than a Go branch, because the config IS the production artefact — a `-X` naming a symbol that does not exist, a files: entry naming a file that is gone, a trigger that no longer matches the tag, and a workflow that respells the gate are all defects whose only production surface is YAML. Scope these by control name: the root package's path is `./.`, which `just mutate .` matches against every package in the tree rather than this one. Seeded by 3u4hv.",
+  "controls": [
+    {
+      "control": "release-stamps-a-real-variable",
+      "clause": "Every `-X` in the release config names a package-level var this tree declares, because `go build -X missing.Symbol=v` drops the stamp silently and ships the compile-time default (3u4hv)",
+      "file": ".goreleaser.yaml",
+      "test": "TestTheReleaseStampsVariablesThisTreeDeclares",
+      "old": ".BuildDate={{.Date}}",
+      "new": ".BuildTime={{.Date}}"
+    },
+    {
+      "control": "release-and-recipe-stamp-alike",
+      "clause": "The release config and the justfile's build recipe stamp the same set of variables, so a binary's provenance does not depend on who built it (3u4hv)",
+      "file": ".goreleaser.yaml",
+      "test": "TestTheReleaseAndTheBuildRecipeStampTheSameVariables",
+      "old": "      - -X github.com/tedkulp/drops/internal/cli.BuildDate={{.Date}}\n",
+      "new": ""
+    },
+    {
+      "control": "release-stamps-a-v-prefixed-version",
+      "clause": "The release stamps a `v`-prefixed version, because goreleaser strips the tag's leading v while `just build` stamps `git describe` verbatim — without it the same commit has two spellings (3u4hv)",
+      "file": ".goreleaser.yaml",
+      "test": "TestTheReleaseStampsAVPrefixedVersion",
+      "old": "cli.Version=v{{.Version}}",
+      "new": "cli.Version={{.Version}}"
+    },
+    {
+      "control": "release-builds-unix-only",
+      "clause": "The release publishes linux and darwin and nothing else, matching the one other GOOS portability_test.go cross-vets (3u4hv)",
+      "file": ".goreleaser.yaml",
+      "test": "TestTheReleaseBuildsOnlyTheOperatingSystemsThisTreeSupports",
+      "old": "    goos:\n      - linux\n      - darwin\n",
+      "new": "    goos:\n      - linux\n      - darwin\n      - windows\n"
+    },
+    {
+      "control": "release-builds-both-architectures",
+      "clause": "The release publishes amd64 and arm64, which the README, the changelog and the release skill all promise as four archives (3u4hv)",
+      "file": ".goreleaser.yaml",
+      "test": "TestTheReleaseBuildsBothArchitectures",
+      "old": "    goarch:\n      - amd64\n      - arm64\n",
+      "new": "    goarch:\n      - amd64\n"
+    },
+    {
+      "control": "release-ships-files-that-exist",
+      "clause": "Every files: entry the archives ship is in this tree, because goreleaser aborts on a missing one after the tag is already pushed (3u4hv)",
+      "file": ".goreleaser.yaml",
+      "test": "TestTheReleaseShipsOnlyFilesThatExist",
+      "old": "      - LICENSE\n",
+      "new": "      - COPYING\n"
+    },
+    {
+      "control": "release-runs-on-a-version-tag",
+      "clause": "The release workflow triggers on a `v*` tag; a trigger that stops matching is silent, since pushing the tag then does nothing and leaves no failed run to notice (3u4hv)",
+      "file": ".github/workflows/release.yml",
+      "package": "./.",
+      "test": "TestTheReleaseRunsOnAVersionTag",
+      "old": "      - 'v*'",
+      "new": "      - 'release-*'"
+    },
+    {
+      "control": "release-fetches-full-history",
+      "clause": "The release checkout sets `fetch-depth: 0`: a shallow one leaves goreleaser no tag history for the changelog and the toolchain no repository to embed vcs.revision from, which is where `drops version` reads the commit (3u4hv)",
+      "file": ".github/workflows/release.yml",
+      "package": "./.",
+      "test": "TestTheReleaseCheckoutFetchesFullHistory",
+      "old": "        with:\n          fetch-depth: 0\n",
+      "new": ""
+    },
+    {
+      "control": "ci-runs-the-gate-recipe",
+      "clause": "CI runs `just test-all`, the documented gate, rather than a weaker recipe under its name (3u4hv)",
+      "file": ".github/workflows/ci.yml",
+      "package": "./.",
+      "test": "TestCIRunsTheGateRecipe",
+      "old": "        run: just test-all",
+      "new": "        run: just test"
+    },
+    {
+      "control": "ci-does-not-respell-the-gate",
+      "clause": "No workflow spells the gate out itself; a second spelling is free to drift from the justfile, and a hand-rolled `go test` step drops the DROPS_DB tripwire silently (3u4hv)",
+      "file": ".github/workflows/ci.yml",
+      "package": "./.",
+      "test": "TestNoWorkflowRespellsTheGate",
+      "old": "      - name: Gate\n        run: just test-all",
+      "new": "      - name: Gate\n        run: go test ./... -race && just test-all"
+    }
+  ]
+}

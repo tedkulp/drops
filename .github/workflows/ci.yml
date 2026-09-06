@@ -1,0 +1,72 @@
+# The gate on every push and pull request, plus a standing check that the
+# release config still loads.
+#
+# The gate step calls `just test-all` rather than respelling it. That is
+# deliberate and it is the whole reason `just` is installed here: the recipe is
+# vet over the packages `./...` skips, a gofmt check over what git counts as
+# part of the tree, and then the race suite with DROPS_DB pointed at the
+# tripwire that stops a test reaching the real store. A workflow that wrote
+# those steps out itself would be a second spelling of the gate, free to drift
+# from the justfile — the defect class AGENTS.md is about. release_test.go
+# holds this file to the recipe.
+#
+# golangci-lint is not run. This repository's documented standard is vet plus
+# gofmt, and CI inheriting a linter would be adopting a standard rather than
+# enforcing one.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: just test-all
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Pinned, because the justfile's recipes are written against a known
+      # `just`. The header of the justfile names the floor: 1.58.0.
+      - name: Install just
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh \
+            | bash -s -- --tag 1.58.0 --to "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Gate
+        run: just test-all
+
+  goreleaser-check:
+    name: goreleaser check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # A broken .goreleaser.yaml is otherwise only discovered by pushing a
+      # tag, which is the one operation that cannot be taken back.
+      - name: Check GoReleaser config
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check

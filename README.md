@@ -26,7 +26,34 @@ with `flock`.
 
 ## Install
 
-Needs Go 1.27+ and [`just`](https://github.com/casey/just).
+A tagged release publishes a static binary for linux and darwin, on amd64 and
+arm64. There is no Windows build and there will not be one: drops serializes
+with `flock`.
+
+**Homebrew**, on macOS. It is a cask, so it is macOS-only — Homebrew on Linux
+does not install casks; use one of the rows below there:
+
+```sh
+brew install --cask tedkulp/tap/drops
+```
+
+**Debian or RPM**, from the [latest
+release](https://github.com/tedkulp/drops/releases/latest):
+
+```sh
+sudo dpkg -i drops_<version>_linux_amd64.deb     # or
+sudo rpm -i  drops_<version>_linux_amd64.rpm
+```
+
+**An archive**, for anything else. Each release also carries `checksums.txt`:
+
+```sh
+tar -xzf drops_<version>_linux_amd64.tar.gz
+install -m 755 drops ~/.local/bin/drops
+```
+
+**From source**, which is how this repository's own checkout gets its binary.
+Needs Go 1.27+ and [`just`](https://github.com/casey/just):
 
 ```sh
 just install
@@ -36,7 +63,8 @@ That runs the gate, builds with a version and build-date stamp, and copies the
 binary to `~/.local/bin/drops`. A copy rather than a symlink on purpose: this
 repository is under active development, and a symlink would make every build the
 live `drops` for every session on the machine. `drops version` reports the
-commit and build date, so staleness is something you can see instead.
+commit and build date, so staleness is something you can see instead — and it
+reports them the same way whichever of these you used.
 
 ## Use
 
@@ -84,3 +112,8 @@ failing. [CONTEXT.md](CONTEXT.md) is the glossary. `just --list` is the rest.
 
 Issues for this repository live in drops itself, not in a GitHub or GitLab
 issue tracker.
+
+CI runs the same gate on every push and pull request — `.github/workflows/ci.yml`
+calls `just test-all` rather than respelling it — and checks that
+`.goreleaser.yaml` still loads. Pushing a `v*` tag publishes a release;
+`.claude/skills/drops-release/SKILL.md` walks that end to end.

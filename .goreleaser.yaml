@@ -1,0 +1,105 @@
+# GoReleaser builds and publishes drops when a `v*` tag is pushed. `.github/
+# workflows/release.yml` is what runs it; `just install` is still how this
+# machine gets a build from source.
+#
+# Two things here are measured differences from the tree this was adapted from
+# (tix), not preferences:
+#
+#   - goos is linux and darwin, and nothing else. drops is UNIX-only by design
+#     — flock, ioctl, no exec("tty") — and portability_test.go cross-vets
+#     exactly one other GOOS, darwin. A windows entry would publish a binary
+#     nothing here has ever compiled. release_test.go holds this list to those
+#     two.
+#   - the ldflags stamp `internal/cli`, which is where drops keeps them. There
+#     is no internal/version package and no Commit variable: `drops version`
+#     reads the revision and the dirty bit out of debug.ReadBuildInfo, which
+#     the Go toolchain embeds in anything built from a repository. A value the
+#     toolchain cannot get wrong beats one this file has to remember to pass —
+#     the same reasoning the justfile's `build` recipe carries.
+#
+# The `v` in front of {{.Version}} is not decoration. GoReleaser strips the tag's
+# leading v, while the justfile's `build` recipe stamps `git describe` output
+# verbatim; without it a released binary would say `drops 0.1.0` where a local
+# one says `drops v0.1.0-14-gabc1234`, and the two builds would disagree about
+# how to spell the same tag. On a release this is exactly {{.Tag}}; on a
+# --snapshot it keeps the suffix that says the build is not one.
+#
+# `go build -X missing.Symbol=v` is not an error; the stamp is simply dropped.
+# So a rename in internal/cli would publish a release whose `drops version`
+# says "devel", with nothing going red. release_test.go is the guard: it holds
+# every `-X` here to a package-level var that exists, and holds this file and
+# the justfile's build recipe to the same set.
+version: 2
+
+builds:
+  - id: drops
+    binary: drops
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/tedkulp/drops/internal/cli.Version=v{{.Version}}
+      - -X github.com/tedkulp/drops/internal/cli.BuildDate={{.Date}}
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+    formats:
+      - tar.gz
+
+nfpms:
+  - id: drops
+    package_name: drops
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    vendor: Ted Kulp
+    maintainer: Ted Kulp <ted@tedkulp.com>
+    homepage: https://github.com/tedkulp/drops
+    description: A cross-project issue tracker for AI coding agents
+    license: MIT
+    formats:
+      - deb
+      - rpm
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+
+homebrew_casks:
+  - repository:
+      owner: tedkulp
+      name: homebrew-tap
+      token: '{{ .Env.HOMEBREW_TOKEN }}'
+    homepage: https://github.com/tedkulp/drops
+    description: A cross-project issue tracker for AI coding agents
+    license: MIT
+    binaries:
+      - drops
+    ids:
+      - default
+    hooks:
+      post:
+        # The binary is not signed or notarized, so strip the quarantine
+        # attribute Gatekeeper adds to downloaded artifacts.
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/drops"]
+          end

@@ -132,6 +132,18 @@ using.
   existing labels. The static half — types, statuses, priorities — costs no
   store read; the dynamic half costs one, which the ticket measured at ~14ms
   per tab press, inside the instant-feeling budget.
+- **Releases are built and published from a `v*` tag.** GoReleaser behind
+  GitHub Actions produces a GitHub Release with static binaries for linux and
+  darwin on amd64 and arm64, `.deb` and `.rpm` packages for linux, a
+  `checksums.txt`, and an updated Homebrew cask in `tedkulp/homebrew-tap` — so
+  `brew install --cask tedkulp/tap/drops` is now a way to get drops that is not
+  a Go toolchain and a checkout. There is no Windows build and there will not
+  be one: drops serializes with `flock`, and `portability_test.go` cross-vets
+  exactly one other GOOS, darwin. A released binary's `drops version` reports
+  the tag, the commit and a build date, spelled the same way `just build`
+  spells them.
+- **MIT LICENSE.** This tree had none, which the release archives, the packages
+  and the cask all name.
 
 ### Changed
 
@@ -296,6 +308,38 @@ using.
 
 ### Internal
 
+- **CI runs the documented gate rather than a second spelling of it.**
+  `.github/workflows/ci.yml` installs `just` and runs `just test-all` on every
+  push and pull request. Writing the steps out in the workflow would have made
+  a second gate free to drift from the justfile, and a hand-rolled `go test`
+  step would have dropped the `DROPS_DB` tripwire silently. `golangci-lint` is
+  deliberately not run: this repository's documented standard is vet plus
+  gofmt, and inheriting a linter would be adopting a standard rather than
+  enforcing one. A second job runs `goreleaser check`, so a broken release
+  config is found on a push instead of on a tag — the one operation that cannot
+  be taken back.
+- **The release config is held to this tree by tests.** `release_test.go`
+  checks that every `-X` stamp names a package-level var that exists — `go
+  build -X missing.Symbol=v` is not an error, it silently drops the stamp and
+  ships a binary reporting `devel` — that `.goreleaser.yaml` and the justfile's
+  `build` recipe stamp the same variables and spell the version the same way,
+  that the release publishes linux and darwin on amd64 and arm64 and nothing
+  else, that every `files:` entry is in the tree, that the release triggers on a
+  `v*` tag and checks out full history, and that no workflow respells the gate.
+  Ten controls in the root `mutations.json`. Four of them found a test that
+  could not fail for its clause: the stamp scan and the gate check were both
+  reading the config files' own prose, so the first version passed a workflow
+  whose `run:` line had been swapped for a weaker recipe, and comparing stamps
+  by name alone covered neither the `v` prefix nor the architecture list.
+- **`dist/` is gitignored.** Go's `vcs.modified` comes from `git status
+  --porcelain`, which counts untracked files, so a `dist/` git could offer to
+  add would stamp every subsequent build as coming from a dirty tree.
+- **A `drops-release` skill.** `.claude/skills/drops-release/SKILL.md` walks a
+  release end to end: the gate, `just mutate` when the release contains a
+  ticket that changed a control, moving `## [Unreleased]` into a dated section
+  in this repository's `## 0.1.0 — 2026-09-03` heading format, committing,
+  tagging, pushing the tag separately, and verifying what actually published.
+  It is the first `.claude/` tree in this repository.
 - **The gate's gofmt check reads the tree from git, not from `.`.** `gofmt -l .`
   walked `/.scratch/` — the gitignored development-store directory — so a
   leftover `.go` script left there by an earlier session failed `just test-all`
