@@ -12,6 +12,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 
@@ -121,6 +123,53 @@ func exactArgs(n int) cobra.PositionalArgs {
 			return invalidArgs("accepts %d arg(s), received %d", n, len(args))
 		}
 		return nil
+	}
+}
+
+// dashLike reports whether r is a glyph a caller could have typed, or had
+// substituted for them, where the ASCII "-" that starts a flag belongs. It is
+// Unicode's dash punctuation — which the ASCII hyphen itself is a member of,
+// along with the en and em dashes a smart-dash substitution produces — plus
+// U+2212 MINUS SIGN, which is mathematical rather than punctuation and is the
+// other glyph an editor swaps a hyphen for.
+func dashLike(r rune) bool {
+	return unicode.Is(unicode.Pd, r) || r == '\u2212'
+}
+
+// captureArgs is exactArgs(n) for the capture verbs, with one refusal in front
+// of the arity check: a positional whose first character is dash-like.
+//
+// Cobra's parser knows only the ASCII "-", so `drops create —-help` — the two
+// hyphens arriving as an em dash — is an ordinary positional, and create filed
+// it as a title at exit 0 with nothing to tell the caller their help request
+// had become a ticket (39rf5). The refusal is over the whole class rather than
+// over that one string: nothing about `help` is special there, and the same
+// substitution turns --json, -d and -p into titles just as silently. It is
+// also the cheaper rule to document — a title never begins with a dash — than
+// a list of manglings that would go stale.
+//
+// The dash check runs BEFORE the arity check because a second positional is
+// how a mangled flag arrives after a real title, and "accepts 1 arg(s),
+// received 2" is the least useful thing to say to somebody whose editor ate
+// their hyphens.
+//
+// "--" is the escape, and it needs no new flag: everything after it is a
+// positional the caller asked for literally, so `drops create -- "—-help"`
+// still files that title.
+func captureArgs(n int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		literal := cmd.ArgsLenAtDash()
+		for i, arg := range args {
+			if literal >= 0 && i >= literal {
+				break
+			}
+			if r, _ := utf8.DecodeRuneInString(arg); dashLike(r) {
+				return invalidArgs(
+					"%q begins with a dash, so it reads as a mangled flag rather than a title; write the flag with an ASCII \"-\", or put the argument after \"--\" to take it literally",
+					arg)
+			}
+		}
+		return exactArgs(n)(cmd, args)
 	}
 }
 

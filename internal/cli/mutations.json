@@ -969,6 +969,46 @@
       "test": "TestCompletionGeneratesInstalledShellScriptsWithoutAStore",
       "old": "\t\t\t\treturn invalidArgs(\"unsupported shell %q; choose bash, zsh, or fish\", args[0])",
       "new": "\t\t\t\treturn nil"
+    },
+    {
+      "control": "mangled-dash-title-refused",
+      "clause": "A capture verb refuses a positional whose first character is dash punctuation, so a smart-dash `create \u2014-help` is a refusal rather than a filed ticket (39rf5)",
+      "file": "internal/cli/root.go",
+      "test": "TestCaptureVerbsRefuseAMangledFlagAsATitle",
+      "old": "\treturn unicode.Is(unicode.Pd, r) || r == '\\u2212'",
+      "new": "\treturn unicode.Is(unicode.Sm, r) || r == '\\u2212'"
+    },
+    {
+      "control": "minus-sign-counts-as-a-dash",
+      "clause": "U+2212 MINUS SIGN is dash-like too, though it is not dash punctuation and Pd alone would let it through (39rf5)",
+      "file": "internal/cli/root.go",
+      "test": "TestCaptureVerbsRefuseAMangledFlagAsATitle",
+      "old": "\treturn unicode.Is(unicode.Pd, r) || r == '\\u2212'",
+      "new": "\treturn unicode.Is(unicode.Pd, r) || false"
+    },
+    {
+      "control": "dash-dash-files-a-title-literally",
+      "clause": "Everything after `--` is a positional the caller asked for literally, so `create -- \u2014-help` still files that title (39rf5)",
+      "file": "internal/cli/root.go",
+      "test": "TestCaptureVerbsRefuseAMangledFlagAsATitle",
+      "old": "\t\t\tif literal >= 0 && i >= literal {\n\t\t\t\tbreak\n\t\t\t}",
+      "new": "\t\t\tif literal >= 0 && i > literal {\n\t\t\t\tbreak\n\t\t\t}"
+    },
+    {
+      "control": "quick-capture-shares-the-refusal",
+      "clause": "The refusal belongs to every capture verb, so `q` takes it as well as `create` (39rf5)",
+      "file": "internal/cli/issue.go",
+      "test": "TestCaptureVerbsRefuseAMangledFlagAsATitle",
+      "old": "\t\tArgs:  captureArgs(1),",
+      "new": "\t\tArgs:  exactArgs(1),"
+    },
+    {
+      "control": "remember-shares-the-refusal",
+      "clause": "`remember` is a capture verb too — one positional, a minted top-level record, an id at exit 0 — so the refusal reaches the memory table and not only the issue table (39rf5)",
+      "file": "internal/cli/memory.go",
+      "test": "TestCaptureVerbsRefuseAMangledFlagAsATitle",
+      "old": "\t\tArgs: captureArgs(1),",
+      "new": "\t\tArgs: exactArgs(1),"
     }
   ]
 }

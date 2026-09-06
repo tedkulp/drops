@@ -40,7 +40,7 @@ func newCreateCmd(app *App) *cobra.Command {
 			"A nested repository resolves to its own project, not its parent.\n" +
 			"With --parent, the issue goes in its parent's project instead and\n" +
 			"the working directory is not consulted.",
-		Args: exactArgs(1),
+		Args: captureArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
@@ -138,7 +138,7 @@ func newQuickCmd(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "q <title>",
 		Short: "Quick capture: create an issue and print only its id",
-		Args:  exactArgs(1),
+		Args:  captureArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err

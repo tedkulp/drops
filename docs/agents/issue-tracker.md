@@ -60,6 +60,50 @@ Every scanning verb answers in one order: priority ascending, then newest first,
 then by id. Relevance never reorders a queue you are working through, so a
 `search` result and a `list` result put the same two issues in the same order.
 
+### A capture title never begins with a dash
+
+The capture verbs — `create`, `q` and `remember`, the three that mint a
+top-level record from one positional and print its id — **refuse an argument
+whose first character is a dash**: the ASCII `-`, any of Unicode's dashes, or
+the mathematical minus sign. Exit 2, having written nothing.
+
+This is not pedantry about punctuation. Cobra's parser knows only the ASCII
+`-`, so when the two hyphens of a long flag arrive as an em dash — a smart-dash
+substitution, or a paste out of a document or chat — the token is an ordinary
+positional and the capture verb used to file it as a title at exit 0, with
+nothing to tell the caller their help request had become a ticket. `28xs7` in
+this store is that artifact: a task titled `—-help`, opened and closed a minute
+apart. Nothing about `help` is special there, which is why the refusal covers
+the class rather than the one string: the same substitution turns `--json`,
+`-d` and `-p` into titles just as silently.
+
+Only the first character is looked at, so a title that *contains* a dash is
+prose and files normally. The check runs before the argument count, so a
+mangled flag after a real title — `drops create "a title" —-json` — is reported
+as the dash rather than as `accepts 1 arg(s), received 2`, which is the least
+useful thing to say to somebody whose editor ate their hyphens.
+
+**`--` is the escape**, and it needed no new flag: everything after it is a
+positional you asked for literally.
+
+```sh
+drops create -- "—-help"        # files a title of "—-help"
+drops q -- "-1 is off by one"
+drops remember -- "—dashes lead this note"
+```
+
+A real help flag is untouched, because cobra answers it before any positional
+is validated: `drops create --help`, `drops create -h`, `drops help create` and
+`drops create "a title" --help` all print the help and exit 0.
+
+This is the capture verbs' rule alone, and the line is drawn where a mangled
+flag can be a *whole* successful invocation. `comment add`'s body and `close
+--reason` take prose, where a leading dash is ordinary, and both need an id
+that has to resolve first; `-d` and `--title` are flag values, already typed.
+`remember` is on the refusing side despite also taking a body, because
+`drops remember —-help` needs nothing else to mint an orphan record — the same
+artifact as `28xs7`, in the memory table.
+
 ## Ids
 
 A new issue id is five random characters and no prefix, so `k3f9x`. A child

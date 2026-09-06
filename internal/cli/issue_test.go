@@ -419,3 +419,104 @@ func TestReopenClearsTheCloseReason(t *testing.T) {
 		t.Fatalf("reopened issue is not back in the default listing: %q", row)
 	}
 }
+
+// TestCaptureVerbsRefuseAMangledFlagAsATitle is 39rf5. Cobra's parser knows
+// only the ASCII "-", so when the two hyphens of a long flag arrive as an em
+// dash — a smart-dash substitution, or a paste out of a document or chat — the
+// token is an ordinary positional and the capture verbs used to file it as a
+// title at exit 0. This store holds 28xs7, a task titled "—-help", from exactly
+// that.
+//
+// The refusal is over the whole class rather than over the one reported string:
+// nothing about `help` is special, and the same substitution turns --json, -d
+// and -p into titles just as silently. It belongs to every capture verb, not
+// just the reported one — `q` and `remember` each mint a top-level record from
+// a single positional at exit 0, which is the artifact this is about.
+func TestCaptureVerbsRefuseAMangledFlagAsATitle(t *testing.T) {
+	db, cwd := newStore(t)
+
+	// Every one of these is a flag somebody meant, mangled into a positional.
+	// The reported case is the first; the rest are the class it belongs to.
+	mangled := []string{
+		"—-help", // em dash, the reported case
+		"–-help", // en dash
+		"—-json", // nothing about "help" is special
+		"—p",     // a short flag is mangled the same way
+		"−-json", // MINUS SIGN, which is not dash punctuation
+		"‐h",     // HYPHEN
+		"－p",     // FULLWIDTH HYPHEN-MINUS
+	}
+	for _, verb := range captureVerbs {
+		for _, title := range mangled {
+			out, _, err := RunForTest([]string{verb, "--inbox", title}, db, cwd)
+			if code := ExitCodeFor(err); code != 2 {
+				t.Errorf("%s %q exit = %d, want 2 (stdout %q)", verb, title, code, out)
+			} else if !strings.Contains(err.Error(), title) {
+				t.Errorf("%s %q refusal = %q, want it to quote the argument", verb, title, err)
+			}
+		}
+	}
+
+	// A mangled flag AFTER a real title is refused for the dash, not reported
+	// as a count. "accepts 1 arg(s), received 2" is the least useful thing to
+	// say to somebody whose editor ate their hyphens.
+	_, _, err := RunForTest([]string{"create", "--inbox", "a real title", "—-json"}, db, cwd)
+	if ExitCodeFor(err) != 2 || !strings.Contains(err.Error(), "—-json") {
+		t.Errorf("create with a trailing mangled flag = exit %d, %q; want 2 naming the argument", ExitCodeFor(err), err)
+	}
+
+	// Not one of those wrote anything — no issue, and no memory either.
+	if n := storedCount(t, db, cwd); n != 0 {
+		t.Fatalf("refused captures wrote %d issues, want 0", n)
+	}
+	if rows := decodeMany[map[string]any](t, mustRun(t, db, cwd, "memories", "--json")); len(rows) != 0 {
+		t.Fatalf("refused captures wrote %d memories, want 0", len(rows))
+	}
+
+	// "--" is the escape, and it needs no new flag: everything after it is a
+	// positional the caller asked for literally.
+	for _, verb := range captureVerbs {
+		id := mustRun(t, db, cwd, verb, "--inbox", "--", "—-help")
+		read, field := []string{"show", id, "--json"}, "title"
+		if verb == "remember" {
+			read, field = []string{"memory", "show", id, "--json"}, "body"
+		}
+		shown := decodeOne[map[string]any](t, mustRun(t, db, cwd, read...))
+		if shown[field] != "—-help" {
+			t.Fatalf("%s -- %q stored %s %q, want it verbatim", verb, "—-help", field, shown[field])
+		}
+	}
+
+	// A dash that is not leading is prose, and prose is what a title is.
+	id := mustRun(t, db, cwd, "create", "--inbox", "create eats a mangled —-help")
+	if shown := decodeOne[map[string]any](t, mustRun(t, db, cwd, "show", id, "--json")); shown["title"] != "create eats a mangled —-help" {
+		t.Fatalf("a title containing a dash was refused or altered: %q", shown["title"])
+	}
+
+	// The real flag is untouched: cobra answers --help before any positional
+	// is validated, so the refusal can never shadow the thing it points at.
+	for _, args := range [][]string{{"create", "--help"}, {"create", "-h"}, {"create", "a title", "--help"}, {"q", "--help"}, {"remember", "--help"}} {
+		out, errOut, code := run(t, db, cwd, args...)
+		if code != 0 || !strings.Contains(out, "Usage:") {
+			t.Errorf("%v exit = %d, stdout %q, stderr %q; want 0 and the help", args, code, out, errOut)
+		}
+	}
+
+	// And the single-hyphen half of the class stays cobra's to refuse.
+	if _, _, code := run(t, db, cwd, "create", "--inbox", "-help"); code != 2 {
+		t.Errorf("create -help exit = %d, want 2", code)
+	}
+}
+
+// captureVerbs are the verbs that mint a top-level record from one positional
+// and print its id: the whole set 39rf5's refusal belongs to.
+var captureVerbs = []string{"create", "q", "remember"}
+
+// storedCount reads the whole store's issue count through the CLI's own verb.
+func storedCount(t *testing.T, db, cwd string) int {
+	t.Helper()
+	payload := decodeOne[struct {
+		Count int `json:"count"`
+	}](t, mustRun(t, db, cwd, "count", "--all-projects", "--json"))
+	return payload.Count
+}
