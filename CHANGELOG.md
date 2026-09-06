@@ -13,11 +13,20 @@ using.
 
 ### Changed
 
+- **This repo's issues moved to GitHub Issues**, now that `tedkulp/drops` is
+  public. `docs/agents/issue-tracker.md` is the GitHub contract the engineering
+  skills read, and the triage and `wayfinder:*` label vocabularies exist on the
+  repo. The 79 closed issues that carried the rewrite — including the `dw32p`
+  map — stay in `~/.drops/drops.db` and were not migrated, so the `dw32p.N` ids
+  cited here and in `docs/research/` still point there.
 - **The CLI contract moved to [docs/cli-contract.md](docs/cli-contract.md)**,
   out of `docs/agents/issue-tracker.md`. That one file had been answering two
   questions — how every verb behaves, and where this repo's issues live — which
   only held together while drops was its own tracker. The contract is unchanged;
-  `docs/agents/issue-tracker.md` keeps the tracker configuration alone.
+  it lost the two "when a skill says" stanzas and the drops-flavoured
+  **Wayfinding operations** section, both of which were tracker configuration
+  rather than verb behaviour. `git show c56a115:docs/agents/issue-tracker.md`
+  has the pre-split file.
 
 ## 0.2.0 — 2026-09-06
 

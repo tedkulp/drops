@@ -4,13 +4,29 @@ A cross-project issue tracker for AI coding agents. Go, pure-Go SQLite, and Cobr
 one database for every repository, with the project resolved from the working
 directory.
 
-## Skills
+## Agent skills
 
-- **Issue tracker:** [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
-  Issues live in drops itself. Its **Wayfinding operations** section defines how to
-  work the map. The CLI itself is [docs/cli-contract.md](docs/cli-contract.md).
-- `codebase-design` for package shape and seams, `tdd` for build tickets, `grilling`
-  plus `domain-modeling` for decision tickets.
+### Issue tracker
+
+GitHub Issues on `tedkulp/drops`, driven by the `gh` CLI. See
+[docs/agents/issue-tracker.md](docs/agents/issue-tracker.md); its **Wayfinding
+operations** section defines how to work a map. Issues do **not** live in the
+`drops` store any more — that history is closed and stays where it is.
+
+### Triage labels
+
+The five canonical roles, each label string equal to its name. See
+[docs/agents/triage-labels.md](docs/agents/triage-labels.md).
+
+### Domain docs
+
+Single-context: `CONTEXT.md` at the root, ADRs under `docs/adr/` once there are
+any. See [docs/agents/domain.md](docs/agents/domain.md).
+
+### Which skill for what
+
+`codebase-design` for package shape and seams, `tdd` for build tickets, `grilling`
+plus `domain-modeling` for decision tickets.
 
 ## The gate
 
