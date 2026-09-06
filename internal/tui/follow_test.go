@@ -84,6 +84,25 @@ func TestTheFollowPickerNamesEveryDirectionFromTheReadersEnd(t *testing.T) {
 	}
 }
 
+// TestTheFollowPickerListsAReciprocalPairOnce: the picker reads the same
+// merged relation the page does, so a `related` edge stored in both directions
+// is one row and one choice. Concatenating the halves gave a duplicate row and
+// two followChoice entries for one issue (y7f6z).
+func TestTheFollowPickerListsAReciprocalPairOnce(t *testing.T) {
+	f := newFixture(t)
+	here := f.issue("The issue the picker is opened on", 1)
+	peer := f.issue("A peer both machines related it to", 2)
+	f.reciprocal(here.ID, peer.ID)
+
+	rows, choices := followRows(viewOf(t, f, here.ID))
+	if got := grouped(choices)["Related"]; !equalIDs(got, []model.ID{peer.ID}) {
+		t.Fatalf("Related = %v, want %v once", got, []model.ID{peer.ID})
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d, want the one relation this issue has: %+v", len(rows), rows)
+	}
+}
+
 func TestTheFollowPickerGroupsInThePagesOwnOrder(t *testing.T) {
 	f := newFixture(t)
 	parent := f.issue("The parent", 1)

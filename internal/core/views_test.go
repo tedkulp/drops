@@ -1,6 +1,7 @@
 package core_test
 
 import (
+	"slices"
 	"strconv"
 	"testing"
 
@@ -339,4 +340,31 @@ func refIDs(refs []core.IssueRef) []model.ID {
 		out = append(out, ref.ID)
 	}
 	return out
+}
+
+// The clause: `related` is undirected to a reader, so RelatedRefs merges both
+// stored directions into one block, outgoing edges first, naming each far end
+// ONCE. A reciprocal pair is two rows — `(from_id, to_id, dep_type)` is the
+// primary key — and concatenating the halves rendered and serialized it twice
+// (y7f6z).
+func TestRelatedRefsMergesBothDirectionsAndNamesEachFarEndOnce(t *testing.T) {
+	rules, opened := issuesNamed(t, "subject", "peer-out", "peer-in", "both-ends")
+	for _, edge := range [][2]model.ID{{"subject", "peer-out"}, {"peer-in", "subject"}} {
+		if _, err := rules.SetDependency(t.Context(), edge[0], edge[1], model.DepRelated, true); err != nil {
+			t.Fatalf("relate %s to %s: %v", edge[0], edge[1], err)
+		}
+	}
+	// The pair sync can deliver and no write-side rule can refuse.
+	putReciprocalPair(t, opened, "subject", "both-ends")
+
+	view, err := rules.ViewIssue(t.Context(), "subject")
+	if err != nil {
+		t.Fatalf("view Issue: %v", err)
+	}
+	// Each half arrives in core's own order, so the outgoing half is
+	// `both-ends` before `peer-out`; the incoming half repeats `both-ends`.
+	want := []model.ID{"both-ends", "peer-out", "peer-in"}
+	if got := refIDs(core.RelatedRefs(view)); !slices.Equal(got, want) {
+		t.Fatalf("related = %v, want %v: both directions, outgoing first, each end once", got, want)
+	}
 }

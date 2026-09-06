@@ -180,18 +180,23 @@ func TestPageNamesDiscoveredFromDirectionsFromTheReadersEnd(t *testing.T) {
 }
 
 // TestPageMergesRelatedDirections keeps both stored halves of an undirected
-// reader-facing relation, with core's outgoing half first.
+// reader-facing relation, with core's outgoing half first — and a far end
+// stored in BOTH directions is named once, because a reciprocal pair is one
+// relation to a reader however many rows it costs (y7f6z). The page takes
+// core's merge rather than spelling one of its own.
 func TestPageMergesRelatedDirections(t *testing.T) {
 	source := issueView()
 	source.Dependencies = []core.DependencyRef{
 		dependency("k3f9x.1", "an outgoing peer", model.DepRelated),
+		dependency("k3f9x.3", "a peer at both ends", model.DepRelated),
 	}
 	source.Dependents = []core.DependencyRef{
+		dependency("k3f9x.3", "a peer at both ends", model.DepRelated),
 		dependency("k3f9x.2", "an incoming peer", model.DepRelated),
 	}
 
 	page := view.Page(source)
-	assertIDs(t, "related", page.Related, "k3f9x.1", "k3f9x.2")
+	assertIDs(t, "related", page.Related, "k3f9x.1", "k3f9x.3", "k3f9x.2")
 }
 
 // TestPageCarriesItsWholeThread: a page is identity, body, every relation AND

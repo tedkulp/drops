@@ -35,11 +35,11 @@
     },
     {
       "control": "related-merges-both-stored-directions",
-      "clause": "A `related` edge is undirected to a reader: both stored directions appear in one `Related` group, with outgoing edges first (hxedy)",
+      "clause": "A page's `Related` block is core's merge of the WHOLE view, not of one stored direction — the merge itself, order and deduplication included, is core's (hxedy, moved to core by y7f6z)",
       "file": "internal/view/page.go",
       "test": "TestPageMergesRelatedDirections",
-      "old": "\tpage.Related = relatedRefs(view.Dependencies, view.Dependents)",
-      "new": "\tpage.Related = relatedRefs(view.Dependents, view.Dependencies)"
+      "old": "\tpage.Related = toRefs(core.RelatedRefs(view))",
+      "new": "\tpage.Related = toRefs(core.RelatedRefs(core.IssueView{Dependents: view.Dependents}))"
     }
   ]
 }

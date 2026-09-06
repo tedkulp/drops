@@ -53,6 +53,13 @@ const (
 	DepDiscoveredFrom DependencyType = "discovered-from"
 )
 
+// Undirected reports whether an edge of this type means the same relation read
+// from either end. `related` is the only one: `blocks` and `discovered-from`
+// name a different thing at each end, and a page names both. So `A related B`
+// and `B related A` are one relation spelled two ways, while `A blocks B` and
+// `B blocks A` are two edges and a cycle.
+func (value DependencyType) Undirected() bool { return value == DepRelated }
+
 func ValidDependencyType(value DependencyType) bool {
 	switch value {
 	case DepBlocks, DepRelated, DepDiscoveredFrom:

@@ -113,6 +113,13 @@ func (core *Core) SetLabel(ctx context.Context, issueID model.ID, name string, p
 }
 
 // SetDependency makes one typed edge live or tombstoned.
+//
+// An UNDIRECTED type is one relation however it is spelled, so the reverse row
+// is the same edge and is acted on with it: adding the reciprocal `related`
+// edge is the no-op that adding it twice already was, and removing one
+// withdraws whichever direction the store holds — both of them, when sync has
+// merged one from each replica. Before y7f6z the reciprocal spelling stored a
+// second row, which a reader then listed twice.
 func (core *Core) SetDependency(ctx context.Context, from, to model.ID, kind model.DependencyType, present bool) (model.Dependency, error) {
 	if !model.ValidDependencyType(kind) || from == to {
 		return model.Dependency{}, fmt.Errorf("%w: invalid dependency", model.ErrInvalid)
@@ -125,8 +132,24 @@ func (core *Core) SetDependency(ctx context.Context, from, to model.ID, kind mod
 		if _, err := tx.Issue(ctx, to); err != nil {
 			return err
 		}
+		var reverse *model.Dependency
+		if kind.Undirected() {
+			stored, err := tx.Dependency(ctx, to, from, kind)
+			switch {
+			case err == nil:
+				reverse = &stored
+			case !errors.Is(err, model.ErrNotFound):
+				return err
+			}
+		}
 		current, err := tx.Dependency(ctx, from, to, kind)
 		if errors.Is(err, model.ErrNotFound) {
+			// The reverse spelling of an undirected edge IS this edge, so it
+			// is what gets revived or withdrawn rather than a second row.
+			if reverse != nil {
+				changed, err = core.setDependencyPresence(ctx, tx, *reverse, present)
+				return err
+			}
 			if !present {
 				return err
 			}
@@ -140,24 +163,54 @@ func (core *Core) SetDependency(ctx context.Context, from, to model.ID, kind mod
 		if err != nil {
 			return err
 		}
-		desired := model.Tombstoned
-		if present {
-			desired = model.Live
-		}
-		if current.Tombstone == desired {
-			changed = current
+		// A live reverse row IS this relation, so reviving a tombstoned
+		// forward row beside it would make a second live row for one
+		// relation. That state is sync's too: one replica removed the edge
+		// while the other added the reciprocal, and neither record knows
+		// about the other.
+		if present && current.Tombstone == model.Tombstoned && reverse != nil && reverse.Tombstone == model.Live {
+			changed = *reverse
 			return nil
 		}
-		observed := current.Revision
-		next, err := observed.Next(core.replica)
+		changed, err = core.setDependencyPresence(ctx, tx, current, present)
 		if err != nil {
 			return err
 		}
-		current.Tombstone, current.Revision = desired, next
-		changed = current
-		return tx.UpdateDependency(ctx, current, observed)
+		// A reciprocal pair only sync could have written is still one relation
+		// to every reader, so withdrawing it withdraws both halves. Adding
+		// touches the spelling asked for and leaves the other alone: the
+		// reader merges them either way.
+		if !present && reverse != nil {
+			if _, err := core.setDependencyPresence(ctx, tx, *reverse, present); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	return changed, err
+}
+
+// setDependencyPresence moves one stored edge to the wanted liveness under
+// compare-and-swap, leaving an edge already there untouched — so a repeated
+// add advances no revision.
+func (core *Core) setDependencyPresence(ctx context.Context, tx *store.Tx, current model.Dependency, present bool) (model.Dependency, error) {
+	desired := model.Tombstoned
+	if present {
+		desired = model.Live
+	}
+	if current.Tombstone == desired {
+		return current, nil
+	}
+	observed := current.Revision
+	next, err := observed.Next(core.replica)
+	if err != nil {
+		return model.Dependency{}, err
+	}
+	current.Tombstone, current.Revision = desired, next
+	if err := tx.UpdateDependency(ctx, current, observed); err != nil {
+		return model.Dependency{}, err
+	}
+	return current, nil
 }
 
 // SetIssueParent sets, moves, restores, or tombstones the sole parent record.

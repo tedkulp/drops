@@ -163,6 +163,33 @@ func (core *Core) ViewIssue(ctx context.Context, id model.ID) (IssueView, error)
 	return view, err
 }
 
+// RelatedRefs is the one relation block a reader sees for `related`: both
+// stored directions merged, the outgoing half first and each half in core's
+// own order, naming every far end ONCE.
+//
+// The merge lives here rather than at each surface because `related` being
+// undirected is a fact about the graph, not about a page or a picker, and a
+// second spelling of it is this repository's dominant defect class. The
+// deduplication is the other half of y7f6z: `(from_id, to_id, dep_type)` is
+// the primary key, so a reciprocal pair is two rows, and while
+// SetDependency now refuses to write the second one, sync can still deliver a
+// pair that two replicas each spelled from their own end. No write-side rule
+// can catch that arrival, so the reader is defensive as well.
+func RelatedRefs(view IssueView) []IssueRef {
+	refs := make([]IssueRef, 0, len(view.Dependencies)+len(view.Dependents))
+	seen := make(map[model.ID]bool, cap(refs))
+	for _, half := range [][]DependencyRef{view.Dependencies, view.Dependents} {
+		for _, dependency := range half {
+			if dependency.Type != model.DepRelated || seen[dependency.ID] {
+				continue
+			}
+			seen[dependency.ID] = true
+			refs = append(refs, dependency.IssueRef)
+		}
+	}
+	return refs
+}
+
 // issueRef reduces a related Issue to the fields a reader is shown. A tombstone
 // is a state, not an absence: the relation is still listed, and it is marked.
 func issueRef(issue model.Issue) IssueRef {

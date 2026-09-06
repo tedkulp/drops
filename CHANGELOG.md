@@ -182,6 +182,18 @@ using.
 
 ### Fixed
 
+- **A reciprocal `related` edge no longer renders and serializes twice.**
+  `related` is documented as undirected, but the two stored directions were
+  concatenated rather than merged, so an issue related from both ends listed
+  its peer twice on `show`, twice in `show --json`, and twice in the navigator's
+  `f` picker. Both ends are fixed: `dep add --type related` spelled from the
+  other end is now the same relation and writes no second row, `dep rm --type
+  related` withdraws the relation whichever direction the store holds it in —
+  both directions when a sync merged one from each machine — and the merge
+  itself, now `core.RelatedRefs` behind the page and the picker alike, names
+  each far end once. `blocks` and `discovered-from` are unchanged: their
+  reciprocal spelling is a second edge, and `A blocks B` with `B blocks A`
+  stays the cycle `dep cycles` reports.
 - **A mangled `--help` is no longer filed as a title.** `create`, `q` and
   `remember` refuse a positional argument whose first character is a dash — ASCII, any Unicode
   dash, or the minus sign — at exit 2, writing nothing. Cobra's parser knows

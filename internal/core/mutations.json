@@ -710,6 +710,62 @@
       "test": "TestReadyAndBlockedLimitTheAnswerNotTheCandidatePool",
       "old": "filter.Limit = 0",
       "new": "_ = filter.Limit"
+    },
+    {
+      "control": "an-undirected-add-finds-the-reverse-spelling",
+      "clause": "`related` is undirected, so the reverse row IS this edge: adding the reciprocal spelling is the no-op adding it twice already was, and never a second row (y7f6z)",
+      "file": "internal/core/relations.go",
+      "test": "TestAddingTheReciprocalRelatedEdgeIsTheSameEdge",
+      "old": "\t\t\tstored, err := tx.Dependency(ctx, to, from, kind)",
+      "new": "\t\t\tstored, err := tx.Dependency(ctx, from, to, kind)"
+    },
+    {
+      "control": "an-undirected-rm-withdraws-the-stored-direction",
+      "clause": "Removing an undirected edge withdraws whichever direction the store holds, so `dep rm` spelled from the other end is not a not-found refusal beside a relation that is still listed (y7f6z)",
+      "file": "internal/core/relations.go",
+      "test": "TestRemovingAnUndirectedEdgeWithdrawsWhicheverDirectionIsStored",
+      "old": "\t\t\tif reverse != nil {",
+      "new": "\t\t\tif reverse != nil && present {"
+    },
+    {
+      "control": "an-undirected-rm-withdraws-both-halves-of-a-pair",
+      "clause": "A reciprocal pair only sync could have written is still ONE relation, so removing it withdraws both halves rather than leaving a duplicate half nobody can name (y7f6z)",
+      "file": "internal/core/relations.go",
+      "test": "TestRemovingAnUndirectedEdgeWithdrawsBothHalvesOfASyncedPair",
+      "old": "\t\tif !present && reverse != nil {",
+      "new": "\t\tif present && reverse != nil {"
+    },
+    {
+      "control": "only-an-undirected-type-merges-its-two-spellings",
+      "clause": "`blocks` and `discovered-from` are directed, so the reciprocal spelling is a second, different edge — A blocks B and B blocks A is the cycle `dep cycles` exists to find, not a duplicate to collapse (y7f6z)",
+      "file": "internal/core/relations.go",
+      "test": "TestTheReciprocalSpellingOfADirectedEdgeIsADifferentEdge",
+      "old": "\t\tif kind.Undirected() {",
+      "new": "\t\tif true {"
+    },
+    {
+      "control": "related-refs-names-each-far-end-once",
+      "clause": "A far end stored in BOTH directions is named once: sync can deliver a reciprocal pair no write-side rule could refuse, and concatenating the halves rendered and serialized it twice (y7f6z)",
+      "file": "internal/core/views.go",
+      "test": "TestRelatedRefsMergesBothDirectionsAndNamesEachFarEndOnce",
+      "old": "\t\t\tif dependency.Type != model.DepRelated || seen[dependency.ID] {",
+      "new": "\t\t\tif dependency.Type != model.DepRelated {"
+    },
+    {
+      "control": "related-refs-lists-the-outgoing-half-first",
+      "clause": "The merged `related` block lists the outgoing half first, each half in core's own order, so a page and a picker cannot disagree about where a far end sits (hxedy, moved to core by y7f6z)",
+      "file": "internal/core/views.go",
+      "test": "TestRelatedRefsMergesBothDirectionsAndNamesEachFarEndOnce",
+      "old": "\tfor _, half := range [][]DependencyRef{view.Dependencies, view.Dependents} {",
+      "new": "\tfor _, half := range [][]DependencyRef{view.Dependents, view.Dependencies} {"
+    },
+    {
+      "control": "an-undirected-add-never-leaves-two-live-rows",
+      "clause": "Adding an undirected edge whose reciprocal is already live is a no-op on THAT row: reviving the tombstone beside it would spell one relation twice, and sync can leave exactly that pair (y7f6z)",
+      "file": "internal/core/relations.go",
+      "test": "TestAddingAnUndirectedEdgeNeverRevivesASecondLiveRow",
+      "old": "\t\tif present && current.Tombstone == model.Tombstoned && reverse != nil && reverse.Tombstone == model.Live {",
+      "new": "\t\tif present && current.Tombstone == model.Live && reverse != nil && reverse.Tombstone == model.Live {"
     }
   ]
 }

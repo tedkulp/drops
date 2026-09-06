@@ -251,10 +251,10 @@
     },
     {
       "control": "related-is-one-group-merging-both-directions",
-      "clause": "`related` is undirected, so it is ONE group holding both directions rather than a pair of headings named from an end that does not exist (qy3de.6 §5)",
+      "clause": "`related` is undirected, so it is ONE group holding core's merge of both directions rather than a pair of headings named from an end that does not exist (qy3de.6 §5; the merge moved to core by y7f6z)",
       "file": "internal/tui/follow.go",
       "test": "TestTheFollowPickerNamesEveryDirectionFromTheReadersEnd",
-      "old": "\t\t{\"Related\", append(\n\t\t\trefsOfType(issue.Dependencies, model.DepRelated),\n\t\t\trefsOfType(issue.Dependents, model.DepRelated)...)},",
+      "old": "\t\t{\"Related\", core.RelatedRefs(issue)},",
       "new": "\t\t{\"Related\", refsOfType(issue.Dependencies, model.DepRelated)},"
     },
     {

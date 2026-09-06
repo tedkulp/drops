@@ -66,6 +66,61 @@ func TestDepRmRestoresReadiness(t *testing.T) {
 	}
 }
 
+// TestDepAddRelatedIsUndirectedFromEitherEnd is the store effect of the one
+// undirected type, stated as what a reader observes: `related` spelled from
+// either end is ONE relation, listed once on both pages, and `dep rm` from
+// either end withdraws it. Adding the reciprocal used to store a second row,
+// which `show` then rendered and serialized twice (y7f6z).
+func TestDepAddRelatedIsUndirectedFromEitherEnd(t *testing.T) {
+	db, cwd := newStore(t)
+	first := mustRun(t, db, cwd, "q", "--inbox", "the first issue")
+	second := mustRun(t, db, cwd, "q", "--inbox", "the second issue")
+
+	mustRun(t, db, cwd, "dep", "add", first, second, "--type", "related")
+	mustRun(t, db, cwd, "dep", "add", second, first, "--type", "related")
+
+	for _, end := range [][2]string{{first, second}, {second, first}} {
+		related := decodeRelatedIDs(t, mustRun(t, db, cwd, "show", end[0], "--json"))
+		if len(related) != 1 || related[0] != end[1] {
+			t.Fatalf("%s .related = %v, want [%s] once", end[0], related, end[1])
+		}
+		page := mustRun(t, db, cwd, "show", end[0])
+		rows := 0
+		for _, line := range strings.Split(page, "\n") {
+			if strings.Contains(line, end[1]) {
+				rows++
+			}
+		}
+		if rows != 1 {
+			t.Fatalf("%s names %s on %d lines, want the one relation row:\n%s", end[0], end[1], rows, page)
+		}
+	}
+
+	// And the relation comes off from the end that did not store it.
+	if got := mustRun(t, db, cwd, "dep", "rm", second, first, "--type", "related"); got != "removed "+second+" -> "+first+" (related)" {
+		t.Fatalf("dep rm printed %q", got)
+	}
+	if related := decodeRelatedIDs(t, mustRun(t, db, cwd, "show", first, "--json")); len(related) != 0 {
+		t.Fatalf("%s .related = %v after the relation was removed", first, related)
+	}
+}
+
+// decodeRelatedIDs reads `show --json`'s `.related` ids, which is the shape an
+// agent parses the relation out of.
+func decodeRelatedIDs(t *testing.T, out string) []string {
+	t.Helper()
+	page := decodeOne[struct {
+		Related []struct {
+			ID string `json:"id"`
+		} `json:"related"`
+	}](t, out)
+	ids := make([]string, 0, len(page.Related))
+	for _, ref := range page.Related {
+		ids = append(ids, ref.ID)
+	}
+	return ids
+}
+
 // TestDepTypeMustBeOneOfThree: an unknown type is a refusal at 2, not a stored
 // edge nothing will ever match.
 func TestDepTypeMustBeOneOfThree(t *testing.T) {

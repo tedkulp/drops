@@ -78,7 +78,7 @@ func Page(view core.IssueView) render.Page {
 	page.Children = toRefs(view.Children)
 	page.DiscoveredFrom = discoveredRefs(view.Dependencies)
 	page.Discovered = discoveredRefs(view.Dependents)
-	page.Related = relatedRefs(view.Dependencies, view.Dependents)
+	page.Related = toRefs(core.RelatedRefs(view))
 	return page
 }
 
@@ -105,23 +105,6 @@ func discoveredRefs(dependencies []core.DependencyRef) []render.Ref {
 	for _, dependency := range dependencies {
 		if dependency.Type == model.DepDiscoveredFrom {
 			refs = append(refs, toRef(dependency.IssueRef))
-		}
-	}
-	return refs
-}
-
-// relatedRefs merges both stored directions because `related` is undirected to
-// a reader. Each half keeps core's order, with outgoing edges first.
-func relatedRefs(dependencies, dependents []core.DependencyRef) []render.Ref {
-	refs := make([]render.Ref, 0, len(dependencies)+len(dependents))
-	for _, dependency := range dependencies {
-		if dependency.Type == model.DepRelated {
-			refs = append(refs, toRef(dependency.IssueRef))
-		}
-	}
-	for _, dependent := range dependents {
-		if dependent.Type == model.DepRelated {
-			refs = append(refs, toRef(dependent.IssueRef))
 		}
 	}
 	return refs

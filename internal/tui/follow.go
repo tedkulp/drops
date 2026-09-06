@@ -44,11 +44,11 @@ type relationGroup struct {
 // direction is a catalogued control rather than a comment.
 //
 // `related` is undirected, so it is ONE group merging both directions rather
-// than a pair. The two halves arrive already ordered from core and are
-// concatenated, out edges first, rather than re-sorted: core's natural id
-// order is unexported, and a second spelling of it here is precisely this
-// repository's dominant defect class. The direction fixture uses both stored
-// halves because the corpus's single live `related` edge cannot prove the merge.
+// than a pair — and the merge itself is core's, not a second spelling of it
+// here, which is precisely this repository's dominant defect class. core
+// orders each half and names each far end once, so a reciprocal pair is one
+// row and one choice (y7f6z). The direction fixture uses both stored halves
+// because the corpus's single live `related` edge cannot prove the merge.
 func relationGroups(issue core.IssueView) []relationGroup {
 	parent := []core.IssueRef{}
 	if issue.Parent != nil {
@@ -61,9 +61,7 @@ func relationGroups(issue core.IssueView) []relationGroup {
 		{"Children", issue.Children},
 		{"Discovered from", refsOfType(issue.Dependencies, model.DepDiscoveredFrom)},
 		{"Discovered", refsOfType(issue.Dependents, model.DepDiscoveredFrom)},
-		{"Related", append(
-			refsOfType(issue.Dependencies, model.DepRelated),
-			refsOfType(issue.Dependents, model.DepRelated)...)},
+		{"Related", core.RelatedRefs(issue)},
 	}
 }
 

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -173,6 +174,39 @@ func (f *fixture) dep(from, to model.ID, kind model.DependencyType) {
 	f.t.Helper()
 	if _, err := f.core.SetDependency(f.t.Context(), from, to, kind, true); err != nil {
 		f.t.Fatalf("dep %s -%s-> %s: %v", from, kind, to, err)
+	}
+}
+
+// reciprocal writes BOTH stored spellings of one `related` edge straight to
+// the store, each authored by a different replica. core refuses to write the
+// second one, so this is the only way the pair arrives: two machines each
+// related the pair from their own end and sync merged two records that share
+// no primary key (y7f6z).
+func (f *fixture) reciprocal(first, second model.ID) {
+	f.t.Helper()
+	keys := []string{"aaaaaaaaaaaaaaaaaaaaaaaaae", "bbbbbbbbbbbbbbbbbbbbbbbbbe"}
+	edges := [][2]model.ID{{first, second}, {second, first}}
+	err := f.opened.WithTx(f.t.Context(), func(ctx context.Context, tx *store.Tx) error {
+		for index, edge := range edges {
+			replica, err := model.ParseReplicaKey(keys[index])
+			if err != nil {
+				return err
+			}
+			revision, err := model.InitialRevision(replica)
+			if err != nil {
+				return err
+			}
+			if err := tx.PutDependency(ctx, model.Dependency{
+				FromID: edge[0], ToID: edge[1], Type: model.DepRelated,
+				CreatedAt: "2026-09-04T12:00:00Z", Revision: revision,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		f.t.Fatalf("write a reciprocal pair: %v", err)
 	}
 }
 

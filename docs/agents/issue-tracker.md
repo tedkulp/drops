@@ -60,6 +60,14 @@ Every scanning verb answers in one order: priority ascending, then newest first,
 then by id. Relevance never reorders a queue you are working through, so a
 `search` result and a `list` result put the same two issues in the same order.
 
+**`related` is undirected; the other two edge types are not.** `dep add
+--type related <a> <b>` and the same command with the ids the other way round
+are **one relation**, so adding the second spelling changes nothing and `dep rm
+--type related` withdraws the relation from whichever end you name it. A page
+lists the far end once either way. `blocks` and `discovered-from` mean a
+different thing at each end, so their reciprocal spelling is a second edge —
+`A blocks B` with `B blocks A` is the cycle `dep cycles` exists to find.
+
 ### A capture title never begins with a dash
 
 The capture verbs — `create`, `q` and `remember`, the three that mint a
@@ -559,7 +567,9 @@ The memory body.
 - Dependency headings are named from the issue being read. `Blocked by` and
   `Blocks` are the two ends of `blocks`. For `A discovered-from B`, A names B
   under `Discovered from` and B names A under `Discovered`. `Related` is
-  undirected and merges edges stored in either direction.
+  undirected: it merges the edges stored in either direction into one block,
+  outgoing first, naming each far end **once** even when the store holds both
+  directions of it.
 - `Children` carries its own count, `Children  N, M open`, where a tombstoned
   child is not open whatever its status says.
 - A relation title too long for the line **wraps under the id column**. A page
