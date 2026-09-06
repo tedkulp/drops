@@ -298,3 +298,59 @@ func TestATombstoneOutranksASupersession(t *testing.T) {
 		t.Fatalf("memory show says %q", page)
 	}
 }
+
+// TestMemoryEditWithNoFieldFlagIsRefused pins the other half of "only the flags
+// you pass are changed": an invocation that names no field at all is a misuse,
+// not a write. It used to report "updated <id>" and exit 0 — and worse than
+// update did, because EditMemory runs its transaction regardless, so the empty
+// edit bumped updated_at and the revision generation on a memory nobody
+// changed: a no-op that syncs (3uzzr).
+func TestMemoryEditWithNoFieldFlagIsRefused(t *testing.T) {
+	db, cwd := newStore(t)
+	mustRun(t, db, cwd, "project", "add", "--slug", "beacon")
+	id := mustRun(t, db, cwd, "remember", "a note nobody edits")
+	before := mustRun(t, db, cwd, "memory", "show", id, "--json")
+
+	for _, args := range [][]string{
+		{"memory", "edit", id},
+		{"memory", "edit", id, "--json"},
+		{"memory", "edit", "mem-zzzzz"},
+		// Both project-move flags are read by value, as the command
+		// reads them when it builds the edit. A flag that moves nothing
+		// is not a field, so passing one is still an empty edit.
+		{"memory", "edit", id, "--global=false"},
+		{"memory", "edit", id, "-P", ""},
+	} {
+		out, _, err := RunForTest(args, db, cwd)
+		if code := ExitCodeFor(err); code != 2 {
+			t.Fatalf("%v exit = %d, want 2 (called it wrong)", args, code)
+		}
+		if !strings.Contains(err.Error(), "no field to edit") {
+			t.Fatalf("%v error = %v, want it to say no field was given", args, err)
+		}
+		if out != "" {
+			t.Fatalf("%v stdout = %q, want nothing: a refused edit reports no write", args, out)
+		}
+	}
+	// The refusal comes before the transaction, so the memory is untouched
+	// down to its revision: an empty edit is not a write that syncs.
+	if after := mustRun(t, db, cwd, "memory", "show", id, "--json"); after != before {
+		t.Fatalf("refused edit changed the memory:\n before %s\n after  %s", before, after)
+	}
+
+	// Every one of the five flags is a field — the project move included,
+	// since it is an edit in MemoryEdit terms. A guard that recognised only
+	// some of them would turn a working invocation into a refusal.
+	for _, flag := range [][]string{
+		{"--title", "renamed"},
+		{"--body", "a new body"},
+		{"--source", "wayfinder"},
+		{"--global"},
+		{"-P", "beacon"},
+	} {
+		args := append([]string{"memory", "edit", id}, flag...)
+		if got := mustRun(t, db, cwd, args...); got != "updated "+id {
+			t.Fatalf("%v output = %q, want the edit reported", args, got)
+		}
+	}
+}

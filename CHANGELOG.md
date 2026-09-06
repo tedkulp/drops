@@ -182,6 +182,19 @@ using.
 
 ### Fixed
 
+- **`drops memory edit <id>` with no field flag is refused rather than reported
+  as a write.** The residual half of the same defect: it printed `updated <id>`
+  and exited 0, and because `EditMemory` runs its transaction whether or not the
+  edit carries anything, the empty edit bumped `updated_at` and the revision
+  generation on a memory nobody changed — a no-op that syncs. Its help already
+  promised "only the flags you pass are changed", the contract `update` now
+  guards, so the two verbs disagreed about what an empty invocation means. It is
+  now a misuse — exit 2, naming that no field was given — refused before the
+  lookup and before the transaction, so the code is 2 whether or not the id
+  exists. `-P <slug>` and `--global` count as fields, being an edit in
+  `MemoryEdit` terms, but are read by value the way the edit itself reads them:
+  `--global=false` and `-P ""` move nothing, so they are empty rather than
+  writes.
 - **`drops update <id>` with no field flag is refused rather than reported as a
   write.** It printed `updated <id>` and exited 0 having written nothing, and
   did so for an id that does not exist as readily as for one that does: the id

@@ -478,6 +478,17 @@ drops forget <id>
   both retired and removed reports the removal: `⊘ … · tombstoned`, never the
   supersession under it.
 
+**`memory edit` changes only the flags you pass, and refuses to be passed
+none.** `memory edit <id>` with no field flag is a misuse: exit 2 naming that no
+field was given, printing nothing. It used to print `updated <id>` and exit 0 —
+and worse than `update` did, because the edit ran its transaction regardless, so
+an empty edit bumped `updated_at` and the revision generation on a memory nobody
+changed: a no-op that syncs (3uzzr). The refusal comes before the lookup, so an
+empty edit is 2 whether or not the id exists. The project move counts as a
+field, so `-P <slug>` or `--global` alone is a real edit — but both are read by
+value, the way the edit itself reads them, so `--global=false` and `-P ""` move
+nothing and are empty.
+
 **A supersession chain lives in one project**, enforced by the schema. So
 `memory edit -P`/`--global` on any link of a chain is refused at exit 2, naming
 the other link; correct the text in place, or remember a fresh memory in the

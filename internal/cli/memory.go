@@ -173,12 +173,29 @@ func newMemoryEditCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "edit <id>",
 		Short: "Edit a memory's title, body, project, or provenance",
-		Long:  "Edit a memory's notebook content; only the flags you pass are changed.",
-		Args:  exactArgs(1),
+		Long: "Edit a memory's notebook content. Only the flags you pass are\n" +
+			"changed: an unpassed flag is not an instruction to write its zero\n" +
+			"value.\n\n" +
+			"At least one field flag is required. An edit naming no field is\n" +
+			"refused rather than reported as a write that never happened.",
+		Args: exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := app.ensureReplica(); err != nil {
 				return err
 			}
+			// An edit that names no field is a misuse, refused before
+			// anything is read. EditMemory writes whether or not the edit
+			// carries anything, so an empty one used to report "updated <id>"
+			// while bumping updated_at and the revision generation on a memory
+			// nobody changed: a no-op that syncs (3uzzr). The project move
+			// counts as a field, and both its flags are read by value, exactly
+			// as the switch below reads them — a flag that moves nothing moves
+			// nothing here either, so --global=false and -P "" are empty.
+			if !anyChanged(cmd, "title", "body", "source") && !global && app.projectFlag == "" {
+				return invalidArgs("no field to edit; pass at least one of " +
+					"--title, --body, --source, --global or -P")
+			}
+
 			f := cmd.Flags()
 			var edit core.MemoryEdit
 			if f.Changed("title") {

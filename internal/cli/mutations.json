@@ -474,6 +474,38 @@
       "new": "\t\t\tcase app.projectFlag != \"\":"
     },
     {
+      "control": "an-empty-memory-edit-is-refused",
+      "clause": "A memory edit naming no field is refused at exit 2 rather than reported as a write, before the lookup and before the transaction, so it cannot bump updated_at and the revision on a memory nobody changed (3uzzr)",
+      "file": "internal/cli/memory.go",
+      "test": "TestMemoryEditWithNoFieldFlagIsRefused",
+      "old": "\t\t\tif !anyChanged(cmd, \"title\", \"body\", \"source\") && !global && app.projectFlag == \"\" {",
+      "new": "\t\t\tif false {"
+    },
+    {
+      "control": "every-memory-edit-content-flag-counts-as-a-field",
+      "clause": "Each of --title, --body and --source alone is a real memory edit, so the emptiness guard scans all three and not just the first (3uzzr)",
+      "file": "internal/cli/memory.go",
+      "test": "TestMemoryEditWithNoFieldFlagIsRefused",
+      "old": "\t\t\tif !anyChanged(cmd, \"title\", \"body\", \"source\") && !global && app.projectFlag == \"\" {",
+      "new": "\t\t\tif !anyChanged(cmd, \"title\") && !global && app.projectFlag == \"\" {"
+    },
+    {
+      "control": "a-memory-project-move-counts-as-a-field",
+      "clause": "The project move is an edit in MemoryEdit terms, so a memory edit carrying only --global or only -P passes the emptiness guard (3uzzr)",
+      "file": "internal/cli/memory.go",
+      "test": "TestMemoryEditWithNoFieldFlagIsRefused",
+      "old": "\t\t\tif !anyChanged(cmd, \"title\", \"body\", \"source\") && !global && app.projectFlag == \"\" {",
+      "new": "\t\t\tif !anyChanged(cmd, \"title\", \"body\", \"source\") && true {"
+    },
+    {
+      "control": "a-project-flag-that-moves-nothing-is-not-a-field",
+      "clause": "The guard reads both project-move flags by value, as the switch that builds the edit reads them, so --global=false and -P \"\" are empty edits and not writes (3uzzr)",
+      "file": "internal/cli/memory.go",
+      "test": "TestMemoryEditWithNoFieldFlagIsRefused",
+      "old": "\t\t\tif !anyChanged(cmd, \"title\", \"body\", \"source\") && !global && app.projectFlag == \"\" {",
+      "new": "\t\t\tif !anyChanged(cmd, \"title\", \"body\", \"source\", \"global\", \"project\") {"
+    },
+    {
       "control": "move-requires-an-explicit-destination",
       "clause": "The destination is --to, never -P, so a move without --to is refused rather than moving nothing (dw32p.31)",
       "file": "internal/cli/move.go",
