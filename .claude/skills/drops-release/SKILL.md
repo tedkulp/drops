@@ -57,7 +57,7 @@ Semver against the last tag:
 - **Minor** (`0.1.x → 0.2.0`) — new verbs or flags, backwards-compatible.
 - **Major** (`0.x.x → 1.0.0`) — a break in the CLI contract.
 
-drops is pre-1.0, and `docs/agents/issue-tracker.md` is what agents drive it by,
+drops is pre-1.0, and `docs/cli-contract.md` is what agents drive it by,
 so treat a changed verb shape as at least a minor.
 
 ## Step 4 — Move the changelog's Unreleased entries

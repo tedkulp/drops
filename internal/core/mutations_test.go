@@ -25,7 +25,7 @@ func twoProjects(t *testing.T, rules *core.Core) (model.Project, model.Project) 
 
 // The clause: `drops move` refiles every named Issue in ONE transaction, so a
 // list whose second entry is unmovable moves none of them. This is the crossing
-// report docs/agents/issue-tracker.md documents; a per-Issue commit would leave
+// report docs/cli-contract.md documents; a per-Issue commit would leave
 // a subtree half-refiled with no way to name what happened.
 func TestMoveIssuesCommitsAllOrNothing(t *testing.T) {
 	rules, _ := openCoreWithIDs(t, "movable")
@@ -111,7 +111,7 @@ func TestMoveIssuesRefusesAnArchivedDestination(t *testing.T) {
 
 // The clause: a Comment does NOT stamp its Issue's updated_at.
 //
-// docs/agents/issue-tracker.md states this outright, because a parser that
+// docs/cli-contract.md states this outright, because a parser that
 // polls updated_at to find changed Issues would otherwise be told wrong. It is
 // deliberate: a Comment is its own replicated record with its own identity, so
 // the Issue has not changed when one arrives.

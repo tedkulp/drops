@@ -8,7 +8,7 @@ directory.
 
 - **Issue tracker:** [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
   Issues live in drops itself. Its **Wayfinding operations** section defines how to
-  work the map.
+  work the map. The CLI itself is [docs/cli-contract.md](docs/cli-contract.md).
 - `codebase-design` for package shape and seams, `tdd` for build tickets, `grilling`
   plus `domain-modeling` for decision tickets.
 
@@ -160,7 +160,7 @@ bytes. Deriving both sides from the same description tests the description.
 
 ### The CLI is a contract
 
-`docs/agents/issue-tracker.md` is what agents read to drive drops. A verb that
+`docs/cli-contract.md` is what agents read to drive drops. A verb that
 changes shape without that file changing is a defect.
 
 Every command in the tree carries at least one boundary test through

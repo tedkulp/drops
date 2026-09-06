@@ -182,7 +182,7 @@ func writeRefs(out io.Writer, heading string, refs []Ref, width int) {
 
 // Thread writes a comment thread on its own, for a verb that shows the thread
 // without the issue around it. It is the SAME writer Page uses, exported
-// rather than re-spelled at the caller: docs/agents/issue-tracker.md promises
+// rather than re-spelled at the caller: docs/cli-contract.md promises
 // `comment list` renders "in the same rendering `show` uses", and a second
 // spelling of it is a promise that holds only until someone edits one of them.
 //

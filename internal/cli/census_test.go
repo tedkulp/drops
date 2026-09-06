@@ -14,7 +14,7 @@ import (
 )
 
 // testedVerbs is the registry the census enforces: every command in the cobra
-// tree, against the test that asserts what docs/agents/issue-tracker.md says a
+// tree, against the test that asserts what docs/cli-contract.md says a
 // reader observes from it.
 //
 // It is a visible list on purpose. The failure this guards against is not a

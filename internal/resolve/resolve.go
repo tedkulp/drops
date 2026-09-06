@@ -48,7 +48,7 @@ const (
 
 // String names the rung for a report. The names are the ladder's own, so a
 // reader who has `config show`'s answer in front of them can find the rule it
-// came from in docs/agents/issue-tracker.md without a translation table.
+// came from in docs/cli-contract.md without a translation table.
 //
 // RuleNone is the empty string rather than a name, because a rung that did not
 // answer is a fact the caller reports by omitting the field.

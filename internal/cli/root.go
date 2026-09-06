@@ -1,7 +1,7 @@
 // Package cli is the Cobra presentation over resolve, core, sync, and render.
 // It contains no SQL and no business rules: every verb adapts one or more of
 // those packages' calls into the agent-facing contract documented in
-// docs/agents/issue-tracker.md.
+// docs/cli-contract.md.
 package cli
 
 import (

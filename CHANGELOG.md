@@ -11,6 +11,14 @@ using.
 
 ## [Unreleased]
 
+### Changed
+
+- **The CLI contract moved to [docs/cli-contract.md](docs/cli-contract.md)**,
+  out of `docs/agents/issue-tracker.md`. That one file had been answering two
+  questions — how every verb behaves, and where this repo's issues live — which
+  only held together while drops was its own tracker. The contract is unchanged;
+  `docs/agents/issue-tracker.md` keeps the tracker configuration alone.
+
 ## 0.2.0 — 2026-09-06
 
 ### Added

@@ -77,7 +77,7 @@ drops close k3f9x --reason "fixed in the debounce"
 drops tui                              # browse it, for a human at a terminal
 ```
 
-**[docs/agents/issue-tracker.md](docs/agents/issue-tracker.md) is the
+**[docs/cli-contract.md](docs/cli-contract.md) is the
 contract**: every verb, how a project is resolved from a directory, what ids
 mean and why nothing parses one, and how a long body gets in. It is what agents
 read to drive drops, and a verb that changes shape without that file changing is
