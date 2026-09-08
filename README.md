@@ -83,6 +83,14 @@ mean and why nothing parses one, and how a long body gets in. It is what agents
 read to drive drops, and a verb that changes shape without that file changing is
 treated as a defect.
 
+## Driving it from the Matt Pocock skills
+
+[docs/matt-pocock-skills/](docs/matt-pocock-skills/) holds a ready-made tracker
+config for the [`mattpocock/skills`](https://github.com/mattpocock/skills)
+engineering suite: copy one markdown file into a repository and `/to-spec`,
+`/to-tickets`, `/triage`, `/code-review` and `/wayfinder` keep their issues in
+drops. Its [README](docs/matt-pocock-skills/README.md) is the install.
+
 ## Syncing two machines
 
 `drops sync` makes `~/.drops` a Git repository itself and commits one file to
@@ -110,8 +118,10 @@ Read **[AGENTS.md](AGENTS.md)** first: the gate, the test discipline every
 ticket is held to, and the tools in this environment that report success while
 failing. [CONTEXT.md](CONTEXT.md) is the glossary. `just --list` is the rest.
 
-Issues for this repository live in drops itself, not in a GitHub or GitLab
-issue tracker.
+Issues for this repository live in [GitHub
+Issues](https://github.com/tedkulp/drops/issues), not in the drops store this
+repository builds; `docs/agents/issue-tracker.md` is the contract for working
+them.
 
 CI runs the same gate on every push and pull request — `.github/workflows/ci.yml`
 calls `just test-all` rather than respelling it — and checks that
