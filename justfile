@@ -152,6 +152,11 @@ lint:
 test-all: lint test
     @echo "all suites green"
 
+# PROTOTYPE (#2, branch prototype/board-look only): the board look over a scratch store.
+board-prototype *ARGS:
+    @go build -o .scratch/bin/board-prototype ./cmd/board-prototype
+    @.scratch/bin/board-prototype "$@"
+
 # Prove the tests can fail. AGENTS.md holds every requirement clause to a
 # control that has been mutated with its test observed red; this is those four
 # steps as one command, over the controls catalogued in each package's
