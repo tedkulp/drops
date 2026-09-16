@@ -1,0 +1,153 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M2MYWMFBBSG9Z5NJXYBN84YS",
+  "session_id": "05ea63f3-23ee-46e3-b0fc-eb24737359f7",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-16T11:16:03.645098Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "CONTEXT.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5",
+  "turn_id": "9d089eb58738",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 228,
+    "cache_creation_tokens": 33389,
+    "cache_read_tokens": 325559,
+    "output_tokens": 10129,
+    "api_call_count": 9
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-wayfinder-2026-09-15T17:04:37.588746Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "wayfinder"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "c2295f043464",
+      "timestamp": "2026-09-15T17:04:37.588746Z",
+      "native": {
+        "command": "/wayfinder"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/wayfinder",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_012sHAxZ2twP1HYpbmHtNprP",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "mattpocock-skills:grilling"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "9d089eb58738",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 66,
+        "end": 67,
+        "entry_ids": [
+          "0058e7cb-fce4-47dd-bb25-ce9c4cf35251"
+        ],
+        "tool_use_id": "toolu_012sHAxZ2twP1HYpbmHtNprP"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_012sHAxZ2twP1HYpbmHtNprP"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: mattpocock-skills:grilling",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01Q7UXuoHTnSBYkia3rj1FBE",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "mattpocock-skills:domain-modeling"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "9d089eb58738",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 70,
+        "end": 71,
+        "entry_ids": [
+          "83b27216-1076-4742-890f-229b5c918b9f"
+        ],
+        "tool_use_id": "toolu_01Q7UXuoHTnSBYkia3rj1FBE"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Q7UXuoHTnSBYkia3rj1FBE"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: mattpocock-skills:domain-modeling",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-16T11:16:03.626982Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 1759,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1759,
+    "total_lines_changed": 1827,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 451,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 90,
+        ".codex/hooks.json": 88,
+        ".opencode/plugins/entire.ts": 269,
+        "CONTEXT.md": 4
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 447,
+      "user_lines_removed": 0,
+      "agent_lines_added": 4,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 90,
+        ".codex/hooks.json": 88,
+        ".opencode/plugins/entire.ts": 269
+      }
+    }
+  ]
+}
