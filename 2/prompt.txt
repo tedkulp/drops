@@ -1,0 +1,83 @@
+/mattpocock-skills:implement 14
+
+---
+
+<task-notification>
+<task-id>a74c1c1d5cc97e588</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-tedkulp-src-drops/c281d772-e45a-456a-b712-852c6783c937/tasks/a74c1c1d5cc97e588.output</output-file>
+<status>completed</status>
+<summary>Agent "Standards review of board diff" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I found one breach of a documented standard: requirement clauses the new tests cover that have no control in `mutations.json`. The rest are judgement-call smells. The changelog, contract, clock seam and scoping of the core controls all follow the repo's rules.
+
+## Documented-standard violations
+
+**Missing controls (hard).** AGENTS.md, "Which controls get mutated", asks for one control per requirement clause, split by load-bearing branch ("comparisons … guards"). It also says: "A control that is not in a `mutations.json` was proved once and can never be proved again. Catalogue it." None of these clauses has an entry in `internal/tui/mutations.json`:
+- **Age buckets** (`board.go` `age`): `docs/cli-contract.md` promises exact cut-offs, `m` under an hour, `h` under two days, `d` under sixty days, `mo` under a year, then `y`. None of those comparisons has a control. `TestACardIsThreeLinesByteForByte` only hits `3h`, `5d` and `20m`, so the `mo` and `y` branches and the 48h edge are untested.
+- **Age fallback** (`since`): no control on `if moment == nil { return card.created }`.
+- **`B` reads nothing** (`toggleBoard`): the `target == m.detailID` → `display` guard has no control, though `TestBReadsNothing…` exists.
+- **Tab clears the follow trail** (`switchColumn`): no control on `m.clearFollow()`.
+- **Board width** (`measureBoard`): no control on `max(width*2/5, 38)`, the 40% and 38-column rule in the contract.
+- **Footer count** (`boardLoaded`): no control on the rule that skips closed issues already counted in `m.all`.
+
+**Comment style (minor).** In `internal/core/reads.go`, `ClosedIssues` has a blank line and a doc comment before it and none after, so it runs straight into `SearchIssues`. Every sibling there is an undocumented one-liner with no gaps.
+
+## Baseline smells (all judgement calls)
+
+- **Duplicated Code:** the rule that skips closed issues in `m.all` appears twice (`boardCards`: `if card.status == model.StatusClosed { continue }`, and `boardLoaded`). If one changes, the footer count and the board drift apart. `firstColumn(m.first, int(m.focus), shownColumns(...))` is worked out three times (`pageBoard`, `boardBody`, `boardTitle`).
+- **Repeated Switches / Divergent Change:** `tui.go` now branches on `if m.board` in `geo`, `halfPage`, `resize`, `current`, `place`, `compose` and `footer`. `compose` also has the awkward pair `if m.board &amp;&amp; !m.zoomed {…}` / `if !m.board &amp;&amp; !m.zoomed {…}`.
+- **Mysterious Name:**
+  - `card` is both a function (`card(candidate row, …)`) and a common `row` parameter name (`columnOf(card row)`, `since(card row, …)`).
+  - The Model field `first int` gives no hint that it is the leftmost column on screen.
+  - `display` versus `showDetail` doesn't say which one reads the store.
+  - `w` in `boardBody` is cryptic.
+- **Primitive Obsession:**
+  - `first` is an `int` while `focus` is a `column`, which forces `int(m.focus)` casts.
+  - `selected := -1` stands for "this column isn't focused" in `columnBody`.
+  - `step := 1` / `-1` stands for the tab direction.
+- **Duplicated readiness rule:** `columnOf`'s `card.blockedBy &gt; 0` restates `ready()`'s `blockedBy == 0` from `rows.go`.
+- **Middle Man:** `core.ClosedIssues` only passes the call to the store. The neighbouring core reads (`Issues`, `Issue`) do the same, though, so the repo's own convention wins here.
+- **Seam inconsistency (minor):** `tui.New` takes the clock as `now func() time.Time`, while `core.New` takes a `Clock` interface. Both follow the seams rule; they just have different shapes.</result>
+<usage><subagent_tokens>61429</subagent_tokens><tool_uses>6</tool_uses><duration_ms>50566</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a5d1a23d759e3b5bb</task-id>
+<tool-use-id>toolu_014PNuTUSi58WCyHX44BKRTB</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-tedkulp-src-drops/c281d772-e45a-456a-b712-852c6783c937/tasks/a5d1a23d759e3b5bb.output</output-file>
+<status>completed</status>
+<summary>Agent "Spec review of board diff" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>The diff covers nearly all of #14. The one real departure is that `B` can read from the store in one case. I found no missing acceptance criterion, and the catalogued controls line up with the clauses.
+
+**(a) Missing or partial**
+
+1. **`B` does not always read nothing.** Spec: "`B` switches views, reads nothing, and carries over the cursor id…" When you go back to the list from a closed card with `C` off, the cursor moves to a different row. `toggleBoard` then calls `m.showDetail(target)`, which reads the page. `docs/cli-contract.md` admits this ("a different issue is a page read like any other"), so it is deliberate, but the spec states no exception. `TestBReadsNothingAndCarries…` closes the store, but it only toggles on an issue both views show, so this path is never tested.
+2. **No control for "reads nothing".** #7 lists "`B` reads nothing and carries the cursor id over" as a control. The catalogue only has `b-focuses-the-cursors-column`. #14's criterion asks only for a model-state test, which exists and would catch the mutant, so this is minor.
+
+**(b) Not asked for (scope creep, all small)**
+
+1. **Closed cards are dimmed** (`columnBody`, and the contract says "closed cards are dimmed"). #14's card spec has no such rule; #7 only mentions it as something the prototype does.
+2. **The footer changes on the board.** It adds a `board` part and counts cards instead of list rows (`boardCount`/`boardLoaded`). Nothing in #14 asks for this.
+3. **Missing timestamps fall back to created.** `since()` uses `created_at` when `started_at` or `closed_at` is missing. This is not specified, though it is harmless.
+4. **The list view now does the Closed read on every refresh too.** This follows from "`B` reads nothing" and the rough-edges line says so ("in both views"), but it is a cost the list did not have before.
+
+**(c) Implemented, but worth checking**
+
+1. **Zooming moves the board's scroll position.** `resize()` calls `pageBoard()` while zoomed, and `geo()` then gives a zero width, so `shownColumns` is 1 and `m.first` shifts. It snaps back when drawn at full width, so nothing visible breaks today. It is a latent problem for the paging rule ("The focused column scrolls into view from either side").
+2. **The follow trail can outlive its base on the way back.** Spec: "It carries the cursor's issue id, … and the follow trail." If there is a trail and going back to the list moves the cursor, `toggleBoard` keeps the trail while the cursor now sits on another issue. `applyFilter` would clear the trail in that case.
+
+**Checked and in line with the spec**
+- **Core:** `ClosedIssues` uses `closed_at DESC, id`, has no limit, is scoped (all projects under `a`), and leaves out tombstoned issues. All five controls would plausibly go red.
+- **Columns:** the four derivation branches each have a control, and the in-progress-over-blocked order is tested with a blocked in-progress issue.
+- **Closed order:** the no-re-sort control is tested with `C` on.
+- **Card:** the clock is passed into the constructor. The card and heading are tested byte-exact. The age source has controls for In progress and Closed; Ready and Blocked are covered by the test but have no control of their own.
+- **Headings and paging:** `▸` has both controls. Paging matches the prototype geometry (1, 2 and 4 columns at 80, 120 and 200), with controls for column count and both scroll directions.
+- **`tab`:** it lands on the same row on screen and wraps, with controls for both.
+- **Frames and docs:** board frame modes run at 80, 120 and 200. The contract subsection, the key-table and `?` rows, the rough-edges line, the changelog entry and the CONTEXT.md entry are all in.
+- **Other rules:** `Esc` does not leave the board, `b` still pages, and `drops tui` still opens in the list.</result>
+<usage><subagent_tokens>71371</subagent_tokens><tool_uses>9</tool_uses><duration_ms>76355</duration_ms></usage>
+</task-notification>

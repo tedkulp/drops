@@ -3,9 +3,27 @@
   "checkpoint_id": "01M2MYWMFBBSG9Z5NJXYBN84YS",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 4,
+  "checkpoints_count": 7,
   "files_touched": [
-    "CONTEXT.md"
+    "CHANGELOG.md",
+    "CONTEXT.md",
+    "docs/cli-contract.md",
+    "internal/cli/tui.go",
+    "internal/core/closed_test.go",
+    "internal/core/mutations.json",
+    "internal/core/reads.go",
+    "internal/store/issues.go",
+    "internal/store/search.go",
+    "internal/tui/board.go",
+    "internal/tui/board_test.go",
+    "internal/tui/doc.go",
+    "internal/tui/fixture_test.go",
+    "internal/tui/frame_test.go",
+    "internal/tui/layout.go",
+    "internal/tui/mutations.json",
+    "internal/tui/rows.go",
+    "internal/tui/source.go",
+    "internal/tui/tui.go"
   ],
   "sessions": [
     {
@@ -21,13 +39,27 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 618,
-    "cache_creation_tokens": 95341,
-    "cache_read_tokens": 1158006,
-    "output_tokens": 26030,
-    "api_call_count": 24
+    "input_tokens": 758,
+    "cache_creation_tokens": 338569,
+    "cache_read_tokens": 11888466,
+    "output_tokens": 114791,
+    "api_call_count": 91,
+    "subagent_tokens": {
+      "input_tokens": 26,
+      "cache_creation_tokens": 123578,
+      "cache_read_tokens": 403906,
+      "output_tokens": 10358,
+      "api_call_count": 13
+    }
   }
 }

@@ -1,0 +1,207 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M2MYWMFBBSG9Z5NJXYBN84YS",
+  "session_id": "c281d772-e45a-456a-b712-852c6783c937",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-16T11:16:05.150831Z",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "save_step_count": 3,
+  "files_touched": [
+    "CHANGELOG.md",
+    "CONTEXT.md",
+    "docs/cli-contract.md",
+    "internal/cli/tui.go",
+    "internal/core/closed_test.go",
+    "internal/core/mutations.json",
+    "internal/core/reads.go",
+    "internal/store/issues.go",
+    "internal/store/search.go",
+    "internal/tui/board.go",
+    "internal/tui/board_test.go",
+    "internal/tui/doc.go",
+    "internal/tui/fixture_test.go",
+    "internal/tui/frame_test.go",
+    "internal/tui/layout.go",
+    "internal/tui/mutations.json",
+    "internal/tui/rows.go",
+    "internal/tui/source.go",
+    "internal/tui/tui.go"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5",
+  "turn_id": "2be1d83516d5",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 140,
+    "cache_creation_tokens": 243228,
+    "cache_read_tokens": 10730460,
+    "output_tokens": 88761,
+    "api_call_count": 67,
+    "subagent_tokens": {
+      "input_tokens": 26,
+      "cache_creation_tokens": 123578,
+      "cache_read_tokens": 403906,
+      "output_tokens": 10358,
+      "api_call_count": 13
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-mattpocock-skills:implement-2026-09-16T10:54:14.66169Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "mattpocock-skills:implement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "36bc33a2afc8",
+      "timestamp": "2026-09-16T10:54:14.66169Z",
+      "native": {
+        "command": "/mattpocock-skills:implement"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/mattpocock-skills:implement",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_019csXRBHdSsRfqUTEbKgenA",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "mattpocock-skills:tdd"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "2be1d83516d5",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 146,
+        "end": 147,
+        "entry_ids": [
+          "7901d280-b0b1-4471-9306-0222e976eca9"
+        ],
+        "tool_use_id": "toolu_019csXRBHdSsRfqUTEbKgenA"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_019csXRBHdSsRfqUTEbKgenA"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: mattpocock-skills:tdd",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01QDHouKgZHLE4Y6h8SqqV3Y",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "mattpocock-skills:code-review"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "2be1d83516d5",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 297,
+        "end": 298,
+        "entry_ids": [
+          "cd2faddd-4e28-4a5e-b4ab-0bb942ceba2b"
+        ],
+        "tool_use_id": "toolu_01QDHouKgZHLE4Y6h8SqqV3Y"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01QDHouKgZHLE4Y6h8SqqV3Y"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: mattpocock-skills:code-review",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-16T11:16:05.053275Z",
+    "agent_lines": 1489,
+    "agent_removed": 20,
+    "human_added": 186,
+    "human_modified": 87,
+    "human_removed": 0,
+    "total_committed": 1724,
+    "total_lines_changed": 1782,
+    "agent_percentage": 84.68013468013467,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 451,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 90,
+        ".codex/hooks.json": 88,
+        ".opencode/plugins/entire.ts": 269,
+        "CONTEXT.md": 4
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 447,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1595,
+      "agent_lines_removed": 58,
+      "user_added_per_file": {
+        ".claude/settings.json": 90,
+        ".codex/hooks.json": 88,
+        ".opencode/plugins/entire.ts": 269
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 447,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1595,
+      "agent_lines_removed": 58,
+      "user_added_per_file": {
+        ".claude/settings.json": 90,
+        ".codex/hooks.json": 88,
+        ".opencode/plugins/entire.ts": 269
+      }
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 578,
+      "user_lines_removed": 38,
+      "agent_lines_added": 1673,
+      "agent_lines_removed": 58,
+      "user_added_per_file": {
+        ".claude/settings.json": 90,
+        ".codex/hooks.json": 88,
+        ".opencode/plugins/entire.ts": 269,
+        "internal/tui/board.go": 46,
+        "internal/tui/board_test.go": 85
+      },
+      "user_removed_per_file": {
+        "internal/tui/board.go": 38
+      }
+    }
+  ]
+}
