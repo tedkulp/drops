@@ -1,0 +1,122 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M2N101XY5SDWDBJ1E3XMNTPK",
+  "session_id": "c58fec73-0608-46f2-88dd-f3634b3b3ee0",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-16T11:52:53.713269Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CHANGELOG.md",
+    "docs/cli-contract.md",
+    "internal/tui/board.go",
+    "internal/tui/board_test.go",
+    "internal/tui/frame_test.go",
+    "internal/tui/mutations.json"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5",
+  "turn_id": "d005ec3a262c",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 72,
+    "cache_creation_tokens": 118236,
+    "cache_read_tokens": 3094916,
+    "output_tokens": 26558,
+    "api_call_count": 36
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-mattpocock-skills:implement-2026-09-16T11:42:27.313136Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "mattpocock-skills:implement"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "04b3eb88fb73",
+      "timestamp": "2026-09-16T11:42:27.313136Z",
+      "native": {
+        "command": "/mattpocock-skills:implement"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/mattpocock-skills:implement",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_018jyQiYf8wskaoAgpSwNGJz",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "mattpocock-skills:code-review"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "d005ec3a262c",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 206,
+        "end": 207,
+        "entry_ids": [
+          "3b3f0766-4ea3-4ae4-9624-b840ad77b25c"
+        ],
+        "tool_use_id": "toolu_018jyQiYf8wskaoAgpSwNGJz"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_018jyQiYf8wskaoAgpSwNGJz"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: mattpocock-skills:code-review",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "initial_attribution": {
+    "calculated_at": "2026-09-16T11:52:53.663714Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 209,
+    "human_modified": 18,
+    "human_removed": 0,
+    "total_committed": 209,
+    "total_lines_changed": 227,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 673,
+      "user_lines_removed": 9,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 90,
+        ".codex/hooks.json": 88,
+        ".opencode/plugins/entire.ts": 269,
+        "CHANGELOG.md": 5,
+        "docs/cli-contract.md": 6,
+        "internal/tui/board.go": 25,
+        "internal/tui/board_test.go": 99,
+        "internal/tui/frame_test.go": 34,
+        "internal/tui/mutations.json": 57
+      },
+      "user_removed_per_file": {
+        "internal/tui/board.go": 5,
+        "internal/tui/board_test.go": 2,
+        "internal/tui/frame_test.go": 1,
+        "internal/tui/mutations.json": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "tool_use_id": "toolu_01K3k1X165t5bUE21GGXZWCy",
+  "agent_id": "aa7897be17fad5b2a",
+  "subagent_type": "general-purpose",
+  "task_description": "Standards review of board diff",
+  "files": [
+    "CHANGELOG.md",
+    "docs/cli-contract.md",
+    "internal/tui/board.go",
+    "internal/tui/board_test.go",
+    "internal/tui/frame_test.go",
+    "internal/tui/mutations.json"
+  ],
+  "started_at": "2026-09-16T07:49:49.172407-04:00",
+  "completed_at": "2026-09-16T07:49:49.172538-04:00"
+}
