@@ -1,0 +1,165 @@
+{
+  "cli_version": "0.10.6",
+  "checkpoint_id": "01M2MYWMFBBSG9Z5NJXYBN84YS",
+  "session_id": "e8edb443-f4f2-4d1c-aed6-65807c3fac2d",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-16T11:16:06.101513Z",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "save_step_count": 3,
+  "files_touched": [
+    "CONTEXT.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5",
+  "turn_id": "47c3003741da",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 232,
+    "cache_creation_tokens": 40446,
+    "cache_read_tokens": 396986,
+    "output_tokens": 9220,
+    "api_call_count": 11
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-wayfinder-2026-09-15T16:59:07.149158Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "wayfinder"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "4165a7c27025",
+      "timestamp": "2026-09-15T16:59:07.149158Z",
+      "native": {
+        "command": "/wayfinder"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/wayfinder",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01KAEmWUSi9iwZLwNjmg69ko",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "mattpocock-skills:grilling"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "47c3003741da",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 47,
+        "end": 48,
+        "entry_ids": [
+          "fca256d0-9594-4668-a8ae-34b626b529bf"
+        ],
+        "tool_use_id": "toolu_01KAEmWUSi9iwZLwNjmg69ko"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01KAEmWUSi9iwZLwNjmg69ko"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: mattpocock-skills:grilling",
+        "default_collapsed": true
+      }
+    },
+    {
+      "id": "claude-skill-toolu_01QghumzkaCb8fu6VNtKzxJ5",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "mattpocock-skills:domain-modeling"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "47c3003741da",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 48,
+        "end": 49,
+        "entry_ids": [
+          "9a8bf5ba-3c8e-445b-877f-918f022b7c10"
+        ],
+        "tool_use_id": "toolu_01QghumzkaCb8fu6VNtKzxJ5"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01QghumzkaCb8fu6VNtKzxJ5"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: mattpocock-skills:domain-modeling",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-16T11:16:06.08433Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 1759,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1759,
+    "total_lines_changed": 1827,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 451,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 90,
+        ".codex/hooks.json": 88,
+        ".opencode/plugins/entire.ts": 269,
+        "CONTEXT.md": 4
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 447,
+      "user_lines_removed": 0,
+      "agent_lines_added": 4,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 90,
+        ".codex/hooks.json": 88,
+        ".opencode/plugins/entire.ts": 269
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 447,
+      "user_lines_removed": 0,
+      "agent_lines_added": 4,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 90,
+        ".codex/hooks.json": 88,
+        ".opencode/plugins/entire.ts": 269
+      }
+    }
+  ]
+}
