@@ -23,6 +23,11 @@ using.
   orders by `closed_at DESC, id`. `B` reads nothing, and it keeps the cursor's
   issue, `/`, `a`, `r` and the follow trail. See the contract's
   [The board](docs/cli-contract.md#the-board).
+- **Long and empty board columns.** A column longer than the screen scrolls one
+  card at a time and keeps the cursor's card on screen, and while it overflows
+  its heading says which cards are showing (`Closed 300 · 39–41`). An empty
+  column keeps its heading and says `nothing closed` in Closed or `none`
+  elsewhere.
 
 ### Changed
 

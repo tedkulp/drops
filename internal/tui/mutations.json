@@ -1,5 +1,5 @@
 {
-  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14; esc's layer ordering by m3z5y. tc2x5 re-cut the redraw/retarget pair onto the two facts the pane can read — which issue is on screen, and the width it was rendered into — instead of the intent the caller passed, and split them three ways so each clause has a mutant the other two tests stay green for. g7b23 added `r`, the ready-only narrowing, and moved refresh to `R`: its controls sit on the predicate itself, on both directions of the toggle, and on each of the two paths that re-derive the visible row set — applyFilter and refresh — because a golden frame would pass whichever rows those returned. bvjgn added `y`: one control on the expression that chooses the id, because a test asserting only that some clipboard command came back passes with the cursor row's id in place of the pane's, one on the refusal an empty row set gets, and one on the LINE it reports through, because m.message would relayout both panes for a keystroke that wrote nothing and a test reading the footer alone would not notice. #14 added the board: one control per column-derivation branch, on Closed taking core's order rather than the list's, on `B` carrying the cursor's column, on `tab`'s landing row and wrap, on the column count and both scroll directions, on the age source per column, on each optional part of a card's third line, and on the heading marker both as text and as the focused column only.",
+  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14; esc's layer ordering by m3z5y. tc2x5 re-cut the redraw/retarget pair onto the two facts the pane can read — which issue is on screen, and the width it was rendered into — instead of the intent the caller passed, and split them three ways so each clause has a mutant the other two tests stay green for. g7b23 added `r`, the ready-only narrowing, and moved refresh to `R`: its controls sit on the predicate itself, on both directions of the toggle, and on each of the two paths that re-derive the visible row set — applyFilter and refresh — because a golden frame would pass whichever rows those returned. bvjgn added `y`: one control on the expression that chooses the id, because a test asserting only that some clipboard command came back passes with the cursor row's id in place of the pane's, one on the refusal an empty row set gets, and one on the LINE it reports through, because m.message would relayout both panes for a keystroke that wrote nothing and a test reading the footer alone would not notice. #14 added the board: one control per column-derivation branch, on Closed taking core's order rather than the list's, on `B` carrying the cursor's column, on `tab`'s landing row and wrap, on the column count and both scroll directions, on the age source per column, on each optional part of a card's third line, and on the heading marker both as text and as the focused column only. #8 added long and empty columns: controls on the column scrolling to the cursor's card and by one card rather than a page, on the range appearing only on overflow and counting from one, and on the empty hint — `nothing closed` in Closed alone, `none` everywhere else, and only under an empty column.",
   "controls": [
     {
       "control": "the-cursor-tracks-an-id",
@@ -840,6 +840,62 @@
       "test": "TestTheBoardLeavesTheDetailPaneFortyPercentButNeverUnder38",
       "old": "detailOuter := max(width*2/5, 38)",
       "new": "detailOuter := max(width*2/5, 0)"
+    },
+    {
+      "control": "a-long-column-scrolls-to-the-cursor",
+      "clause": "A column longer than the screen scrolls so the cursor's card stays on screen (#8)",
+      "file": "internal/tui/board.go",
+      "test": "TestALongColumnScrollsACardAtATimeKeepingTheCursorsCardOnScreen",
+      "old": "func cardTop(selected, fit int) int { return max(0, selected-fit+1) }",
+      "new": "func cardTop(selected, fit int) int { return 0 * max(0, selected-fit+1) }"
+    },
+    {
+      "control": "a-long-column-scrolls-a-card-at-a-time",
+      "clause": "A long column scrolls one card at a time, not a screenful (#8)",
+      "file": "internal/tui/board.go",
+      "test": "TestALongColumnScrollsACardAtATimeKeepingTheCursorsCardOnScreen",
+      "old": "func cardTop(selected, fit int) int { return max(0, selected-fit+1) }",
+      "new": "func cardTop(selected, fit int) int { return selected / fit * fit }"
+    },
+    {
+      "control": "the-range-appears-only-on-overflow",
+      "clause": "A heading carries the range on screen only while its column overflows; a column that exactly fits has none (#8)",
+      "file": "internal/tui/board.go",
+      "test": "TestAHeadingShowsTheRangeOnlyWhileTheColumnOverflows",
+      "old": "\tif count > fit {\n",
+      "new": "\tif count >= fit {\n"
+    },
+    {
+      "control": "the-range-counts-from-one",
+      "clause": "The heading's range is 1-based: the top card is 1, not 0 (#8)",
+      "file": "internal/tui/board.go",
+      "test": "TestAHeadingShowsTheRangeOnlyWhileTheColumnOverflows",
+      "old": "top+1, top+fit)",
+      "new": "top, top+fit-1)"
+    },
+    {
+      "control": "nothing-closed-only-in-closed",
+      "clause": "`nothing closed` is Closed's empty hint and no other column's (#8)",
+      "file": "internal/tui/board.go",
+      "test": "TestAnEmptyColumnKeepsItsHeadingAndShowsAHint",
+      "old": "\tif col == colClosed {\n\t\treturn \"nothing closed\"",
+      "new": "\tif true {\n\t\treturn \"nothing closed\""
+    },
+    {
+      "control": "an-empty-closed-says-nothing-closed",
+      "clause": "An empty Closed says `nothing closed` rather than the other columns' `none` (#8)",
+      "file": "internal/tui/board.go",
+      "test": "TestAnEmptyColumnKeepsItsHeadingAndShowsAHint",
+      "old": "\tif col == colClosed {\n\t\treturn \"nothing closed\"",
+      "new": "\tif false {\n\t\treturn \"nothing closed\""
+    },
+    {
+      "control": "the-hint-only-under-an-empty-column",
+      "clause": "The empty hint shows only under a column with no cards (#8)",
+      "file": "internal/tui/board.go",
+      "test": "TestAnEmptyColumnKeepsItsHeadingAndShowsAHint",
+      "old": "\tif len(cards) == 0 {\n\t\tlines = append(lines, dimStyle",
+      "new": "\tif true {\n\t\tlines = append(lines, dimStyle"
     }
   ]
 }

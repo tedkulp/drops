@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -514,11 +515,107 @@ func TestACardIsThreeLinesByteForByte(t *testing.T) {
 // A heading is the column's name and its count, byte for byte, with `▸ ` on
 // the focused column and two spaces on any other.
 func TestAHeadingIsTheNameAndCount(t *testing.T) {
-	if got, want := heading(colInProgress, 12, true), "▸ In progress 12"; got != want {
+	if got, want := heading(colInProgress, 12, 0, 12, true), "▸ In progress 12"; got != want {
 		t.Fatalf("focused heading = %q, want %q", got, want)
 	}
-	if got, want := heading(colClosed, 0, false), "  Closed 0"; got != want {
+	if got, want := heading(colClosed, 0, 0, 3, false), "  Closed 0"; got != want {
 		t.Fatalf("heading = %q, want %q", got, want)
+	}
+}
+
+// The clause: only while a column overflows does its heading carry the range
+// on screen, 1-based and joined with an en dash. A column that exactly fits
+// is the boundary: every card is on screen, so there is no range to report.
+func TestAHeadingShowsTheRangeOnlyWhileTheColumnOverflows(t *testing.T) {
+	for _, testcase := range []struct {
+		name            string
+		count, top, fit int
+		want            string
+	}{
+		{"scrolled deep", 300, 38, 3, "▸ Closed 300 · 39–41"},
+		{"at the top", 4, 0, 3, "▸ Closed 4 · 1–3"},
+		{"exactly fits", 3, 0, 3, "▸ Closed 3"},
+		{"room to spare", 1, 0, 3, "▸ Closed 1"},
+	} {
+		if got := heading(colClosed, testcase.count, testcase.top, testcase.fit, true); got != testcase.want {
+			t.Fatalf("%s: heading = %q, want %q", testcase.name, got, testcase.want)
+		}
+	}
+}
+
+// The clause: a column taller than the frame scrolls one card at a time as the
+// cursor walks down it, and the cursor's card is always on screen. Read off
+// the board body alone, because the detail pane also shows the cursor's title.
+func TestALongColumnScrollsACardAtATimeKeepingTheCursorsCardOnScreen(t *testing.T) {
+	titles := []string{"alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf"}
+	fixture := newFixture(t)
+	for _, title := range titles {
+		fixture.issue(title, 2)
+	}
+
+	// 12 lines is 9 pane rows: a heading and two cards.
+	pane := onBoard(t, fixture, 200, 12)
+	fit := cardsFit(pane.geo().rows)
+	if fit != 2 {
+		t.Fatalf("a column fits %d cards, want 2 for this test to scroll", fit)
+	}
+
+	for step := range titles {
+		if step > 0 {
+			press(t, pane, "j")
+		}
+		if pane.cursor.position != step {
+			t.Fatalf("after %d presses the cursor is on card %d", step, pane.cursor.position)
+		}
+		selected := pane.cards[colReady][step].title
+		geo := pane.geo()
+		body := plain(pane.boardBody(geo.listWidth, geo.rows))
+		first := max(0, step-fit+1)
+		wantHeading := fmt.Sprintf("▸ Ready %d · %d–%d", len(titles), first+1, first+fit)
+		if !strings.Contains(body, wantHeading) {
+			t.Fatalf("cursor on %s: want the heading %q:\n%s", selected, wantHeading, body)
+		}
+		for index, candidate := range pane.cards[colReady] {
+			if shown := index >= first && index < first+fit; strings.Contains(body, candidate.title) != shown {
+				t.Fatalf("cursor on %s: card %s on screen = %v, want %v:\n%s",
+					selected, candidate.title, !shown, shown, body)
+			}
+		}
+	}
+}
+
+// The clauses: an empty column keeps its heading and says so under it, dimmed.
+// Closed says `nothing closed`, and every other column says `none`. A column
+// with cards gets no hint above them.
+func TestAnEmptyColumnKeepsItsHeadingAndShowsAHint(t *testing.T) {
+	now := time.Date(2026, 9, 4, 12, 0, 0, 0, time.UTC)
+	for _, testcase := range []struct {
+		col  column
+		hint string
+	}{
+		{colReady, "none"},
+		{colBlocked, "none"},
+		{colInProgress, "none"},
+		{colClosed, "nothing closed"},
+	} {
+		lines := strings.Split(columnBody(testcase.col, nil, -1, 28, 8, now), "\n")
+		wantHeading := fmt.Sprintf("  %-26s", columnNames[testcase.col]+" 0")
+		if got := plain(lines[0]); got != wantHeading {
+			t.Fatalf("%s: heading line = %q, want %q", columnNames[testcase.col], got, wantHeading)
+		}
+		wantHint := fmt.Sprintf("%-28s", testcase.hint)
+		if got := plain(lines[1]); got != wantHint {
+			t.Fatalf("%s: hint line = %q, want %q", columnNames[testcase.col], got, wantHint)
+		}
+		if lines[1] == plain(lines[1]) {
+			t.Fatalf("%s: hint line %q is unstyled, want it dimmed", columnNames[testcase.col], lines[1])
+		}
+	}
+
+	occupied := row{id: "k3f9x", status: model.StatusOpen, priority: 1, kind: model.TypeTask, title: "a card"}
+	lines := strings.Split(plain(columnBody(colReady, []row{occupied}, 0, 28, 8, now)), "\n")
+	if !strings.HasPrefix(lines[1], "○ P1 task k3f9x") {
+		t.Fatalf("a column with a card: line under the heading = %q, want the card", lines[1])
 	}
 }
 

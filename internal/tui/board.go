@@ -239,19 +239,38 @@ func flush(left, right string, width int) string {
 
 // heading is a column's name and count. `▸ ` marks the focused column and
 // only that one; the others get two spaces, so names line up either way.
-func heading(col column, count int, focused bool) string {
+//
+// Only while the column overflows does it add the cards on screen, 1-based:
+// ` · 39–41`. A column that fits has nothing off screen to place you in.
+// top is the first card shown and fit how many a screen holds.
+func heading(col column, count, top, fit int, focused bool) string {
 	marker := "  "
 	if focused {
 		marker = "▸ "
 	}
-	return fmt.Sprintf("%s%s %d", marker, columnNames[col], count)
+	title := fmt.Sprintf("%s%s %d", marker, columnNames[col], count)
+	if count > fit {
+		title += fmt.Sprintf(" · %d–%d", top+1, top+fit)
+	}
+	return title
+}
+
+// emptyHint is what an empty column says under its heading, so it reads as
+// empty rather than broken.
+func emptyHint(col column) string {
+	if col == colClosed {
+		return "nothing closed"
+	}
+	return "none"
 }
 
 // columnBody renders one column into exactly width × height. selected is the
 // cursor's card, or -1 in a column that is not focused.
 func columnBody(col column, cards []row, selected, width, height int, now time.Time) string {
 	focused := selected >= 0
-	title := render.Ellipsis(heading(col, len(cards), focused), width)
+	fit := cardsFit(height)
+	top := cardTop(max(selected, 0), fit)
+	title := render.Ellipsis(heading(col, len(cards), top, fit, focused), width)
 	if focused {
 		title = headStyle.Render(title)
 	} else {
@@ -259,8 +278,9 @@ func columnBody(col column, cards []row, selected, width, height int, now time.T
 	}
 	lines := []string{title}
 
-	fit := cardsFit(height)
-	top := cardTop(max(selected, 0), fit)
+	if len(cards) == 0 {
+		lines = append(lines, dimStyle.Render(render.Ellipsis(emptyHint(col), width)))
+	}
 	for index := top; index < len(cards) && index < top+fit; index++ {
 		if index > top {
 			lines = append(lines, "")

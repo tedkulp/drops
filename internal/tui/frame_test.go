@@ -12,6 +12,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+
+	"github.com/tedkulp/drops/internal/model"
 )
 
 // A frame test is REGRESSION COVER, not a control (map Notes): it fails on any
@@ -28,7 +30,12 @@ const wideRow = "| a path that goes on and on | a rate per gigabyte | a reason t
 // corpus is a fixture holding one of each thing the layout has to survive.
 func corpus(t *testing.T) *fixture {
 	t.Helper()
-	f := newFixture(t, "beacon-responsive-layout-pass-6w0g", "iss01", "iss02", "iss03", "iss04")
+	named := []model.ID{"beacon-responsive-layout-pass-6w0g", "iss01", "iss02", "iss03", "iss04"}
+	// Named, because a minted id counts from iss01 and would collide with these.
+	for index := range 12 {
+		named = append(named, model.ID(fmt.Sprintf("old%02d", index+1)))
+	}
+	f := newFixture(t, named...)
 	// P0 so it leads the queue: the pane never re-sorts, and the CLI's order
 	// is priority ascending, then newest first, then id.
 	f.issueWith("The longest open id in the corpus, cut to twelve columns on its row",
@@ -42,6 +49,13 @@ func corpus(t *testing.T) *fixture {
 	done := f.issue("A finished issue whose title is far too long for any board column", 4)
 	f.claim(done.ID, "somebody-with-a-long-name")
 	f.close(done.ID, "finished")
+	// Enough closed issues that Closed overflows at every size below, even
+	// 200x50, so the board's frames hold with a scrolled column and its range
+	// in the heading. In progress stays empty, so they hold with its hint too.
+	for index := range 12 {
+		closed := f.issue(fmt.Sprintf("Closed long ago, number %d", index+1), 4)
+		f.close(closed.ID, "finished")
+	}
 	return f
 }
 
@@ -107,6 +121,25 @@ func frameModes(t *testing.T) []struct {
 		{"board paged to Closed", func(pane *Model) {
 			press(t, pane, "B")
 			pane.key(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+		}},
+		// Closed overflows in the corpus, so G scrolls it and its heading
+		// carries the range; In progress is empty and carries a hint.
+		{"board scrolled down Closed", func(pane *Model) {
+			press(t, pane, "B")
+			pane.key(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+			press(t, pane, "G")
+			if closed, fit := len(pane.cards[colClosed]), cardsFit(pane.geo().rows); closed <= fit {
+				t.Fatalf("Closed holds %d cards and fits %d; this mode proves nothing", closed, fit)
+			}
+		}},
+		{"board on an empty column", func(pane *Model) {
+			press(t, pane, "B")
+			pressNamed(t, pane, tea.KeyTab)
+			pressNamed(t, pane, tea.KeyTab)
+			if pane.focus != colInProgress || len(pane.cards[colInProgress]) != 0 {
+				t.Fatalf("focus %s, In progress holds %d cards; this mode proves nothing",
+					columnNames[pane.focus], len(pane.cards[colInProgress]))
+			}
 		}},
 		{"board with closed included", func(pane *Model) {
 			press(t, pane, "C")

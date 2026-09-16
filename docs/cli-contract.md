@@ -923,6 +923,13 @@ card is in reverse video, and closed cards are dimmed.
 Each column's heading is `<name> <count>`. `▸ ` marks the focused column and no
 other, and the other headings are dimmed.
 
+**A column longer than the screen scrolls one card at a time**, keeping the
+cursor's card on screen; a column the cursor is not in shows from its top. Only
+while a column overflows, its heading adds the cards on screen, counted from 1
+and joined with an en dash: `Closed 300 · 39–41`. **An empty column keeps its
+heading** and says so under it, dimmed: `nothing closed` in Closed, and `none`
+in any other column.
+
 **`j` `k` `↓` `↑` `g` `G` `^d` `^u` move within the focused column** and clear
 the follow trail, as they do in the list. **`tab` and `shift+tab` move to the
 next and previous column**, wrapping round all four, and land on the card at the
