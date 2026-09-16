@@ -1,0 +1,13 @@
+/mattpocock-skills:to-spec Turn the map 'Kanban board in the TUI' (tedkulp/drops#1) into the board v1 spec. Read every closed child ticket's resolution comment, and treat the `prototype/board-look` branch as the source for the look. Also carry over the map's Notes and Out of scope, so the spec knows what not to build.
+
+---
+
+/mattpocock-skills:to-tickets
+
+---
+
+Close the map (drops#1) and link the spec to it for reference
+
+---
+
+/mattpocock-skills:ask-matt Do I run /implement on the spec? Or do I just pick off non-blocked issues one by one manually?
