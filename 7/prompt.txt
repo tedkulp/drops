@@ -1,0 +1,18 @@
+/wayfinder What would it take to add some kind of kanban board interface to the tui? I'm pretty sure bv (beads_viewer) can do it. Based on what we have so far, are all the pieces data-wise in place to do it? Or is there more to do to the core before we can add it to the tui?
+
+---
+
+/setup-matt-pocock-skills
+
+---
+
+yes
+
+---
+
+Going with all your recommendations
+
+---
+
+Q8 - b. It'll just have to have a modal or something popup to ask for the Closed message. ESC would cancel and put the card back to the previous column.
+Use the recommendations on the rest. Make a Q10 ticket.
