@@ -28,7 +28,7 @@ const wideRow = "| a path that goes on and on | a rate per gigabyte | a reason t
 // corpus is a fixture holding one of each thing the layout has to survive.
 func corpus(t *testing.T) *fixture {
 	t.Helper()
-	f := newFixture(t, "beacon-responsive-layout-pass-6w0g", "iss01", "iss02", "iss03")
+	f := newFixture(t, "beacon-responsive-layout-pass-6w0g", "iss01", "iss02", "iss03", "iss04")
 	// P0 so it leads the queue: the pane never re-sorts, and the CLI's order
 	// is priority ascending, then newest first, then id.
 	f.issueWith("The longest open id in the corpus, cut to twelve columns on its row",
@@ -37,6 +37,11 @@ func corpus(t *testing.T) *fixture {
 	blocker := f.issue("The blocker", 2)
 	f.blocks(blocked.ID, blocker.ID)
 	f.issueIn(f.other, "Another project's issue", 3)
+	// Closed and claimed, so the board's Closed column holds a card with a
+	// title to cut and a third line; the list never shows it with `C` off.
+	done := f.issue("A finished issue whose title is far too long for any board column", 4)
+	f.claim(done.ID, "somebody-with-a-long-name")
+	f.close(done.ID, "finished")
 	return f
 }
 
@@ -95,6 +100,34 @@ func frameModes(t *testing.T) []struct {
 		{"a message far wider than the frame", func(pane *Model) {
 			pane.message = strings.Repeat("a very long failure ", 20)
 		}},
+		// The board replaces the left pane with columns that page sideways,
+		// so it has to hold square at every width that shows a different
+		// number of them — one at 80, two at 120, four at 200.
+		{"board", func(pane *Model) { press(t, pane, "B") }},
+		{"board paged to Closed", func(pane *Model) {
+			press(t, pane, "B")
+			pane.key(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+		}},
+		{"board with closed included", func(pane *Model) {
+			press(t, pane, "C")
+			press(t, pane, "B")
+		}},
+		{"board picker open", func(pane *Model) {
+			press(t, pane, "B")
+			pressNamed(t, pane, tea.KeyTab)
+			press(t, pane, "f")
+			if pane.modal == nil {
+				t.Fatalf("f opened no picker on %s; this mode proves nothing", pane.detailID)
+			}
+		}},
+		{"board zoomed", func(pane *Model) {
+			press(t, pane, "B")
+			press(t, pane, "enter")
+		}},
+		{"board message up", func(pane *Model) {
+			press(t, pane, "B")
+			pane.message = strings.Repeat("a very long failure ", 20)
+		}},
 	}
 }
 
@@ -127,7 +160,7 @@ func assertSquare(t *testing.T, what, block string, width, height int) {
 func TestEveryFrameLineMeasuresTheFrameWidth(t *testing.T) {
 	fixture := corpus(t)
 
-	for _, size := range []struct{ width, height int }{{80, 24}, {120, 40}, {60, 12}, {40, 3}} {
+	for _, size := range []struct{ width, height int }{{80, 24}, {120, 40}, {200, 50}, {60, 12}, {40, 3}} {
 		for _, mode := range frameModes(t) {
 			pane := fixture.model(size.width, size.height)
 			mode.setup(pane)
@@ -144,7 +177,7 @@ func TestEveryFrameLineMeasuresTheFrameWidth(t *testing.T) {
 func TestTheComposedFrameIsSquareBeforeItIsPadded(t *testing.T) {
 	fixture := corpus(t)
 
-	for _, size := range []struct{ width, height int }{{80, 24}, {120, 40}, {60, 12}, {40, 4}} {
+	for _, size := range []struct{ width, height int }{{80, 24}, {120, 40}, {200, 50}, {60, 12}, {40, 4}} {
 		for _, mode := range frameModes(t) {
 			pane := fixture.model(size.width, size.height)
 			mode.setup(pane)
@@ -305,7 +338,7 @@ func TestAHeadlessProgramRunsTheFrameAndLeavesTheAltScreen(t *testing.T) {
 	// qy3de.2 proved a real tea.Program runs with a pipe and a buffer at a
 	// pinned size, so the interactive half needs no terminal and no fake.
 	fixture := corpus(t)
-	pane := New(fixture.core, fixture.project, "tester", fixture.editor, fixture.warnings)
+	pane := New(fixture.core, fixture.project, "tester", fixture.editor, fixture.warnings, fixture.clock.Now)
 
 	reader, writer := io.Pipe()
 	go func() {

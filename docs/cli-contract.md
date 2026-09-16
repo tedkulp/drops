@@ -680,6 +680,10 @@ terminal. **An agent should not run it**: it takes over the screen, reads keys,
 and emits no parseable output. Every question it answers has a verb above that
 answers it on stdout.
 
+The left pane has **two views**: the list, which `drops tui` always opens in,
+and the board, which `B` switches to and back from. The detail pane stays on the
+right in both. See [The board](#the-board).
+
 **It refuses to start where no project resolves, and exits 2**, which is the one
 place this verb is deliberately asymmetric with `list`, `ready` and `config
 show`. Those print `drops: no project resolves here` to stderr and exit 0
@@ -713,6 +717,8 @@ carries the **full untruncated id**, one glance away.
 | `C` | include closed issues |
 | `a` | span every project, and add the project column |
 | `r` | ready only: hide the rows with an open blocker |
+| `B` | switch the left pane between the list and the board |
+| `tab` `shift+tab` | on the board, the next or previous column, wrapping round all four |
 | `R` | re-read the store |
 | `f` | pick a relation of the right pane's issue and follow it |
 | `Backspace` | back one relation; `Esc` drops the whole trail |
@@ -878,6 +884,58 @@ cursor on the next one, so `x`-close walks the list; changing priority
 re-orders the list and the cursor rides its row to the new position. Writing to
 a **followed** issue leaves the left pane untouched.
 
+### The board
+
+`B` sets the left pane out as a board: the live issues in scope, one card each,
+in four **columns** — Ready, Blocked, In progress, Closed. Every key keeps the
+meaning it has in the list. What follows is only what differs.
+
+**A column is derived, never stored.** An `open` issue with no unfinished
+blocker is in **Ready**, and one with an unfinished blocker is in **Blocked**.
+Every `in_progress` issue is in **In progress**, blocked or not, so started work
+never looks unstarted. A `closed` issue is in **Closed**. Nothing can be put
+into Ready or Blocked; an issue lands in one by being open.
+
+Ready, Blocked and In progress are in the CLI's order, the same as the list.
+**Closed is most recently closed first**, with id breaking a tie, and it is
+**always on the board, whatever `C` says**. A tombstoned issue is never shown.
+
+**`B` reads nothing.** The board's rows are loaded with the list's, so the
+switch is instant and the rows do not change under you. It carries the cursor's
+issue, focusing the column that holds it, and it carries `/`, `a`, `r` and the
+follow trail. Going back to the list with the cursor on a card the list does
+not show (a closed one with `C` off) puts the cursor on the row that held its
+place, as any row leaving the list does, and because that moves the cursor it
+drops the follow trail. `drops tui` always opens in the list,
+and **`Esc` never leaves the board**. `b` still pages the detail pane up.
+
+**A card is three lines**, with one blank line between cards:
+
+1. the status mark, `P<n>`, the type and the id, with the **age** flush right;
+2. the title, cut with `…`;
+3. `@assignee` and `blocked by N`, joined with ` · `, each only when present.
+
+The age counts from when the issue was **created** in Ready and Blocked,
+**started** in In progress, and **closed** in Closed: `m` under an hour, `h`
+under two days, `d` under sixty days, `mo` under a year, then `y`. The focused
+card is in reverse video, and closed cards are dimmed.
+
+Each column's heading is `<name> <count>`. `▸ ` marks the focused column and no
+other, and the other headings are dimmed.
+
+**`j` `k` `↓` `↑` `g` `G` `^d` `^u` move within the focused column** and clear
+the follow trail, as they do in the list. **`tab` and `shift+tab` move to the
+next and previous column**, wrapping round all four, and land on the card at the
+same row position on screen, or the last card above it.
+
+**The board pages its columns sideways rather than squeezing them.** The detail
+pane takes 40% of the frame, never under 38 columns, and the board gets the
+rest. As many columns show as fit at 28 wide, between one and four: one at 80
+columns, two at 120, all four at 200. Columns are separated by a dim `│`. The
+focused column is always on screen, scrolled into view from whichever side it
+went off, and while fewer than four fit the border says how many are hidden on
+each side: `◀ 1 · 2 ▶`.
+
 ## Sync: the second machine
 
 `drops sync` is one cycle — pull, import, export, push — against a Git-backed
@@ -1019,6 +1077,10 @@ So a session does not mistake them for its own error:
   strings**, not of issue objects, so `.blocked_by[].id` fails with `Cannot index
   string with string`. `.blocked_by | join(", ")` and `| length` are the two useful
   forms.
+- **The board's Closed column loads with no limit.** Every closed issue in scope
+  is read on every refresh, in both views, because `B` reads nothing. At around
+  10,000 closed issues a refresh costs about 100ms. A slow `R` on a large store is
+  that cost, not a fault.
 - **Deferral is readable and not writable.** `list --deferred` filters on
   `deferred_until` and `show` prints a `deferred until` line, but no verb sets
   one: the data is preserved from the old store, and deferral in practice is done

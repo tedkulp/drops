@@ -82,6 +82,16 @@
 // core.Ready omits. Keeping the predicate local is what leaves the row set as
 // list's contract under it.
 //
+// # The board
+//
+// `B` is the left pane's second view (#7): the same row set set out in four
+// derived columns, with Closed added from core's own closed read, loaded
+// whatever `C` says. Both views are derived on every narrowing and every
+// refresh, from rows loaded together, which is what lets `B` read nothing. The
+// cursor is one cursor: its id is the issue and its position indexes whichever
+// view is up, so carrying it across is a matter of finding the column that
+// holds the id rather than copying anything.
+//
 // # Following
 //
 // `f` opens a picker over the right pane's relations and `enter` retargets the

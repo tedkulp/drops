@@ -1,5 +1,5 @@
 {
-  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14; esc's layer ordering by m3z5y. tc2x5 re-cut the redraw/retarget pair onto the two facts the pane can read — which issue is on screen, and the width it was rendered into — instead of the intent the caller passed, and split them three ways so each clause has a mutant the other two tests stay green for. g7b23 added `r`, the ready-only narrowing, and moved refresh to `R`: its controls sit on the predicate itself, on both directions of the toggle, and on each of the two paths that re-derive the visible row set — applyFilter and refresh — because a golden frame would pass whichever rows those returned. bvjgn added `y`: one control on the expression that chooses the id, because a test asserting only that some clipboard command came back passes with the cursor row's id in place of the pane's, one on the refusal an empty row set gets, and one on the LINE it reports through, because m.message would relayout both panes for a keystroke that wrote nothing and a test reading the footer alone would not notice.",
+  "note": "Live controls for internal/tui, the two-pane navigator. Golden frames are regression cover, not controls: a frame test fails on any byte diff and therefore proves nothing about a specific clause, which is this repository's dominant defect class wearing a costume. These sit on the load-bearing branches qy3de.11, qy3de.6 and qy3de.7 name — the cursor's id-tracking, the filter predicate, the truncation rule, the row set's status filter, the picker's row/line coordinate conversion, the direction of every relation heading, the modal's row-applicability logic, the editor's two refusals, the reopen prompt and the warning sink — split by branch where one clause is too coarse to mutate in one place. Seeded by qy3de.11; the follow half added by qy3de.12; the write set by qy3de.13; the poll, the stale marker and the redraw/retarget split by qy3de.14; esc's layer ordering by m3z5y. tc2x5 re-cut the redraw/retarget pair onto the two facts the pane can read — which issue is on screen, and the width it was rendered into — instead of the intent the caller passed, and split them three ways so each clause has a mutant the other two tests stay green for. g7b23 added `r`, the ready-only narrowing, and moved refresh to `R`: its controls sit on the predicate itself, on both directions of the toggle, and on each of the two paths that re-derive the visible row set — applyFilter and refresh — because a golden frame would pass whichever rows those returned. bvjgn added `y`: one control on the expression that chooses the id, because a test asserting only that some clipboard command came back passes with the cursor row's id in place of the pane's, one on the refusal an empty row set gets, and one on the LINE it reports through, because m.message would relayout both panes for a keystroke that wrote nothing and a test reading the footer alone would not notice. #14 added the board: one control per column-derivation branch, on Closed taking core's order rather than the list's, on `B` carrying the cursor's column, on `tab`'s landing row and wrap, on the column count and both scroll directions, on the age source per column, on each optional part of a card's third line, and on the heading marker both as text and as the focused column only.",
   "controls": [
     {
       "control": "the-cursor-tracks-an-id",
@@ -110,16 +110,16 @@
       "clause": "`r` stacks with `/` and survives `a` and `C`, because applyFilter re-derives the visible set through the one function that applies both (g7b23)",
       "file": "internal/tui/tui.go",
       "test": "TestReadyComposesWithTheFilterAndSurvivesAAndC",
-      "old": "\tm.clearFollow()\n\tm.rows = m.visible()",
-      "new": "\tm.clearFollow()\n\tm.rows = matching(m.all, m.filter)"
+      "old": "\tm.clearFollow()\n\tm.derive()\n\treturn m.showDetail(m.cursor.id)",
+      "new": "\tm.clearFollow()\n\tm.derive()\n\tm.rows = matching(m.all, m.filter)\n\tm.cursor.restore(m.rows)\n\treturn m.showDetail(m.cursor.id)"
     },
     {
       "control": "the-ready-narrowing-survives-a-refresh",
       "clause": "`R` and every write go through refresh, which re-derives the visible set through the same function, so a blocked issue written by somebody else does not appear on a pane told to hide exactly that (g7b23)",
       "file": "internal/tui/tui.go",
       "test": "TestReadyNarrowingSurvivesARefresh",
-      "old": "\tm.all = rows\n\tm.rows = m.visible()\n\tm.cursor.restore(m.rows)",
-      "new": "\tm.all = rows\n\tm.rows = matching(m.all, m.filter)\n\tm.cursor.restore(m.rows)"
+      "old": "\tm.all, m.closed = rows, closed\n\tm.derive()\n\tif len(m.stack) == 0 {",
+      "new": "\tm.all, m.closed = rows, closed\n\tm.derive()\n\tm.rows = matching(m.all, m.filter)\n\tm.cursor.restore(m.rows)\n\tif len(m.stack) == 0 {"
     },
     {
       "control": "ready-only-empty-state-names-the-narrowing",
@@ -286,8 +286,8 @@
       "clause": "Moving the left cursor clears the follow stack. This is the control under a key REMOVED from the design: euv2e.5's `esc clears the stack` was dropped because `j` — a key you were about to press — already does it (qy3de.6 §7, §10 control 8)",
       "file": "internal/tui/tui.go",
       "test": "TestMovingTheLeftCursorClearsTheFollowStack",
-      "old": "\tm.clearFollow()\n\tm.cursor.move(m.rows, to)",
-      "new": "\tm.cursor.move(m.rows, to)"
+      "old": "\tm.clearFollow()\n\tm.cursor.move(m.current(), to)",
+      "new": "\tm.cursor.move(m.current(), to)"
     },
     {
       "control": "a-tombstoned-issue-offers-no-actions",
@@ -390,8 +390,8 @@
       "clause": "The re-read after a write RESTORES the cursor onto its tracked id rather than holding an index, so a priority change — which re-orders the list, since `ORDER BY issues.priority` is the store's first key — carries the cursor to the row's new position instead of selecting someone else (qy3de.7 §9)",
       "file": "internal/tui/tui.go",
       "test": "TestAPriorityWriteCarriesTheCursorToTheRowsNewPosition",
-      "old": "\tm.rows = m.visible()\n\tm.cursor.restore(m.rows)\n\tif len(m.stack) == 0 {",
-      "new": "\tm.rows = m.visible()\n\tm.cursor.move(m.rows, m.cursor.position)\n\tif len(m.stack) == 0 {"
+      "old": "\tm.cursor.restore(m.current())",
+      "new": "\tm.cursor.move(m.current(), m.cursor.position)"
     },
     {
       "control": "the-message-line-costs-a-pane-row-not-the-footer",
@@ -454,8 +454,8 @@
       "clause": "A failed refresh keeps the old rows and therefore keeps their sequence state: the token read before source.rows is committed only after that read succeeds, so clearing the transient error cannot leave stale rows reporting fresh (hc6jb)",
       "file": "internal/tui/tui.go",
       "test": "TestFailedRefreshKeepsTheStaleMarker",
-      "old": "\trows, err := m.source.rows(m.ctx, m.scope)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\tm.seq, m.observed = seq, seq",
-      "new": "\trows, err := m.source.rows(m.ctx, m.scope)\n\tm.seq, m.observed = seq, seq\n\tif err != nil {\n\t\treturn nil, err\n\t}"
+      "old": "\trows, err := m.source.rows(m.ctx, m.scope)\n\tif err != nil {\n\t\treturn nil, nil, err\n\t}\n\tclosed, err",
+      "new": "\trows, err := m.source.rows(m.ctx, m.scope)\n\tm.seq, m.observed = seq, seq\n\tif err != nil {\n\t\treturn nil, nil, err\n\t}\n\tclosed, err"
     },
     {
       "control": "a-refresh-clears-the-stale-marker",
@@ -616,6 +616,230 @@
       "test": "TestCtrlCQuitsFromTheFilterPrompt",
       "old": "\tif m.typing {\n\t\tswitch key {\n\t\tcase \"ctrl+c\":\n\t\t\treturn tea.Quit\n\t\tcase \"enter\":",
       "new": "\tif m.typing {\n\t\tswitch key {\n\t\tcase \"enter\":"
+    },
+    {
+      "control": "a-closed-issue-is-in-closed",
+      "clause": "A closed issue is in the Closed column (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestTheBoardSetsEachIssueInItsDerivedColumn",
+      "old": "\tcase candidate.status == model.StatusClosed:\n",
+      "new": "\tcase false:\n"
+    },
+    {
+      "control": "in-progress-outranks-blocked",
+      "clause": "An in_progress issue is in In progress even when it is blocked: started work never looks unstarted (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestTheBoardSetsEachIssueInItsDerivedColumn",
+      "old": "\tcase candidate.status == model.StatusInProgress:\n\t\treturn colInProgress\n\tcase candidate.blockedBy > 0:\n\t\treturn colBlocked\n",
+      "new": "\tcase candidate.blockedBy > 0:\n\t\treturn colBlocked\n\tcase candidate.status == model.StatusInProgress:\n\t\treturn colInProgress\n"
+    },
+    {
+      "control": "an-open-blocked-issue-is-in-blocked",
+      "clause": "An open issue with an open blocker is in Blocked (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestTheBoardSetsEachIssueInItsDerivedColumn",
+      "old": "\tcase candidate.blockedBy > 0:\n",
+      "new": "\tcase false:\n"
+    },
+    {
+      "control": "an-open-ready-issue-is-in-ready",
+      "clause": "An open issue with no open blocker is in Ready (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestTheBoardSetsEachIssueInItsDerivedColumn",
+      "old": "\treturn colReady\n}",
+      "new": "\treturn colBlocked\n}"
+    },
+    {
+      "control": "closed-is-cores-order",
+      "clause": "The board takes Closed from core's closed read and never re-sorts it, even under `C` where the list holds the same issues in the queue's order (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestTheBoardTakesClosedInCoresOrder",
+      "old": "\t\tif candidate.status == model.StatusClosed {\n\t\t\tcontinue\n\t\t}",
+      "new": "\t\tif false {\n\t\t\tcontinue\n\t\t}"
+    },
+    {
+      "control": "b-focuses-the-cursors-column",
+      "clause": "`B` carries the cursor's issue across: the column holding it takes the focus (#14)",
+      "file": "internal/tui/tui.go",
+      "test": "TestBFocusesTheColumnHoldingTheCursorsIssue",
+      "old": "\t\t\t\tm.focus = column(index)\n",
+      "new": "\t\t\t\t_ = index\n"
+    },
+    {
+      "control": "tab-lands-on-the-nearest-row",
+      "clause": "`tab` lands on the card at the old row position on screen, clamped to the target column (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestTabLandsOnTheNearestRowPositionAndWraps",
+      "old": "offset := m.cursor.position - cardTop(m.cursor.position, fit)",
+      "new": "offset := 0 * (m.cursor.position - cardTop(m.cursor.position, fit))"
+    },
+    {
+      "control": "tab-counts-the-row-on-screen",
+      "clause": "`tab`'s row position is the row ON SCREEN, so a column scrolled down lands on the same visible row of the next one rather than the same index (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestTabCountsTheRowPositionOnScreen",
+      "old": "offset := m.cursor.position - cardTop(m.cursor.position, fit)",
+      "new": "offset := m.cursor.position - 0*cardTop(m.cursor.position, fit)"
+    },
+    {
+      "control": "tab-wraps-round-four-columns",
+      "clause": "`tab` and `shift+tab` cycle through the four columns and wrap round at both ends (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestTabLandsOnTheNearestRowPositionAndWraps",
+      "old": "column((int(m.focus) + step + columnCount) % columnCount)",
+      "new": "column(min(max(int(m.focus)+step, 0), columnCount-1))"
+    },
+    {
+      "control": "columns-shown-fit-at-28",
+      "clause": "The board shows as many columns as fit at 28 wide, between one and four: one at 80, two at 120, four at 200 (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestTheBoardPagesColumnsToKeepTheFocusedOneOnScreen",
+      "old": "(boardWidth+1)/(minColumnWidth+1)",
+      "new": "boardWidth/(minColumnWidth/2)"
+    },
+    {
+      "control": "focused-column-scrolls-in-from-the-left",
+      "clause": "A focused column off screen to the left scrolls into view (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestTheBoardPagesColumnsToKeepTheFocusedOneOnScreen",
+      "old": "\tif focused < first {\n",
+      "new": "\tif false {\n"
+    },
+    {
+      "control": "focused-column-scrolls-in-from-the-right",
+      "clause": "A focused column off screen to the right scrolls into view (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestTheBoardPagesColumnsToKeepTheFocusedOneOnScreen",
+      "old": "\tif focused >= first+shown {\n",
+      "new": "\tif false {\n"
+    },
+    {
+      "control": "in-progress-age-counts-from-started",
+      "clause": "An In progress card's age counts from when it was started, not created (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestACardIsThreeLinesByteForByte",
+      "old": "\t\tmoment = candidate.started\n",
+      "new": "\t\tmoment = candidate.created\n"
+    },
+    {
+      "control": "closed-age-counts-from-closed",
+      "clause": "A Closed card's age counts from when it was closed, not created (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestACardIsThreeLinesByteForByte",
+      "old": "\t\tmoment = candidate.closedAt\n",
+      "new": "\t\tmoment = candidate.created\n"
+    },
+    {
+      "control": "assignee-only-when-claimed",
+      "clause": "A card's `@assignee` appears only when the issue is claimed (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestACardIsThreeLinesByteForByte",
+      "old": "\tif candidate.assignee != \"\" {\n",
+      "new": "\tif true {\n"
+    },
+    {
+      "control": "blocked-by-only-when-blocked",
+      "clause": "A card's `blocked by N` appears only when the issue has an open blocker (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestACardIsThreeLinesByteForByte",
+      "old": "\tif candidate.blockedBy > 0 {\n",
+      "new": "\tif true {\n"
+    },
+    {
+      "control": "heading-marker-is-the-focus",
+      "clause": "A heading carries `▸ ` when focused and two spaces otherwise (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestAHeadingIsTheNameAndCount",
+      "old": "\tif focused {\n\t\tmarker",
+      "new": "\tif true {\n\t\tmarker"
+    },
+    {
+      "control": "only-the-focused-column-is-marked",
+      "clause": "`▸` marks only the focused column; every other heading is unmarked (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestOnlyTheFocusedColumnIsMarked",
+      "old": "\t\tif col == m.focus {\n",
+      "new": "\t\tif true {\n"
+    },
+    {
+      "control": "age-fallback-is-creation",
+      "clause": "A card whose column's moment is missing — an in_progress issue with no started_at — counts its age from creation rather than showing none (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestACardIsThreeLinesByteForByte",
+      "old": "\tif moment == nil {\n\t\treturn candidate.created",
+      "new": "\tif false {\n\t\treturn candidate.created"
+    },
+    {
+      "control": "age-minutes-end-at-an-hour",
+      "clause": "An age reads in minutes under an hour and in hours from the hour (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestAnAgeChangesUnitAtEachBoundary",
+      "old": "\tcase elapsed < time.Hour:",
+      "new": "\tcase elapsed <= time.Hour:"
+    },
+    {
+      "control": "age-hours-end-at-two-days",
+      "clause": "An age reads in hours under two days and in days from two days (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestAnAgeChangesUnitAtEachBoundary",
+      "old": "\tcase elapsed < 48*time.Hour:",
+      "new": "\tcase elapsed <= 48*time.Hour:"
+    },
+    {
+      "control": "age-days-end-at-sixty-days",
+      "clause": "An age reads in days under sixty days and in months from sixty (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestAnAgeChangesUnitAtEachBoundary",
+      "old": "\tcase elapsed < 60*day:",
+      "new": "\tcase elapsed <= 60*day:"
+    },
+    {
+      "control": "age-months-end-at-a-year",
+      "clause": "An age reads in months under a year and in years from a year (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestAnAgeChangesUnitAtEachBoundary",
+      "old": "\tcase elapsed < 365*day:",
+      "new": "\tcase elapsed <= 365*day:"
+    },
+    {
+      "control": "tab-clears-the-follow-trail",
+      "clause": "`tab` moves the cursor, so it clears the follow trail as every cursor move does (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestMovementStaysInTheFocusedColumnAndClearsTheTrail",
+      "old": "\tm.pageBoard()\n\tm.clearFollow()\n",
+      "new": "\tm.pageBoard()\n"
+    },
+    {
+      "control": "b-redraws-without-reading",
+      "clause": "`B` redraws the right pane from the view it holds rather than reading the store (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestBReadsNothingAndCarriesTheCursorFilterScopeReadyAndTrail",
+      "old": "\tif target != \"\" && target == m.detailID {",
+      "new": "\tif false {"
+    },
+    {
+      "control": "leaving-the-board-onto-another-issue-drops-the-trail",
+      "clause": "Going back to the list onto a different issue is a cursor move, so the follow trail goes and the right pane follows the cursor (#14)",
+      "file": "internal/tui/board.go",
+      "test": "TestLeavingTheBoardFromACardTheListLacksDropsTheTrail",
+      "old": "\tif m.cursor.id != carried {",
+      "new": "\tif carried == \"never an id\" {"
+    },
+    {
+      "control": "board-detail-pane-is-forty-percent",
+      "clause": "On the board the detail pane takes 40% of the frame, borders included (#14)",
+      "file": "internal/tui/layout.go",
+      "test": "TestTheBoardLeavesTheDetailPaneFortyPercentButNeverUnder38",
+      "old": "detailOuter := max(width*2/5, 38)",
+      "new": "detailOuter := max(width/2, 38)"
+    },
+    {
+      "control": "board-detail-pane-is-never-under-38",
+      "clause": "On the board the detail pane is never narrower than 38 columns, borders included (#14)",
+      "file": "internal/tui/layout.go",
+      "test": "TestTheBoardLeavesTheDetailPaneFortyPercentButNeverUnder38",
+      "old": "detailOuter := max(width*2/5, 38)",
+      "new": "detailOuter := max(width*2/5, 0)"
     }
   ]
 }

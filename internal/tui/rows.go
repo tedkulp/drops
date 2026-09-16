@@ -34,6 +34,12 @@ type row struct {
 	// blockedBy is how many OPEN blockers this issue still has. It comes
 	// from one core.OpenBlockers call per refresh, never one read per row.
 	blockedBy int
+
+	// The rest is what a board card says and a list row does not: the type,
+	// the claim, and the three moments a card's age can count from.
+	kind                       model.IssueType
+	assignee                   string
+	created, started, closedAt *model.Timestamp
 }
 
 // scope is what the row set covers: qy3de.4's `a` and `C`.
