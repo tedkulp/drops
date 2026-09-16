@@ -1,0 +1,9 @@
+/mattpocock-skills:wayfinder 1
+
+---
+
+Use the recommendations
+
+---
+
+/mattpocock-skills:ask-matt So what do we do here after I clear context? Run wayfinder on the map again? Immediately use to-spec?
