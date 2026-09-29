@@ -11,6 +11,8 @@ using.
 
 ## [Unreleased]
 
+## 0.3.0 — 2026-09-29
+
 ### Added
 
 - **A board in `drops tui`.** `B` switches the left pane between the list and a
@@ -45,6 +47,13 @@ using.
   **Wayfinding operations** section, both of which were tracker configuration
   rather than verb behaviour. `git show c56a115:docs/agents/issue-tracker.md`
   has the pre-split file.
+
+### Fixed
+
+- **`brew install` no longer warns that `postflight` is deprecated.** The
+  Homebrew cask strips the quarantine attribute with `postflight_steps`, set
+  through GoReleaser's `custom_block` because its `hooks.post.install` still
+  renders the old `postflight do` block.
 
 ## 0.2.0 — 2026-09-06
 
