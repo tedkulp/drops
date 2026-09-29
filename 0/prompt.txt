@@ -1,0 +1,5 @@
+Can we fix this yet? Warning: Calling `postflight` is deprecated! Use `postflight_steps` instead.
+Please report this issue to the tedkulp/homebrew-tap tap (not Homebrew/* repositories), or even better, submit a PR to fix it:
+  /opt/homebrew/Library/Taps/tedkulp/homebrew-tap/Casks/drops.rb:36
+
+It had something to do with a goreleaser update
