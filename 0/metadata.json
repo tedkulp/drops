@@ -1,0 +1,74 @@
+{
+  "cli_version": "0.11.3",
+  "checkpoint_id": "01M3Q040S38ERNQ5RH9V75A3YK",
+  "session_id": "84999050-ff4a-49ce-932d-de3fe83a42e4",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-29T16:31:46.833755Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CHANGELOG.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "163d8561de94",
+  "checkpoint_transcript_start": 169,
+  "transcript_lines_at_start": 169,
+  "compact_transcript_start": 27,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01Teu2bp7zHuraa2zcnyZxZn",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "drops-release"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "163d8561de94",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 134,
+        "end": 135,
+        "entry_ids": [
+          "d5b52de4-6722-45bd-96c9-cc41cacb2fb8"
+        ],
+        "tool_use_id": "toolu_01Teu2bp7zHuraa2zcnyZxZn"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01Teu2bp7zHuraa2zcnyZxZn"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: drops-release",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-29T16:31:46.821901Z",
+    "agent_lines": 9,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 9,
+    "total_lines_changed": 9,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
