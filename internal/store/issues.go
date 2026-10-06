@@ -138,16 +138,32 @@ type IssueFilter struct {
 	Limit int
 }
 
-// Issues lists matching Issues in queue order: priority first, then newest
-// first, then ID, which is the order idx_issues_project_queue is built for.
+// queueOrder is priority first, then newest first, then ID, which is the order
+// idx_issues_project_queue is built for. closedOrder is most recently closed
+// first, then ID, so two Issues closed at one instant still read in one order.
+const (
+	queueOrder  = "issues.priority, issues.created_at DESC, issues.id"
+	closedOrder = "issues.closed_at DESC, issues.id"
+)
+
+// Issues lists matching Issues in queue order.
 func (read reader) Issues(ctx context.Context, filter IssueFilter) ([]model.Issue, error) {
-	return read.issuesWhere(ctx, filter, "")
+	return read.issuesWhere(ctx, filter, queueOrder, "")
+}
+
+// ClosedIssues lists the live closed Issues in one Project, or in every Project
+// when project is nil, most recently closed first. It is a read of its own
+// rather than an order option on IssueFilter because the answer is unbounded
+// by design today and a limit is expected to arrive as one parameter here.
+func (read reader) ClosedIssues(ctx context.Context, project *model.ProjectKey) ([]model.Issue, error) {
+	filter := IssueFilter{Project: project, Statuses: []model.Status{model.StatusClosed}}
+	return read.issuesWhere(ctx, filter, closedOrder, "")
 }
 
 // issuesWhere is the one place an Issue listing is built. Search adds its match
 // predicate here rather than assembling a second query, so a filtered search and
 // a filtered list can never disagree about what a filter means.
-func (read reader) issuesWhere(ctx context.Context, filter IssueFilter, extra string, extraArgs ...any) ([]model.Issue, error) {
+func (read reader) issuesWhere(ctx context.Context, filter IssueFilter, order, extra string, extraArgs ...any) ([]model.Issue, error) {
 	predicates, args := filter.predicates()
 	if extra != "" {
 		predicates = append(predicates, extra)
@@ -158,7 +174,7 @@ func (read reader) issuesWhere(ctx context.Context, filter IssueFilter, extra st
 	if len(predicates) > 0 {
 		query += " WHERE " + strings.Join(predicates, " AND ")
 	}
-	query += " ORDER BY issues.priority, issues.created_at DESC, issues.id"
+	query += " ORDER BY " + order
 	if filter.Limit > 0 {
 		query += " LIMIT ?"
 		args = append(args, filter.Limit)

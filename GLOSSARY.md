@@ -84,6 +84,10 @@ An open issue with no blocking dependency on another issue that is itself unfini
 
 An open issue with at least one blocking dependency on an unfinished issue. Blocked and ready are complementary properties of the same open set; neither is a status an issue can be put into.
 
+## Board column
+
+One of the four groupings a board places a live issue in: Ready, Blocked, In progress, or Closed. A column is derived, never stored: an `open` issue sits in Ready or Blocked by its readiness, an `in_progress` issue sits in In progress whether or not it is blocked, and a `closed` issue sits in Closed. Because Ready and Blocked are properties rather than statuses, an issue cannot be put into either; it arrives there by being open.
+
 ## Related dependency
 
 A non-blocking association between two issues. `A related B` is undirected to a reader even though its replicated record has `from` and `to` fields: A and B each read the other under `Related`, and neither end implies origin or precedence.

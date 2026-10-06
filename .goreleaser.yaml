@@ -95,11 +95,13 @@ homebrew_casks:
       - drops
     ids:
       - default
-    hooks:
-      post:
-        # The binary is not signed or notarized, so strip the quarantine
-        # attribute Gatekeeper adds to downloaded artifacts.
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/drops"]
-          end
+    # The binary is not signed or notarized, so strip the quarantine attribute
+    # Gatekeeper adds to downloaded artifacts. Homebrew deprecated the
+    # `postflight do` block that `hooks.post.install` renders, and GoReleaser
+    # has no field for its replacement, `postflight_steps`, so it goes in raw.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{" }}staged_path{{ "}}" }}/drops"]
+        end
+      end

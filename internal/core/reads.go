@@ -37,6 +37,9 @@ func (core *Core) Issue(ctx context.Context, id model.ID) (model.Issue, error) {
 func (core *Core) Issues(ctx context.Context, filter IssueFilter) ([]model.Issue, error) {
 	return core.store.Issues(ctx, filter)
 }
+func (core *Core) ClosedIssues(ctx context.Context, project *model.ProjectKey) ([]model.Issue, error) {
+	return core.store.ClosedIssues(ctx, project)
+}
 func (core *Core) SearchIssues(ctx context.Context, query string, filter IssueFilter) ([]model.Issue, error) {
 	return core.store.SearchIssues(ctx, query, filter)
 }

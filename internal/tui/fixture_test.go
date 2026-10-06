@@ -51,6 +51,7 @@ type fixture struct {
 	other    model.Project
 	warnings chan core.Warning
 	editor   []string
+	clock    fixedClock
 }
 
 func newFixture(t *testing.T, ids ...model.ID) *fixture {
@@ -68,8 +69,8 @@ func newFixture(t *testing.T, ids ...model.ID) *fixture {
 	// buffered channel the pane drains, because under an alt screen the
 	// default stderr sink is invisible (qy3de.7 §5).
 	warnings := make(chan core.Warning, 32)
-	rules := core.New(opened, replica,
-		fixedClock{now: time.Date(2026, 9, 4, 12, 0, 0, 0, time.UTC)},
+	clock := fixedClock{now: time.Date(2026, 9, 4, 12, 0, 0, 0, time.UTC)}
+	rules := core.New(opened, replica, clock,
 		&namedIDs{values: ids},
 		func(w core.Warning) { warnings <- w })
 
@@ -83,6 +84,7 @@ func newFixture(t *testing.T, ids ...model.ID) *fixture {
 	}
 	return &fixture{
 		t: t, core: rules, opened: opened, project: project, other: other, warnings: warnings,
+		clock: clock,
 		// The default editor writes nothing and exits 0, which is the
 		// silent-abort case. A test that wants text says so with editorWrites.
 		editor: shEditor(":"),
@@ -272,7 +274,7 @@ func (f *fixture) comments(id model.ID) []model.Comment {
 // Run would have left it before the program started.
 func (f *fixture) model(width, height int) *Model {
 	f.t.Helper()
-	pane := New(f.core, f.project, "tester", f.editor, f.warnings)
+	pane := New(f.core, f.project, "tester", f.editor, f.warnings, f.clock.Now)
 	pane.ctx = f.t.Context()
 	pane.width, pane.height = width, height
 	pane.resize()

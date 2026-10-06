@@ -25,7 +25,7 @@ const (
 // borders included (qy3de.2) — get that backwards and the top edge and the
 // body differ by exactly two columns.
 type geometry struct {
-	listWidth   int // zero when the frame is zoomed to the detail pane
+	listWidth   int // the board's width on the board; zero when zoomed
 	detailWidth int
 	bodyHeight  int
 	rows        int // content rows in each pane
@@ -48,6 +48,18 @@ func measure(width, height int, zoomed bool) geometry {
 	outerLeft := int(float64(width) * split)
 	measured.listWidth = max(outerLeft-2, 1)
 	measured.detailWidth = max(width-outerLeft-2, 1)
+	return measured
+}
+
+// measureBoard lays out one frame with the board on the left (#2, variant E).
+// The detail pane yields to 40% of the frame, never under 38 columns
+// including its border, and the board gets the rest — which is what gives one
+// column at 80, two at 120 and four at 200.
+func measureBoard(width, height int) geometry {
+	measured := measure(width, height, false)
+	detailOuter := max(width*2/5, 38)
+	measured.listWidth = max(width-detailOuter-2, 1)
+	measured.detailWidth = max(width-measured.listWidth-4, 1)
 	return measured
 }
 

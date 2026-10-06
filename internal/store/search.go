@@ -22,7 +22,7 @@ func (read reader) SearchIssues(ctx context.Context, query string, filter IssueF
 	                    OR issues.id IN (SELECT issue_id FROM comments
 	                                     WHERE comments.rowid IN (SELECT rowid FROM comments_fts
 	                                                              WHERE comments_fts MATCH ?)))`
-	return read.issuesWhere(ctx, filter, predicate, match, match)
+	return read.issuesWhere(ctx, filter, queueOrder, predicate, match, match)
 }
 
 // SearchMemories lists the Memories whose title or body matches.

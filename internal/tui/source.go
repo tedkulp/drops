@@ -41,11 +41,7 @@ func (s *source) rows(ctx context.Context, sc scope) ([]row, error) {
 		}
 	}
 
-	filter := core.IssueFilter{Statuses: sc.statuses()}
-	if !sc.allProjects {
-		key := s.project.Key
-		filter.Project = &key
-	}
+	filter := core.IssueFilter{Statuses: sc.statuses(), Project: s.scoped(sc)}
 	issues, err := s.core.Issues(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -57,17 +53,57 @@ func (s *source) rows(ctx context.Context, sc scope) ([]row, error) {
 
 	rows := make([]row, 0, len(issues))
 	for _, issue := range issues {
-		rows = append(rows, row{
-			id:         issue.ID,
-			project:    s.slugs[issue.ProjectKey],
-			status:     issue.Status,
-			priority:   issue.Priority,
-			title:      issue.Title,
-			tombstoned: issue.Tombstone == model.Tombstoned,
-			blockedBy:  len(blockers[issue.ID]),
-		})
+		rows = append(rows, s.rowOf(issue, len(blockers[issue.ID])))
 	}
 	return rows, nil
+}
+
+// closed reads the board's Closed column for one scope: most recently closed
+// first, in core's order, which the pane never re-sorts. It is read whatever
+// `C` says, because the board always shows closed work, and it needs no
+// blocker map: a closed issue is terminal, so it is never keyed there.
+//
+// It is read on every row-set read, in both views, because `B` reads nothing:
+// the board has to be on hand the moment the key is pressed.
+func (s *source) closed(ctx context.Context, sc scope) ([]row, error) {
+	issues, err := s.core.ClosedIssues(ctx, s.scoped(sc))
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]row, 0, len(issues))
+	for _, issue := range issues {
+		rows = append(rows, s.rowOf(issue, 0))
+	}
+	return rows, nil
+}
+
+// scoped is the project a read is limited to: the pane's own, or none at all
+// under `a`.
+func (s *source) scoped(sc scope) *model.ProjectKey {
+	if sc.allProjects {
+		return nil
+	}
+	key := s.project.Key
+	return &key
+}
+
+// rowOf is one issue as the pane holds it, in either view.
+func (s *source) rowOf(issue model.Issue, blockedBy int) row {
+	created := issue.CreatedAt
+	return row{
+		id:         issue.ID,
+		project:    s.slugs[issue.ProjectKey],
+		status:     issue.Status,
+		priority:   issue.Priority,
+		title:      issue.Title,
+		tombstoned: issue.Tombstone == model.Tombstoned,
+		blockedBy:  blockedBy,
+		kind:       issue.Type,
+		assignee:   assigneeOf(issue),
+		created:    &created,
+		started:    issue.StartedAt,
+		closedAt:   issue.ClosedAt,
+	}
 }
 
 // issue reads one issue and every relation rendered with it, in core's own

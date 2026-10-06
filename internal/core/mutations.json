@@ -766,6 +766,51 @@
       "test": "TestAddingAnUndirectedEdgeNeverRevivesASecondLiveRow",
       "old": "\t\tif present && current.Tombstone == model.Tombstoned && reverse != nil && reverse.Tombstone == model.Live {",
       "new": "\t\tif present && current.Tombstone == model.Live && reverse != nil && reverse.Tombstone == model.Live {"
+    },
+    {
+      "control": "closed-issues-are-most-recently-closed-first",
+      "clause": "The board's closed read orders by closed_at descending in the store, so the top of Closed is what just finished (#14)",
+      "file": "internal/store/issues.go",
+      "package": "./internal/core",
+      "test": "TestClosedIssuesAreMostRecentlyClosedFirst",
+      "old": "closedOrder = \"issues.closed_at DESC, issues.id\"",
+      "new": "closedOrder = \"issues.closed_at, issues.id\""
+    },
+    {
+      "control": "closed-issues-break-a-tie-on-id",
+      "clause": "Two issues closed at the same instant read in id order, so the board's Closed column has one order and not whichever the index returns (#14)",
+      "file": "internal/store/issues.go",
+      "package": "./internal/core",
+      "test": "TestClosedIssuesBreakATieOnID",
+      "old": "closedOrder = \"issues.closed_at DESC, issues.id\"",
+      "new": "closedOrder = \"issues.closed_at DESC, issues.id DESC\""
+    },
+    {
+      "control": "closed-issues-are-scoped-to-the-project",
+      "clause": "The closed read is scoped to the named project and spans every project only when none is named, which is the board's `a` (#14)",
+      "file": "internal/store/issues.go",
+      "package": "./internal/core",
+      "test": "TestClosedIssuesAreScopedToTheProjectOrSpanTheStore",
+      "old": "filter := IssueFilter{Project: project, Statuses: []model.Status{model.StatusClosed}}",
+      "new": "filter := IssueFilter{Statuses: []model.Status{model.StatusClosed}}"
+    },
+    {
+      "control": "closed-issues-are-closed-only",
+      "clause": "The closed read returns closed issues only, never open or in_progress ones (#14)",
+      "file": "internal/store/issues.go",
+      "package": "./internal/core",
+      "test": "TestClosedIssuesLeaveOutLiveAndTombstonedIssues",
+      "old": "filter := IssueFilter{Project: project, Statuses: []model.Status{model.StatusClosed}}",
+      "new": "filter := IssueFilter{Project: project}"
+    },
+    {
+      "control": "closed-issues-leave-out-tombstoned",
+      "clause": "The closed read leaves out a tombstoned issue, so removed work never reaches the board (#14)",
+      "file": "internal/store/issues.go",
+      "package": "./internal/core",
+      "test": "TestClosedIssuesLeaveOutLiveAndTombstonedIssues",
+      "old": "filter := IssueFilter{Project: project, Statuses: []model.Status{model.StatusClosed}}",
+      "new": "filter := IssueFilter{Project: project, Statuses: []model.Status{model.StatusClosed}, IncludeTombstoned: true}"
     }
   ]
 }

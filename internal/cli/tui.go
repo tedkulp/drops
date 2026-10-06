@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -56,7 +57,7 @@ func newTUICmd(app *App) *cobra.Command {
 			// already reads it.
 			return tui.New(app.core, project, resolveAuthor(""),
 				tui.ResolveEditor(os.Getenv("VISUAL"), os.Getenv("EDITOR")),
-				app.warnings).Run(app.ctx)
+				app.warnings, time.Now).Run(app.ctx)
 		},
 	}
 	return cmd

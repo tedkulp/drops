@@ -11,6 +11,26 @@ using.
 
 ## [Unreleased]
 
+## 0.3.0 — 2026-09-29
+
+### Added
+
+- **A board in `drops tui`.** `B` switches the left pane between the list and a
+  board of the live issues in scope, set out in four derived columns: Ready,
+  Blocked, In progress and Closed. Each issue is a three-line card showing its
+  status, priority, type, id, age, title, claim and blocker count. `tab` and
+  `shift+tab` move between columns. At narrow widths the columns page sideways
+  so the focused one stays on screen. Closed is always on the board, most
+  recently closed first, from a new core read (`ClosedIssues`) that the store
+  orders by `closed_at DESC, id`. `B` reads nothing, and it keeps the cursor's
+  issue, `/`, `a`, `r` and the follow trail. See the contract's
+  [The board](docs/cli-contract.md#the-board).
+- **Long and empty board columns.** A column longer than the screen scrolls one
+  card at a time and keeps the cursor's card on screen, and while it overflows
+  its heading says which cards are showing (`Closed 300 · 39–41`). An empty
+  column keeps its heading and says `nothing closed` in Closed or `none`
+  elsewhere.
+
 ### Changed
 
 - **This repo's issues moved to GitHub Issues**, now that `tedkulp/drops` is
@@ -27,6 +47,13 @@ using.
   **Wayfinding operations** section, both of which were tracker configuration
   rather than verb behaviour. `git show c56a115:docs/agents/issue-tracker.md`
   has the pre-split file.
+
+### Fixed
+
+- **`brew install` no longer warns that `postflight` is deprecated.** The
+  Homebrew cask strips the quarantine attribute with `postflight_steps`, set
+  through GoReleaser's `custom_block` because its `hooks.post.install` still
+  renders the old `postflight do` block.
 
 ## 0.2.0 — 2026-09-06
 

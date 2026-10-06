@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -65,8 +66,14 @@ type Model struct {
 	// shape when that lands.
 	author string
 
-	all    []row // the loaded set, in the CLI's order, never re-sorted
-	rows   []row // what the local narrowing leaves
+	all  []row // the loaded set, in the CLI's order, never re-sorted
+	rows []row // what the local narrowing leaves
+	// closed is the board's Closed column as core ordered it, loaded
+	// whatever `C` says, and cards is the narrowed board, one slice per
+	// column. Both are kept current in either view, because `B` reads
+	// nothing.
+	closed []row
+	cards  [columnCount][]row
 	scope  scope
 	filter string
 	typing bool // the `/` prompt is open
@@ -76,7 +83,22 @@ type Model struct {
 	// and this is a predicate over rows already loaded, so it costs no read
 	// and cannot drop a row the pane's own modes put on screen.
 	readyOnly bool
-	cursor    cursor
+	// cursor is ONE cursor for both views: its id is the issue under it,
+	// and its position indexes the list's rows or the focused column's
+	// cards, whichever is up. So `B` carries the issue across by
+	// construction rather than by copying it.
+	cursor cursor
+
+	// board is `B`: the left pane is the board rather than the list. focus
+	// is the column the cursor is in, and first the leftmost column on
+	// screen when the width pages them.
+	board bool
+	focus column
+	first int
+
+	// now is the clock a card's age is measured against, passed in rather
+	// than read at the point of use.
+	now func() time.Time
 
 	detail     viewport.Model
 	detailID   model.ID
@@ -162,12 +184,13 @@ type Model struct {
 // sink is already a core.New parameter, so cli points it here and the pane
 // drains it after every write. Under an alt screen the sink's default — a line
 // on stderr — is invisible, which would silently discard a credential finding.
-func New(issues *core.Core, project model.Project, author string, editor []string, warnings <-chan core.Warning) *Model {
+func New(issues *core.Core, project model.Project, author string, editor []string, warnings <-chan core.Warning, now func() time.Time) *Model {
 	return &Model{
 		source:   &source{core: issues, project: project},
 		author:   author,
 		editor:   editor,
 		warnings: warnings,
+		now:      now,
 		detail:   viewport.New(),
 		// A frame is composed before the first tea.WindowSizeMsg arrives;
 		// these are the size it is composed at until one does.
@@ -199,11 +222,11 @@ func (m *Model) run(ctx context.Context, options ...tea.ProgramOption) error {
 // reload re-reads the row set for the current scope and re-points the cursor
 // and the detail pane at whatever survived.
 func (m *Model) reload() error {
-	rows, err := m.readRows()
+	rows, closed, err := m.readRows()
 	if err != nil {
 		return err
 	}
-	m.all = rows
+	m.all, m.closed = rows, closed
 	return m.applyFilter()
 }
 
@@ -214,17 +237,24 @@ func (m *Model) reload() error {
 // screen, never ahead of it. Delaying the state change until both reads succeed
 // also means a failed refresh leaves the retained row set's marker untouched.
 // See the seq field for why lagging is the safe direction.
-func (m *Model) readRows() ([]row, error) {
+//
+// The board's closed read is part of every row-set read, in either view, so
+// that `B` never has to read.
+func (m *Model) readRows() ([]row, []row, error) {
 	seq, err := m.source.seq(m.ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	rows, err := m.source.rows(m.ctx, m.scope)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	closed, err := m.source.closed(m.ctx, m.scope)
+	if err != nil {
+		return nil, nil, err
 	}
 	m.seq, m.observed = seq, seq
-	return rows, nil
+	return rows, closed, nil
 }
 
 // stale reports whether the store has moved since the row set was read. It is
@@ -256,19 +286,54 @@ func (m *Model) poll() {
 // One function rather than the expression written twice, because applyFilter
 // and refresh both need it and they must never disagree about what is on
 // screen.
-func (m *Model) visible() []row {
-	rows := m.all
+func (m *Model) visible() []row { return m.narrow(m.all) }
+
+// narrow is visible over any loaded rows, so the board's columns are cut by
+// exactly the predicate and the substring the list is.
+func (m *Model) narrow(rows []row) []row {
 	if m.readyOnly {
 		rows = ready(rows)
 	}
 	return matching(rows, m.filter)
 }
 
+// derive re-narrows both views from what is loaded and puts the cursor back
+// on whichever is up.
+func (m *Model) derive() {
+	m.rows = m.visible()
+	m.cards = m.boardCards()
+	m.place()
+}
+
+// current is the rows the cursor moves over: the list, or the focused column.
+func (m *Model) current() []row {
+	if m.board {
+		return m.cards[m.focus]
+	}
+	return m.rows
+}
+
+// place restores the cursor onto the view that is up. On the board the
+// cursor's issue can be in any column, so the column holding it takes the
+// focus first and the cursor rides its id there; the position is only the
+// fallback, exactly as it is in the list.
+func (m *Model) place() {
+	if m.board {
+		for index, cards := range m.cards {
+			if m.cursor.id != "" && slices.ContainsFunc(cards, func(candidate row) bool { return candidate.id == m.cursor.id }) {
+				m.focus = column(index)
+				break
+			}
+		}
+		m.pageBoard()
+	}
+	m.cursor.restore(m.current())
+}
+
 // applyFilter narrows the loaded set and restores the cursor onto it.
 func (m *Model) applyFilter() error {
 	m.clearFollow()
-	m.rows = m.visible()
-	m.cursor.restore(m.rows)
+	m.derive()
 	return m.showDetail(m.cursor.id)
 }
 
@@ -294,13 +359,12 @@ func (m *Model) applyFilter() error {
 // with it, and that page opens at the top like any other page the reader did
 // not scroll. showDetail decides that on identity, so nothing here has to.
 func (m *Model) refresh() error {
-	rows, err := m.readRows()
+	rows, closed, err := m.readRows()
 	if err != nil {
 		return err
 	}
-	m.all = rows
-	m.rows = m.visible()
-	m.cursor.restore(m.rows)
+	m.all, m.closed = rows, closed
+	m.derive()
 	if len(m.stack) == 0 {
 		return m.showTarget(m.cursor.id)
 	}
@@ -356,11 +420,18 @@ func (m *Model) showDetail(id model.ID) error {
 		m.detail.SetContent("")
 		return nil
 	}
-	geo := m.geo()
 	issue, err := m.source.issue(m.ctx, id)
 	if err != nil {
 		return err
 	}
+	return m.display(id, issue)
+}
+
+// display is showDetail after the read: it renders an issue the pane already
+// holds, which is what lets `B` redraw the right pane at its new width without
+// asking the store for anything.
+func (m *Model) display(id model.ID, issue core.IssueView) error {
+	geo := m.geo()
 	text, err := m.source.page(issue, geo.detailWidth)
 	if err != nil {
 		return err
@@ -391,7 +462,7 @@ func (m *Model) showDetail(id model.ID) error {
 // selectRow moves the cursor and retargets the detail pane with it.
 func (m *Model) selectRow(to int) error {
 	m.clearFollow()
-	m.cursor.move(m.rows, to)
+	m.cursor.move(m.current(), to)
 	return m.showDetail(m.cursor.id)
 }
 
@@ -460,6 +531,9 @@ func (m *Model) escape() {
 // is taken off the height HERE, once, so every caller — the viewport's own
 // resize, the picker's scroll window, ^d's half page — measures the same frame.
 func (m *Model) geo() geometry {
+	if m.board && !m.zoomed {
+		return measureBoard(m.width, m.height-m.messageLines())
+	}
 	return measure(m.width, m.height-m.messageLines(), m.zoomed)
 }
 
@@ -618,15 +692,24 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// halfPage is how far ^d and ^u move the list cursor: half the rows a pane
-// shows. Both panes get the same row budget, so it is one number.
-func (m *Model) halfPage() int { return max(m.geo().rows/2, 1) }
+// halfPage is how far ^d and ^u move the cursor: half the rows a pane shows.
+// Both panes get the same row budget, so it is one number — in the list. On
+// the board a card is several rows, so it is half the cards a column shows.
+func (m *Model) halfPage() int {
+	if m.board {
+		return max(cardsFit(m.geo().rows)/2, 1)
+	}
+	return max(m.geo().rows/2, 1)
+}
 
 // resize hands the viewport the geometry the frame will use.
 func (m *Model) resize() {
 	geo := m.geo()
 	m.detail.SetWidth(geo.detailWidth)
 	m.detail.SetHeight(m.detailRows(geo))
+	if m.board {
+		m.pageBoard()
+	}
 }
 
 // fail records what a read error does mid-session. There is nowhere to print
@@ -777,6 +860,20 @@ func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 		// it changed.
 		m.readyOnly = !m.readyOnly
 		m.fail(m.applyFilter())
+	case "B":
+		// The board is the left pane's other view. It never leaves on
+		// `Esc`: escape() has no layer for it, so a stray press backing
+		// out of a picker cannot drop you into the list.
+		m.fail(m.toggleBoard())
+	case "tab", "shift+tab":
+		// Columns are the board's; in the list there is nothing to cycle.
+		if m.board {
+			step := 1
+			if key == "shift+tab" {
+				step = -1
+			}
+			m.fail(m.switchColumn(step))
+		}
 	case "R":
 		// UNCONDITIONAL, stale or not (qy3de.14 §Q6). An override that
 		// silently declines is the thing you press twice, and making it
@@ -814,7 +911,7 @@ func (m *Model) key(pressed tea.KeyPressMsg) tea.Cmd {
 	case "g":
 		m.fail(m.selectRow(0))
 	case "G":
-		m.fail(m.selectRow(len(m.rows) - 1))
+		m.fail(m.selectRow(len(m.current()) - 1))
 	case "ctrl+d":
 		m.fail(m.selectRow(m.cursor.position + m.halfPage()))
 	case "ctrl+u":
@@ -978,7 +1075,12 @@ func (m *Model) compose() string {
 	}
 	detail := box(pad(inner, geo.detailWidth, geo.rows), geo.detailWidth, m.detailTitle())
 	body := detail
-	if !m.zoomed {
+	switch {
+	case m.zoomed:
+	case m.board:
+		body = lipgloss.JoinHorizontal(lipgloss.Top,
+			box(m.boardBody(geo.listWidth, geo.rows), geo.listWidth, m.boardTitle(geo.listWidth)), detail)
+	default:
 		list := listBody(m.rows, m.cursor.position, geo.listWidth, geo.rows,
 			m.scope.allProjects, m.emptyState())
 		body = lipgloss.JoinHorizontal(lipgloss.Top,
@@ -1036,11 +1138,18 @@ func (m *Model) widest() int {
 // `C`'s 6.3x row jump and `/`'s narrowing legible.
 func (m *Model) footer(geo geometry) string {
 	scope := m.listTitle()
-	count := fmt.Sprintf("%d issues", len(m.all))
-	if len(m.rows) != len(m.all) {
-		count = fmt.Sprintf("%d of %d", len(m.rows), len(m.all))
+	shown, loaded := len(m.rows), len(m.all)
+	if m.board {
+		shown, loaded = m.boardCount(), m.boardLoaded()
+	}
+	count := fmt.Sprintf("%d issues", loaded)
+	if shown != loaded {
+		count = fmt.Sprintf("%d of %d", shown, loaded)
 	}
 	parts := []string{scope, count}
+	if m.board {
+		parts = append(parts, "board")
+	}
 	if m.filter != "" || m.typing {
 		parts = append(parts, "/"+m.filter)
 	}
@@ -1125,6 +1234,8 @@ func helpText() string {
 		"  /                   filter on id and title",
 		"  Esc                 go back one layer — this help, the whole relation",
 		"                      trail, the filter, the zoom — and never quit",
+		"  B                   the board: Ready · Blocked · In progress · Closed",
+		"  tab shift+tab       next · previous board column",
 		"  C a                 include closed · span every project",
 		"  r                   ready only: hide the rows with an open blocker",
 		"  R                   re-read the store (the footer says `stale · R`",
