@@ -20,7 +20,7 @@ The five canonical roles, each label string equal to its name. See
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` at the root, ADRs under `docs/adr/` once there are
+Single-context: `GLOSSARY.md` at the root, ADRs under `docs/adr/` once there are
 any. See [docs/agents/domain.md](docs/agents/domain.md).
 
 ### Which skill for what

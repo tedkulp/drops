@@ -116,7 +116,7 @@ Pre-1.0: `drops tui` has landed and a good deal of cleanup comes first.
 
 Read **[AGENTS.md](AGENTS.md)** first: the gate, the test discipline every
 ticket is held to, and the tools in this environment that report success while
-failing. [CONTEXT.md](CONTEXT.md) is the glossary. `just --list` is the rest.
+failing. [GLOSSARY.md](GLOSSARY.md) is the glossary. `just --list` is the rest.
 
 Issues for this repository live in [GitHub
 Issues](https://github.com/tedkulp/drops/issues), not in the drops store this
